@@ -1,0 +1,31 @@
+diff -Nur -x '*.orig' -x '*~' rapid-photo-downloader-0.0.10/doc/rapid-photo-downloader.pod rapid-photo-downloader-0.0.10.new/doc/rapid-photo-downloader.pod
+--- rapid-photo-downloader-0.0.10/doc/rapid-photo-downloader.pod	2009-05-23 11:46:12.000000000 +0200
++++ rapid-photo-downloader-0.0.10.new/doc/rapid-photo-downloader.pod	2009-07-26 11:20:53.000000000 +0200
+@@ -22,6 +22,8 @@
+ 
+ =head1 OPTIONS
+ 
++=over
++
+ =item B<--version>
+ 
+ Displays information about the currently installed version and exits.
+@@ -42,12 +44,18 @@
+ 
+ Displays image file extensions the program recognizes and exits.
+ 
++=back
++
+ =head1 ENVIRONMENT VARIABLES
+ 
++=over
++
+ =item B<LOCALEDIR>
+ 
+ If set, overrides the system-wide directory in which translation data will be searched for.
+ 
++=back
++
+ =head1 BUGS
+ 
+ * Support for downloading directly from cameras is experimental. Not all cameras are supported.
