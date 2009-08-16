@@ -1,15 +1,15 @@
 rapid-photo-downloader (0.0.10-1~0) unstable; urgency=low
 
-  * Build for Debian
+  * Upload to Debian (Closes: #539183)
   * Change maintainer to myself
-  * Bumped Standards version to 3.8.2
+  * Bumped Standards version to 3.8.3
   * Bumped debhelper compat to 7
   * Build-depends on python-all
   * Added patch system
   * Added French translation
   * Added patch to fix POD syntax warnings
 
- -- Julien Valroff <julien@kirya.net>  Sun, 26 Jul 2009 11:22:14 +0200
+ -- Julien Valroff <julien@kirya.net>  Sun, 16 Aug 2009 08:39:34 +0200
 
 rapid-photo-downloader (0.0.10-0ubuntu1~ppa2) hardy; urgency=low
 
