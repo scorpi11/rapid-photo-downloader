@@ -85,6 +85,7 @@ TEXT = 'Text'
 FILENAME = 'Filename'
 METADATA = 'Metadata'
 SEQUENCES = 'Sequences'
+JOB_CODE = 'Job code'
 
 SEPARATOR = os.sep
 
@@ -161,7 +162,8 @@ LIST_DATE_TIME_L2 = ['YYYYMMDD', 'YYYY-MM-DD','YYMMDD', 'YY-MM-DD',
                     'MMDDYYYY', 'MMDDYY', 'MMDD', 
                     'DDMMYYYY', 'DDMMYY', 'YYYY', 'YY', 
                     'MM', 'DD', 
-                    'HHMMSS', 'HHMM']
+                    'HHMMSS', 'HHMM', 'HH-MM-SS',  'HH-MM',  'HH',  'MM',  'SS']
+                    
 
 LIST_IMAGE_DATE_TIME_L2 = LIST_DATE_TIME_L2 + [SUBSECONDS]
 
@@ -178,6 +180,8 @@ class i18TranslateMeThanks:
         _('Filename')
         _('Metadata')
         _('Sequences')
+        # Translators: for an explanation of what this means, see http://damonlynch.net/rapid/documentation/index.html#jobcode
+        _('Job code')
         _('Image date')
         _('Today')
         _('Yesterday')
@@ -275,7 +279,17 @@ class i18TranslateMeThanks:
         _('HHMMSS')
         # Translators: for an explanation of what this means, see http://damonlynch.net/rapid/documentation/index.html#renamedateandtime
         _('HHMM')
-    
+        # Translators: for an explanation of what this means, see http://damonlynch.net/rapid/documentation/index.html#renamedateandtime
+        _('HH-MM-SS')        
+        # Translators: for an explanation of what this means, see http://damonlynch.net/rapid/documentation/index.html#renamedateandtime
+        _('HH-MM') 
+        # Translators: for an explanation of what this means, see http://damonlynch.net/rapid/documentation/index.html#renamedateandtime
+        _('HH')
+        # Translators: for an explanation of what this means, see http://damonlynch.net/rapid/documentation/index.html#renamedateandtime
+        _('MM') 
+        # Translators: for an explanation of what this means, see http://damonlynch.net/rapid/documentation/index.html#renamedateandtime
+        _('SS') 
+        
 
 # Convenience values for python datetime conversion using values in 
 # LIST_DATE_TIME_L2.  Obviously the two must remain synchronized.
@@ -284,7 +298,8 @@ DATE_TIME_CONVERT = ['%Y%m%d', '%Y-%m-%d','%y%m%d', '%y-%m-%d',
                     '%m%d%Y', '%m%d%y', '%m%d',
                     '%d%m%Y', '%d%m%y', '%Y', '%y', 
                     '%m', '%d',
-                    '%H%M%S', '%H%M']
+                    '%H%M%S', '%H%M', '%H-%M-%S',  '%H-%M',  
+                    '%H',  '%M',  '%S']
                     
 
 LIST_IMAGE_NUMBER_L2 = [IMAGE_NUMBER_ALL, IMAGE_NUMBER_1, IMAGE_NUMBER_2, 
@@ -392,7 +407,7 @@ DICT_SEQUENCE_L1 = {
 
 
 LIST_IMAGE_RENAME_L0 = [DATE_TIME, TEXT, FILENAME, METADATA, 
-                        SEQUENCES]
+                        SEQUENCES,  JOB_CODE]
                         
 
 DICT_IMAGE_RENAME_L0 = {
@@ -401,16 +416,18 @@ DICT_IMAGE_RENAME_L0 = {
                     FILENAME: DICT_FILENAME_L1,
                     METADATA: DICT_METADATA_L1,
                     SEQUENCES: DICT_SEQUENCE_L1, 
+                    JOB_CODE: None, 
                     ORDER_KEY: LIST_IMAGE_RENAME_L0
                     }
 
-LIST_SUBFOLDER_L0 = [DATE_TIME, TEXT, FILENAME, METADATA, SEPARATOR]
+LIST_SUBFOLDER_L0 = [DATE_TIME, TEXT, FILENAME, METADATA, JOB_CODE,  SEPARATOR]
 
 DICT_SUBFOLDER_L0 = {
                     DATE_TIME: DICT_DATE_TIME_L1,
                     TEXT: None,
                     FILENAME: DICT_SUBFOLDER_FILENAME_L1,
                     METADATA: DICT_METADATA_L1,
+                    JOB_CODE: None, 
                     SEPARATOR: None,
                     ORDER_KEY: LIST_SUBFOLDER_L0
                    }
@@ -556,6 +573,14 @@ def upgradePreferencesToCurrent(imageRenamePrefs,  subfolderPrefs,  previousVers
     # only check image rename, for now....
     upgraded,  imageRenamePrefs = _upgradePreferencesToCurrent(imageRenamePrefs,  previousVersion)
     return (upgraded,  imageRenamePrefs , subfolderPrefs)
+ 
+
+def usesJobCode(prefs):
+    """ Returns True if the preferences contain a job code, else returns False"""
+    for i in range(0,  len(prefs),  3):
+        if prefs[i] == JOB_CODE:
+            return True
+    return False
     
 def checkPreferencesForValidity(imageRenamePrefs,  subfolderPrefs,  version=config.version):
     """Returns true if the passed in preferences are valid"""
@@ -748,6 +773,8 @@ class ImageRenamePreferences:
 
         self.fileSequenceLock = fileSequenceLock
         self.sequences = sequences
+        
+        self.job_code = ''
     
         # derived classes will have their own definitions, do not overwrite
         if not hasattr(self, "prefsDefnL0"):
@@ -771,7 +798,12 @@ class ImageRenamePreferences:
         v = ''
         
         for i in range(0,  len(self.prefList),  3):
-            s = "%s: " % self.prefList[i] 
+            if (self.prefList[i+1] or self.prefList[i+2]):
+                c = ':'
+            else: 
+                c = ''
+            s = "%s%s " % (self.prefList[i],  c) 
+            
             if self.prefList[i+1]:
                 s = "%s%s" % (s,  self.prefList[i+1])
             if self.prefList[i+2]:
@@ -781,6 +813,9 @@ class ImageRenamePreferences:
         return v
             
 
+    def setJobCode(self,  job_code):
+        self.job_code = job_code
+        
     def _getDateComponent(self):
         """
         Returns portion of new image / subfolder name based on date time
@@ -804,6 +839,23 @@ class ImageRenamePreferences:
 
         if d:
             if self.L2 <> SUBSECONDS:
+                
+                if type(d) == type('string'):
+                    # will be a string only if the date time could not be converted in the datetime type
+                    # try to massage badly formed date / times into a valid value
+                    _datetime = d.strip()
+                    # remove any weird characters at the end of the string
+                    while _datetime and not _datetime[-1].isdigit():
+                        _datetime = _datetime[:-1]
+                    _date,  _time = _datetime.split(' ')
+                    _datetime = "%s %s" % (_date.replace(":",  "-") ,  _time.replace("-",  ":"))
+                    try:
+                        d = datetime.datetime.strptime(_datetime, '%Y-%m-%d %H:%M:%S')
+                    except:
+                        v = ''
+                        problem = _('Error in date time component. Value %s appears invalid') % ''
+                        return (v,  problem)
+
                 try:
                     return (d.strftime(convertDateForStrftime(self.L2)), None)
                 except:
@@ -1011,7 +1063,7 @@ class ImageRenamePreferences:
             return self._getStoredSequenceNo()                   
         elif self.L1 == SEQUENCE_LETTER:
             return self._getSequenceLetter()
-
+            
     def _getComponent(self):
         try:
             if self.L0 == DATE_TIME:
@@ -1024,6 +1076,8 @@ class ImageRenamePreferences:
                 return self._getMetadataComponent()
             elif self.L0 == SEQUENCES:
                 return self._getSequencesComponent()
+            elif self.L0 == JOB_CODE:
+                return (self.job_code,  None)
             elif self.L0 == SEPARATOR:
                 return (os.sep, None)
         except:
@@ -1197,7 +1251,7 @@ class ImageRenamePreferences:
             widgets.append(widget1)
             widgets.append(None)
             return
-        elif key == SEPARATOR:
+        elif key in [SEPARATOR,  JOB_CODE]:
             widgets.append(None)
             widgets.append(None)
             return

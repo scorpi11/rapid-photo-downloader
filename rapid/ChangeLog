@@ -1,3 +1,55 @@
+Version 0.1.0 beta 1
+--------------------
+
+2009-11-14
+
+This code is ready for full release, but given the magnitude of changes, a beta
+seems like a good idea, simply to catch any undetected bugs.
+
+Added a "Job codes" option. Like the "text" option in image and subfolder name
+generation, this allows you to specify text that will be placed into the file
+and subfolder names. However, unlike the "text" option, which requires that the
+text be directly entered via the program preferences, when using the "Job code"
+option, the program will prompt for it each time a download begins. 
+
+Made Download button the default button. Hitting enter while the main window
+has focus will now start the download.
+
+Fixed bug #387002: added dependency in Ubuntu packages for librsvg2-common. 
+Thanks go to user hasp for this fix.
+
+Fixed bug #478620: problem with corrupted image files. Thanks go to user Katrin
+Krieger for tracking this one down.
+
+Fixed bug #479424: some camera model names do not have numbers, but it still
+makes sense to return a shortened name. Thanks go to user Wesley Harp for 
+highlighting this problem.
+
+Fixed bug #482831: program no longer crashes when auto-download is off, and a 
+device is inserted before another download has completed
+
+Added Czech translation by Tomas Novak.
+
+Added French translation by Julien Valroff, Michel Ange, and Cenwen.
+
+Added Hungarian translation by Balazs Oveges and Andras Lorincz.
+
+Added Slovak translation by Tomas Novak.
+
+Added Swedish translation by Ulf Urden and Michal Predotka.
+
+Added dependency on gnome-icon-theme in Ubuntu packages.
+
+Added additional hour, minute and second options in image renaming and subfolder
+creation. Thanks to Art Zemon for the patch.
+
+Malformed image date time exif values have are minimally checked to see if they
+can still be used for subfolder and image renaming. Some software programs seem
+to make a mess of them.
+
+Update man page, including a bug fix by Julien Valroff.
+
+
 Version 0.0.10
 --------------
 
