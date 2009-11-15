@@ -8,8 +8,9 @@ rapid-photo-downloader (0.1.0~b1-1) unstable; urgency=low
   * Removed patch to fix pod syntax: fixed upstream
   * Added VCS-* control fields
   * Fixed Build-Deps vs Build-Deps-Indep
+  * Added patch to remove empty directory from package
 
- -- Julien Valroff <julien@kirya.net>  Sun, 15 Nov 2009 09:25:41 +0100
+ -- Julien Valroff <julien@kirya.net>  Sun, 15 Nov 2009 09:42:19 +0100
 
 rapid-photo-downloader (0.0.10-1~0) unstable; urgency=low
 
