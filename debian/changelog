@@ -1,3 +1,10 @@
+rapid-photo-downloader (0.1.0~b1-2) unstable; urgency=low
+
+  * NOT RELEASED YET
+  * Switched to 3.0 (quilt) source package format
+
+ -- Julien Valroff <julien@kirya.net>  Sun, 15 Nov 2009 11:35:02 +0100
+
 rapid-photo-downloader (0.1.0~b1-1) unstable; urgency=low
 
   * New upstream beta release:
