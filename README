@@ -1,0 +1,50 @@
+Rapid Photo Downloader is written by a photographer for professional and amateur
+photographers. Released under the GNU GPL license, it is designed for use on the
+Linux Desktop. It can download photos from multiple cameras, memory cards, and
+Portable Storage Devices simultaneously. It provides many options for subfolder
+creation, image renaming and backup.
+
+It can download images directly from only from those cameras supported by
+libgphoto2, and only on recent Linux distributions (those that contain gvfs).
+This support is experimental. Some cameras do not work. If you cannot browse the 
+camera's contents in a file manager (e.g. Nautilus), the camera download will
+not work until the gvfs support is improved.
+
+If you can put your camera into PTP mode, you may find it works a lot better.
+
+Cameras that do not work when not in PTP mode as at May 2009 include the
+Canon 20D and 300D.
+
+For more information see http://damonlynch.net/rapid
+
+Please report any bug or unexepcted behaviour here:
+
+https://launchpad.net/rapid/+filebug
+
+Furthermore, please feel welcome to contribute anything to help this program
+reach more people: translations, feature suggestions, code, artwork, and
+documentation can always be improved!
+
+Installation
+============
+
+See the INSTALL file in the directory rapid.
+
+Documentation
+=============
+
+See http://damonlynch.net/rapid/documentation
+
+Running the program
+===================
+   
+Start the program from its menu entry. If you want additional output from the 
+command line, from a terminal run:
+
+rapid-photo-downloader
+
+Known Bugs
+==========
+
+See https://bugs.launchpad.net/rapid/+bugs
+

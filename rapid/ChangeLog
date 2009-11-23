@@ -1,0 +1,462 @@
+Version 0.1.0 beta 2
+--------------------
+
+2009-11-22
+
+New feature: when detection of portable storage devices is selected, the program
+will prompt you whether or not to download from each device it automatically
+detects. You can choose whether the program should remember the choice you make
+every time it runs. This fixes bug #376020.
+
+Fixed bug #484432: error in adding job codes via the preferences dialog.
+
+Fixed bug #486886: Job code prompt can appear multiple times.
+
+Updated Hungarian and French translations.
+
+
+Version 0.1.0 beta 1
+--------------------
+
+2009-11-14
+
+This code is ready for full release, but given the magnitude of changes, a beta
+seems like a good idea, simply to catch any undetected bugs.
+
+Added a "Job codes" option. Like the "text" option in image and subfolder name
+generation, this allows you to specify text that will be placed into the file
+and subfolder names. However, unlike the "text" option, which requires that the
+text be directly entered via the program preferences, when using the "Job code"
+option, the program will prompt for it each time a download begins. 
+
+Made Download button the default button. Hitting enter while the main window
+has focus will now start the download.
+
+Fixed bug #387002: added dependency in Ubuntu packages for librsvg2-common. 
+Thanks go to user hasp for this fix.
+
+Fixed bug #478620: problem with corrupted image files. Thanks go to user Katrin
+Krieger for tracking this one down.
+
+Fixed bug #479424: some camera model names do not have numbers, but it still
+makes sense to return a shortened name. Thanks go to user Wesley Harp for 
+highlighting this problem.
+
+Fixed bug #482831: program no longer crashes when auto-download is off, and a 
+device is inserted before another download has completed.
+
+Added Czech translation by Tomas Novak.
+
+Added French translation by Julien Valroff, Michel Ange, and Cenwen.
+
+Added Hungarian translation by Balazs Oveges and Andras Lorincz.
+
+Added Slovak translation by Tomas Novak.
+
+Added Swedish translation by Ulf Urden and Michal Predotka.
+
+Added dependency on gnome-icon-theme in Ubuntu packages.
+
+Added additional hour, minute and second options in image renaming and subfolder
+creation. Thanks to Art Zemon for the patch.
+
+Malformed image date time exif values have are minimally checked to see if they
+can still be used for subfolder and image renaming. Some software programs seem
+to make a mess of them.
+
+Updated man page, including a bug fix by Julien Valroff.
+
+
+Version 0.0.10
+--------------
+
+2009-06-05
+
+Updated Russian translation by Sergei Sedov.
+
+Fixed bug #383028: program would crash when using an automatically configured 
+backup device and gvfs.
+
+
+
+Version 0.0.9
+-------------
+
+2009-06-02
+
+Added Italian translation by Marco Solari and Luca Reverberi.
+
+Added German translation by Martin Egger and Daniel Passler.
+
+Added Russian translation by Sergei Sedov.
+
+Added Finnish translation by Mikko Ruohola.
+
+A Help button has been added to Preferences dialog window. Clicking it takes you
+to the documentation found online at the program's website. This documentation 
+is now complete.
+
+The Preferences Dialog Window is now navigated using a list control, as it was
+in early versions of the program. This change was necesseary because with some
+translations, the dialog window was becoming too wide with the normal tab 
+layout. Usability of the preferences dialog is improved: it will now resize 
+itself based on its content.
+
+Better integration with Nautilus is now possible through the setting of 
+MimeType=x-content/image-dcf in the program's .desktop file.
+
+
+
+Version 0.0.9 beta 4
+--------------------
+
+2009-05-26
+
+Added Spanish translation by Jose Luis Navarro and Abel O'Rian.
+
+Whenever subfolder preferences are modified in the Preferences Dialog window,
+they are now checked to see if they contain any extraneous entries. If 
+necessary, any entries like this are removed when the dialog window is closed.
+
+Bug fix: Changes in preferences should be applied to devices that have already
+been scanned, but their images not yet downloaded. This bug was introduced in 
+beta 2 when fixing bug #368098.
+
+Bug fix: check subfolder preferences for validity before beginning download. 
+While image rename preferences were checked, this check was neglected.
+
+Bug fix: do not allow automatic downloading when there is an error in the
+preferences.
+
+
+
+Version 0.0.9 beta 3
+--------------------
+
+2009-05-25
+
+Added command line options for controlling verbosity, displaying which image
+file types are recognized, and printing the program version.
+
+Updated man page to reflect recent program changes and new command line options.
+
+Prepared program for translation into other languages. Thanks go to Mark Mruss 
+and his blog http://www.learningpython.com for code examples and explanations.
+
+Polish translation by Michal Predotka. Coming soon: French, German and
+Spanish translations.
+
+To install the program using python setup.py, the program msgfmt must now be
+present. On most Linux distributions, this is found in the package gettext.
+
+Updated INSTALL file to reflect minimum version of pyexiv2 needed, and included
+information about handling any error related to msgfmt not being installed.
+
+Minor fixes to logic that checks whether the Download button should be disabled
+or not. This should now be more reliable.
+
+Bug fix: error log window can now be reopened after being closed with the "x" 
+button. Thanks go to ESR and his Python FAQ entry for this fix.
+
+Bug fix: example of subfolder name now has word wrap. Thanks go to Michal
+Predotka for reporting this.
+
+Bug fix: don't crash when a thumbnail image is missing and the 'orientation'
+variable has not yet been assigned.
+
+
+
+Version 0.0.9 beta 2
+--------------------
+
+2009-05-12
+
+By popular demand, allow direct downloading from cameras. This support is
+experimental and may not work with your camera. This is possible through the use
+of the new gvfs service, provided by GIO, that exists in recent versions of
+Linux. A recent version of Linux is a must. The camera must also be supported by
+libgphoto2 in combination with gvfs. If you cannot browse the camera's contents
+in a file manager (e.g. Nautilus), the camera download will not work until the
+gvfs support is improved.
+
+Although this is a popular request, the reality is that downloading images
+directly from the camera is often extremely slow in comparison to popping the
+memory card into a card reader and downloading from that. 
+
+Fix bug #368098: the program now starts more quickly and does not become
+unresponsive when scanning devices with a large number of images. This will
+hardly be noticeable by users that download from memory cards, but for those
+who download from hard drives with hundreds of GBs of files -- they'll notice
+a big difference.
+
+Fix bug #372284: for image renaming, the "image number" component is more 
+robust. Now, only the series of digits at the end of a filename are recognized 
+as the image number (obviously the file's extension is not included as being
+part of the filename in this case). This allows takes in account files from
+cameras like the Canon 1D series, which can have filenames like VD1D7574.CR2.
+
+Bug fix: don't download from volumes mounted while the program is already 
+running unless auto detection is specified. This bug could occur when auto
+detection was enabled, then disabled, and then a volume was mounted.
+
+
+
+Version 0.0.8
+-------------
+
+2009-05-01
+
+Added stored and downloads today sequence numbers:
+
+* The stored sequence number is remembered each time the program is run.
+
+* Downloads today tracks how many downloads are made on a given day. The time a
+  day "starts" is set via a new preference value, day start. This is useful if
+  you often photograph something late at night (e.g. concerts) and want a new
+  day to "start" at 3am, for instance.
+
+Make estimate of time remaining to download images much more accurate.
+
+Display download speed in status bar.
+
+Reorganized sequence number/letter selection in preferences.
+
+Add feature to detect change in program version, upgrading preferences where
+necessary.
+
+Only allow one instance of the program to be run -- raise existing window if it
+is run again. This is very useful when Rapid Photo Downloader is set to run
+automatically upon insertion of a memory card.
+
+Add "exit at end of successful download" automation feature.
+
+When an image's download is skipped, the thumbnail is now lightened.
+
+Show a missing image icon if the thumbnail cannot be displayed for some reason.
+(See bug #369640 for why thumbnail images from certain RAW files are not 
+displayed).
+
+Resize main window when an image device is inserted -- it now expands to show
+each device that is inserted.
+
+Do not proceed with download if there is an error in the image rename or
+download subfolder preferences. Instead, indicate a download error.
+
+Allow version 0.1.1 of pyexiv2 to be used (an older version of the library code
+that is used to get information on the images, found in distributions like 
+Ubuntu 8.04 Hardy Heron).
+
+In cases where image rename or download subfolder preferences are invalid, 
+more helpful information is printed to the console output.
+
+Bug fix: better handle automated shortening Canon names like 'Canon 5D Mark II'.
+It is now shortened to '5DMkII' instead of merely '5D'.
+
+Bug fix: reenable example of image renaming and subfolder name generation by
+using first image from the first available download device. This was
+inadvertently disabled in an earlier beta.
+
+Bug fix: make default download subfolder YYYY/YYYYMMDD again. It was
+inadvertently set to DDMMYYYY/YYYYMMDD in beta 6.
+
+Bug fix: don't change download button label to "pause" when "Start downloading
+on program startup" is set to true.
+
+Bug fix: implement code to warn / give error about missing backup devices.
+
+Bug fix: reset progress bar after completion of successful download.
+
+Fix bug #317404 when clearing completed downloads.
+
+
+
+Version 0.0.8 beta 7
+--------------------
+
+2009-04-07
+
+Added serial number metadata option for select Nikon, Canon, Olympus, Fuji, 
+Panasonic, and Kodak cameras.
+
+Added shutter count metadata option for select Nikon cameras, e.g. Nikon D300,
+D3 etc.
+
+Add owner name metadata option for select Canon cameras, e.g. 5D Mk II etc.
+
+
+Version 0.0.8 beta 6
+--------------------
+
+2009-03-31
+
+Add YYYY-MM-DD and YY-MM-DD options in date time renaming, suggested by
+Andreas F.X. Siegert and Paul Gear.
+
+Fix bug #352242 where image has no metadata.
+
+Handle images with corrupt metadata more gracefully.
+
+
+Version 0.0.8 beta 5
+--------------------
+
+2009-03-30
+
+Reduce console output.
+
+
+Version 0.0.8 beta 4
+--------------------
+
+2009-03-25
+
+Updated Ubuntu package.
+
+Version 0.0.8 beta 3
+--------------------
+
+2009-03-25
+
+Updated Ubuntu package.
+
+
+Version 0.0.8 beta 2
+--------------------
+
+2009-03-25
+
+First Ububtu package.
+
+Rename tarball package to suit package name.
+
+Updated README.
+
+Version 0.0.8 beta 1
+--------------------
+
+2009-03-20
+
+Make file renaming thread safe, fixing a long-standing (if difficult to 
+activate) bug.
+
+Implement add unique identifier when file name is not unique.
+
+Added "Report a Problem", "Get Help Online", "Make a Donation" to Help menu.
+
+Implemented "Clear completed downloads" menu item.
+
+Download images in order they were taken (checked by time they modified).
+
+Fixed bug where choosing text as the first item in a download subfolder caused a
+crash.
+
+Fixed bug where date and time choices based on when image is downloaded caused a
+crash.
+
+Initial code to show error message when image renaming preferences have an 
+error.
+
+Fixed bug where some invalid preferences were not being caught.
+
+Run default python, not one specified in env, as per recommendations in Debian
+Python Policy.
+
+Remove initial period from filename extension when generating a subfolder name 
+(or else the folder will be hidden).
+
+Check to see if metadata is essential to generate image names is now more 
+robust.
+
+Remove list control from preferences, reverting to normal tabbed preferences, 
+as the window was becoming too wide.
+
+Show notifcations via libnotify.
+
+Error and warning icons can now be clicked on to open log window.
+
+Finally, last but certainly not least--implemented sequence number and sequence
+letter generation:
+ * session sequence number
+ * sequence letter
+Coming soon:
+ * downloads today sequence number
+ * subfolder sequence number
+ * stored sequence number
+ 
+
+Version 0.0.7
+-------------
+
+2009-01-13
+
+Implemented option for automatic detection of Portal Storage Devices. 
+
+Version 0.0.6
+-------------
+
+2009-01-11
+
+Fixed extremely annoying bug where memory cards could not be unmounted.
+
+Made sample image selection for preferences more robust.
+
+Added license details to about dialog.
+
+Fix bug where image rename preferences entry boxes vertically expanded, looking 
+very ugly indeed.
+
+Wrap new filename in image rename preferences when it becomes too long.
+
+Make default download folder selection more robust.
+
+Remove sequence number and sequence letter from list of choices for image rename
+(not yet implemented).
+
+Bug #314825: fix by not calling  gnomevfs.get_local_path_from_uri() unless 
+strictly necessary.
+
+Version 0.0.5
+-------------
+
+2009-01-09
+
+Implement auto download on device insertion, and auto download on program
+startup.
+
+Increase default width of preferences dialog box.
+
+Add vertical scrollbar to image rename preferences.
+
+Fixes for bugs #313463 & #313462.
+
+Version 0.0.4
+-------------
+
+2009-01-06
+
+Bug #314284: Implement backup functionality.
+
+Bug #314285: Insert debugging code to help determine the cause of this bug.
+
+Version 0.0.3
+-------------
+
+2009-01-03
+
+Bug #313398: Fix bug where application needed to be restarted for new
+preferences to take effect.
+
+Added setup.py installer.
+
+Version 0.0.2
+-------------
+
+Dependencies:
+Pyexiv 0.1.2
+
+Updated metadata code to reflect changes in pyexiv library.
+
+Version 0.0.1
+-------------
+
+Initial release.
