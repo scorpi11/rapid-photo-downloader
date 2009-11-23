@@ -351,6 +351,8 @@ class RapidPreferences(prefs.Preferences):
         "device_autodetection": prefs.Value(prefs.BOOL, True),
         "device_location": prefs.Value(prefs.STRING, os.path.expanduser('~')), 
         "device_autodetection_psd": prefs.Value(prefs.BOOL,  False),
+        "device_whitelist": prefs.ListValue(prefs.STRING_LIST,  ['']), 
+        "device_blacklist": prefs.ListValue(prefs.STRING_LIST,  ['']), 
         "backup_images": prefs.Value(prefs.BOOL, False),
         "backup_device_autodetection": prefs.Value(prefs.BOOL, True),
         "backup_identifier": prefs.Value(prefs.STRING, 
@@ -1042,21 +1044,21 @@ class PreferencesDialog(gnomeglade.Component):
 
 
     def on_add_job_code_button_clicked(self,  button):
-        j = JobCodeDialog(self.widget,  self.prefs.job_codes,  None)
-        if j.run() == gtk.RESPONSE_OK:
-            self.add_job_code(j.get_job_code())
-        j.destroy()
+        j = JobCodeDialog(self.widget,  self.prefs.job_codes,  None, self.add_job_code,  False)       
 
-    def add_job_code(self,  job_code):
-        if job_code and job_code not in self.prefs.job_codes:
-            self.job_code_liststore.prepend((job_code,  ))
-            self.update_job_codes()
-            selection = self.job_code_treeview.get_selection()
-            selection.unselect_all()
-            selection.select_path((0, ))
-            #scroll to the top
-            adjustment = self.job_code_scrolledwindow.get_vadjustment()
-            adjustment.set_value(adjustment.lower)
+
+    def add_job_code(self,  dialog,  userChoseCode,  job_code,  autoStart):
+        dialog.destroy()
+        if userChoseCode:
+            if job_code and job_code not in self.prefs.job_codes:
+                self.job_code_liststore.prepend((job_code,  ))
+                self.update_job_codes()
+                selection = self.job_code_treeview.get_selection()
+                selection.unselect_all()
+                selection.select_path((0, ))
+                #scroll to the top
+                adjustment = self.job_code_scrolledwindow.get_vadjustment()
+                adjustment.set_value(adjustment.lower)
 
     def on_remove_job_code_button_clicked(self,  button):
         """ remove selected job codes (can be multiple selection)"""
@@ -2154,13 +2156,91 @@ class ImageHBox(gtk.HBox):
         adjustment.set_value(adjustment.upper)
 
         
+class UseDeviceDialog(gtk.Dialog):
+    def __init__(self,  parent_window,  path,  volume,  autostart, postChoiceCB):
+        gtk.Dialog.__init__(self, _('Device Detected'), None,
+                   gtk.DIALOG_MODAL | gtk.DIALOG_DESTROY_WITH_PARENT,
+                   (gtk.STOCK_NO, gtk.RESPONSE_CANCEL, 
+                   gtk.STOCK_YES, gtk.RESPONSE_OK))
+                        
+        self.postChoiceCB = postChoiceCB
+        
+        self.set_icon_from_file(paths.share_dir('glade3/rapid-photo-downloader-about.png'))
+        # Translators: for an explanation of what this means, see http://damonlynch.net/rapid/documentation/index.html#usedeviceprompt
+        prompt_label = gtk.Label(_('Should this device or partition be used to download images from?'))
+        prompt_label.set_line_wrap(True)
+        device_label = gtk.Label()
+        device_label.set_markup("<b>%s</b>" % volume.get_name(limit=0))
+        device_hbox = gtk.HBox()
+        device_hbox.pack_start(device_label, False, False)
+        path_label = gtk.Label()
+        path_label.set_markup("<i>%s</i>" % path)
+        path_hbox = gtk.HBox()
+        path_hbox.pack_start(path_label, False, False)
+        
+        icon = volume.get_icon_pixbuf(36)
+        if icon:
+            image = gtk.Image()
+            image.set_from_pixbuf(icon)
+            
+        # Translators: for an explanation of what this means, see http://damonlynch.net/rapid/documentation/index.html#usedeviceprompt
+        self.always_checkbutton = gtk.CheckButton(_('_Remember this choice'),  True)
 
+        if icon:
+            device_hbox_icon = gtk.HBox(homogeneous=False, spacing=6)
+            device_hbox_icon.pack_start(image, False, False, padding = 6)
+            device_vbox = gtk.VBox(homogeneous=True, spacing=6)
+            device_vbox.pack_start(device_hbox, False, False)
+            device_vbox.pack_start(path_hbox, False, False)
+            device_hbox_icon.pack_start(device_vbox, False, False)
+            self.vbox.pack_start(device_hbox_icon, padding = 6)
+        else:
+            self.vbox.pack_start(device_hbox, padding=6)
+            self.vbox.pack_start(path_hbox, padding = 6)
+            
+        self.vbox.pack_start(prompt_label,  padding=6)
+        self.vbox.pack_start(self.always_checkbutton,  padding=6)
+
+        self.set_border_width(6)
+        self.set_has_separator(False)   
+        
+        self.set_default_response(gtk.RESPONSE_OK)
+      
+       
+        self.set_transient_for(parent_window)
+        self.show_all()
+        self.path = path
+        self.volume = volume
+        self.autostart = autostart
+        
+        self.connect('response', self.on_response)
+        
+    def on_response(self,  device_dialog, response):
+        userSelected = False
+        permanent_choice = self.always_checkbutton.get_active()
+        if response == gtk.RESPONSE_OK:
+            userSelected = True
+            # Translators: for an explanation of what this means, see http://damonlynch.net/rapid/documentation/index.html#usedeviceprompt
+            cmd_line(_("%s selected for downloading from" % self.volume.get_name(limit=0)))
+            if permanent_choice:
+                # Translators: for an explanation of what this means, see http://damonlynch.net/rapid/documentation/index.html#usedeviceprompt
+                cmd_line(_("This device or partition will always be used to download from"))
+        else:
+            # Translators: for an explanation of what this means, see http://damonlynch.net/rapid/documentation/index.html#usedeviceprompt
+            cmd_line(_("%s rejected as a download device" % self.volume.get_name(limit=0)))
+            if permanent_choice:
+                # Translators: for an explanation of what this means, see http://damonlynch.net/rapid/documentation/index.html#usedeviceprompt
+                cmd_line(_("This device or partition will never be used to download from"))
+            
+        self.postChoiceCB(self,  userSelected,  permanent_choice,  self.path,  
+                          self.volume, self.autostart)        
 
 class JobCodeDialog(gtk.Dialog):
     """ Dialog prompting for a job code"""
     
     def __init__(self,  parent_window,  job_codes,  default_job_code,  postJobCodeEntryCB,  autoStart):
-        gtk.Dialog.__init__(self, _('Enter a Job Code'), None,
+        # Translators: for an explanation of what this means, see http://damonlynch.net/rapid/documentation/index.html#jobcode
+        gtk.Dialog.__init__(self,  _('Enter a Job Code'), None,
                    gtk.DIALOG_MODAL | gtk.DIALOG_DESTROY_WITH_PARENT,
                    (gtk.STOCK_CANCEL, gtk.RESPONSE_CANCEL, 
                    gtk.STOCK_OK, gtk.RESPONSE_OK))
@@ -2174,11 +2254,21 @@ class JobCodeDialog(gtk.Dialog):
         for text in job_codes:
             self.combobox.append_text(text)
             
-        self.job_code_hbox = gtk.HBox(False)
+        self.job_code_hbox = gtk.HBox(homogeneous = False)
+        
+        if len(job_codes):
+            # Translators: for an explanation of what this means, see http://damonlynch.net/rapid/documentation/index.html#jobcode
+            task_label = gtk.Label(_('Enter a new job code, or select a previous one.'))
+        else:
+            # Translators: for an explanation of what this means, see http://damonlynch.net/rapid/documentation/index.html#jobcode
+            task_label = gtk.Label(_('Enter a new job code.'))            
+        task_label.set_line_wrap(True)
+        task_hbox = gtk.HBox()
+        task_hbox.pack_start(task_label, False, False, padding=6)
 
         label = gtk.Label(_('Job Code:'))
-        self.job_code_hbox.pack_start(label,  padding=6)
-        self.job_code_hbox.pack_start(self.combobox,  True,  True,  padding=6)
+        self.job_code_hbox.pack_start(label, False, False, padding=6)
+        self.job_code_hbox.pack_start(self.combobox, True, True, padding=6)
         
         self.set_border_width(6)
         self.set_has_separator(False)
@@ -2200,8 +2290,9 @@ class JobCodeDialog(gtk.Dialog):
 
         if default_job_code:
             self.entry.set_text(default_job_code)
-            
-        self.vbox.pack_start(self.job_code_hbox,  padding=12)
+        
+        self.vbox.pack_start(task_hbox, False, False, padding = 6)
+        self.vbox.pack_start(self.job_code_hbox, False, False, padding=12)
         
         self.set_transient_for(parent_window)
         self.show_all()
@@ -2224,7 +2315,7 @@ class JobCodeDialog(gtk.Dialog):
             userChoseCode = True
             cmd_line(_("Job Code entered"))  
         else:
-            cmd_line(_("Job Code not entered - download to be cancelled"))
+            cmd_line(_("Job Code not entered"))
         self.postJobCodeEntryCB(self,  userChoseCode,  self.get_job_code(),  self.autoStart)
 
         
@@ -2482,12 +2573,42 @@ class RapidApp(gnomeglade.GnomeApp,  dbus.service.Object):
             self.prefs.job_codes = [code] + jcs
             
     
-      
+    def getUseDevice(self,  path,  volume, autostart):  
+        """ Prompt user whether or not to download from this device """
         
+        cmd_line(_("Prompting whether to use %s" % volume.get_name(limit=0)))
+        d = UseDeviceDialog(self.widget, path, volume, autostart, self.gotUseDevice)
+        
+    def gotUseDevice(self,  dialog,  userSelected,  permanent_choice,  path, volume, autostart):
+        """ User has chosen whether or not to use a device to download from """
+        dialog.destroy()
+        
+        if userSelected:
+            if permanent_choice and path not in self.prefs.device_whitelist:
+                # do not do a list append operation here without the assignment, or the preferences will not be updated!
+                if len(self.prefs.device_whitelist):
+                    self.prefs.device_whitelist = self.prefs.device_whitelist + [path]
+                else:
+                    self.prefs.device_whitelist = [path]
+            self.initiateScan(path, volume, autostart)
+            
+        elif permanent_choice and path not in self.prefs.device_blacklist:
+            # do not do a list append operation here without the assignment, or the preferences will not be updated!
+            if len(self.prefs.device_blacklist):
+                self.prefs.device_blacklist = self.prefs.device_blacklist + [path]
+            else:
+                self.prefs.device_blacklist = [path]
+                
     def _getJobCode(self,  postJobCodeEntryCB,  autoStart):
-        cmd_line(_("Prompting for Job Code"))
-        self.prompting_for_job_code = True
-        j = JobCodeDialog(self.widget,  self.prefs.job_codes,  self.last_chosen_job_code, postJobCodeEntryCB,  autoStart)
+        """ prompt for a job code """
+        
+
+        if not self.prompting_for_job_code:
+            cmd_line(_("Prompting for Job Code"))
+            self.prompting_for_job_code = True
+            j = JobCodeDialog(self.widget,  self.prefs.job_codes,  self.last_chosen_job_code, postJobCodeEntryCB,  autoStart)
+        else:
+            cmd_line(_("Already prompting for Job Code, do not prompt again"))
         
     def getJobCode(self,  autoStart=True):
         """ called from the copyphotos thread"""
@@ -2669,30 +2790,42 @@ class RapidApp(gnomeglade.GnomeApp,  dbus.service.Object):
         if self.usingVolumeMonitor():
             volume = Volume(mount)
             path = volume.get_path()
-            if not self.isGProxyShadowMount(mount):
-                self._printDetectedDevice(volume.get_name(limit=0),  path)
-                
-                isBackupVolume = self.checkIfBackupVolume(path)
-                            
-                if isBackupVolume:
-                    backupPath = os.path.join(path,  self.prefs.backup_identifier)
-                    if path not in self.backupVolumes:
-                        self.backupVolumes[backupPath] = volume
-                        self.rapid_statusbar.push(self.statusbar_context_id, self.displayBackupVolumes())
-
-                elif media.isImageMedia(path) or self.searchForPsd():
-                    cardMedia = CardMedia(path, volume,  True)
-                    i = workers.getNextThread_id()
+             
+            if path in self.prefs.device_blacklist and self.searchForPsd():
+                cmd_line(_("Device %(device)s (%(path)s) ignored") % {
+                            'device': volume.get_name(limit=0), 'path': path})
+            else:
+                if not self.isGProxyShadowMount(mount):
+                    self._printDetectedDevice(volume.get_name(limit=0),  path)
                     
-                    self._printAutoStart(self.prefs.auto_download_upon_device_insertion)
-                    
-                    workers.append(CopyPhotos(i, self, self.fileRenameLock, self.fileSequenceLock, self.statsLock, 
-                                                                self.downloadStats,  self.prefs.auto_download_upon_device_insertion, 
-                                                                cardMedia))
+                    isBackupVolume = self.checkIfBackupVolume(path)
+                                
+                    if isBackupVolume:
+                        backupPath = os.path.join(path,  self.prefs.backup_identifier)
+                        if path not in self.backupVolumes:
+                            self.backupVolumes[backupPath] = volume
+                            self.rapid_statusbar.push(self.statusbar_context_id, self.displayBackupVolumes())
+
+                    elif media.isImageMedia(path) or self.searchForPsd():
+                        if self.searchForPsd() and path not in self.prefs.device_whitelist:
+                            # prompt user if device should be used or not
+                            self.getUseDevice(path,  volume, self.prefs.auto_download_upon_device_insertion)
+                        else:   
+                            self._printAutoStart(self.prefs.auto_download_upon_device_insertion)                   
+                            self.initiateScan(path, volume, self.prefs.auto_download_upon_device_insertion)
+                             
+    def initiateScan(self, path, volume, autostart):
+        """ initiates scan of image device"""
+        cardMedia = CardMedia(path, volume,  True)
+        i = workers.getNextThread_id()
+        
+        workers.append(CopyPhotos(i, self, self.fileRenameLock, self.fileSequenceLock, self.statsLock, 
+                                                    self.downloadStats, autostart, 
+                                                    cardMedia))
 
 
-                    self.setDownloadButtonSensitivity()
-                    self.startScan()
+        self.setDownloadButtonSensitivity()
+        self.startScan()
 
         
     def on_volume_unmounted(self, monitor, volume):
@@ -2777,7 +2910,7 @@ class RapidApp(gnomeglade.GnomeApp,  dbus.service.Object):
         
     def setupAvailableImageAndBackupMedia(self,  onStartup,  onPreferenceChange,  doNotAllowAutoStart):
         """
-        Creates a list of CardMedia
+        Sets up volumes for downloading from and backing up to
         
         onStartup should be True if the program is still starting, i.e. this is being called from the 
         program's initialization.
@@ -2791,7 +2924,7 @@ class RapidApp(gnomeglade.GnomeApp,  dbus.service.Object):
         
         self.clearNotStartedDownloads()
         
-        cardMediaList = []
+        volumeList = []
         self.backupVolumes = {}
         
         if not workers.noDownloadingWorkers():
@@ -2807,14 +2940,19 @@ class RapidApp(gnomeglade.GnomeApp,  dbus.service.Object):
                 path = volume.get_path(avoid_gnomeVFS_bug = True)
 
                 if path:
-                    if not self.isGProxyShadowMount(v):
-                        self._printDetectedDevice(volume.get_name(limit=0), path)
-                        isBackupVolume = self.checkIfBackupVolume(path)
-                        if isBackupVolume:
-                            backupPath = os.path.join(path,  self.prefs.backup_identifier)
-                            self.backupVolumes[backupPath] = volume
-                        elif self.prefs.device_autodetection and (media.isImageMedia(path) or self.searchForPsd()):
-                            cardMediaList.append(CardMedia(path, volume, True))
+                    if path in self.prefs.device_blacklist and self.searchForPsd():
+                        cmd_line(_("Device %(device)s (%(path)s) ignored") % {
+                                    'device': volume.get_name(limit=0), 
+                                    'path': path})
+                    else:
+                        if not self.isGProxyShadowMount(v):
+                            self._printDetectedDevice(volume.get_name(limit=0), path)
+                            isBackupVolume = self.checkIfBackupVolume(path)
+                            if isBackupVolume:
+                                backupPath = os.path.join(path,  self.prefs.backup_identifier)
+                                self.backupVolumes[backupPath] = volume
+                            elif self.prefs.device_autodetection and (media.isImageMedia(path) or self.searchForPsd()):
+                                volumeList.append((path, volume))
                         
         
         if not self.prefs.device_autodetection:
@@ -2822,8 +2960,7 @@ class RapidApp(gnomeglade.GnomeApp,  dbus.service.Object):
             path = self.prefs.device_location
             if path:
                 cmd_line(_("Using manually specified path") + " %s" %  path)
-                cardMedia = CardMedia(path,  None,  True)
-                cardMediaList.append(cardMedia)
+                volumeList.append((path,  None))
                     
         if self.prefs.backup_images:
             if not self.prefs.backup_device_autodetection:
@@ -2837,7 +2974,6 @@ class RapidApp(gnomeglade.GnomeApp,  dbus.service.Object):
             self.rapid_statusbar.push(self.statusbar_context_id, '')
         
         # add each memory card / other device to the list of threads
-        j = workers.getNextThread_id()
         
         if doNotAllowAutoStart:
             autoStart = False
@@ -2846,14 +2982,13 @@ class RapidApp(gnomeglade.GnomeApp,  dbus.service.Object):
         
         self._printAutoStart(autoStart)
 
-        for i in range(j, j + len(cardMediaList)):
-            cardMedia = cardMediaList[i - j]
-            workers.append(CopyPhotos(i, self, self.fileRenameLock, self.fileSequenceLock, self.statsLock, 
-                                                        self.downloadStats, autoStart, cardMedia))
-            
-        
-        self.setDownloadButtonSensitivity()
-        self.startScan()
+        for i in range(len(volumeList)):
+            path, volume = volumeList[i]
+            if self.searchForPsd() and path not in self.prefs.device_whitelist:
+                # prompt user to see if device should be used or not
+                self.getUseDevice(path, volume, autoStart)
+            else:
+                self.initiateScan(path, volume, autoStart)
         
     def _setupDownloadbutton(self):
     
@@ -3224,6 +3359,29 @@ class Volume:
                 path = gnomevfs.get_local_path_from_uri(uri)
         return path
         
+        
+    def get_icon_pixbuf(self, size):
+        """ returns icon for the volume, or None if not available"""
+        
+        icontheme = gtk.icon_theme_get_default()        
+
+        if using_gio:
+            gicon = self.volume.get_icon()
+            f = None
+            if isinstance(gicon, gio.ThemedIcon):
+                iconinfo = icontheme.choose_icon(gicon.get_names(), size, gtk.ICON_LOOKUP_USE_BUILTIN)
+                f = iconinfo.get_filename()
+                try:
+                    v = gtk.gdk.pixbuf_new_from_file_at_size(f, size, size)
+                except:
+                    f = None                
+            if not f:
+                v = icontheme.load_icon('gtk-harddisk', size, gtk.ICON_LOOKUP_USE_BUILTIN)
+        else:
+            gicon = self.volume.get_icon()
+            v = icontheme.load_icon(gicon, size, gtk.ICON_LOOKUP_USE_BUILTIN)
+        return v
+            
     def unmount(self,  callback):
         self.volume.unmount(callback)
 
