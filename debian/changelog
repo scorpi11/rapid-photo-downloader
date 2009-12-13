@@ -1,4 +1,4 @@
-rapid-photo-downloader (0.1.0~b2-2) unstable; urgency=low
+rapid-photo-downloader (0.1.0-1) unstable; urgency=low
 
   * New upstream release
   * Replaced perl build-dep by gettext
