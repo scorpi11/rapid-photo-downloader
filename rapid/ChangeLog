@@ -1,3 +1,23 @@
+Version 0.1.0
+-------------
+
+2009-12-07
+
+Added icons to notification messages.
+
+Updated Czech, French, German, Hungarian, Polish, Russian, Slovak, Spanish and
+Swedish translations.
+
+Bug fix: properly handle devices being unmounted, fixing a bug introduced in
+Version 0.0.9 beta 2.
+
+Bug fix: When program preferences are changed, image and backup devices are now 
+refreshed only when the preferences dialog window is closed.
+
+Bug fix: Minutes component of image and folder renaming had the same code as 
+months.
+
+
 Version 0.1.0 beta 2
 --------------------
 

@@ -656,6 +656,10 @@ class PreferencesDialog(gnomeglade.Component):
         
         self.widget.set_transient_for(parentApp.widget)
         self.prefs = parentApp.prefs
+        
+        parentApp.preferencesDialogDisplayed = True
+        
+        self.parentApp = parentApp
 
         self._setupTabSelector()
         
@@ -1041,10 +1045,14 @@ class PreferencesDialog(gnomeglade.Component):
                     self.prefs.subfolder = self.prefs.get_default("subfolder")
                     
             self.widget.destroy()
+            self.parentApp.preferencesDialogDisplayed = False
+            self.parentApp.postPreferenceChange()
+            
+
 
 
     def on_add_job_code_button_clicked(self,  button):
-        j = JobCodeDialog(self.widget,  self.prefs.job_codes,  None, self.add_job_code,  False)       
+        j = JobCodeDialog(self.widget,  self.prefs.job_codes,  None, self.add_job_code,  False, True)       
 
 
     def add_job_code(self,  dialog,  userChoseCode,  job_code,  autoStart):
@@ -1749,6 +1757,13 @@ class CopyPhotos(Thread):
                 message = "%s\n%s " % (message,  self.noErrors) + _("errors")
                 
             n = pynotify.Notification(notificationName,  message)
+            
+            if self.cardMedia.volume:
+                icon = self.cardMedia.volume.get_icon_pixbuf(self.parentApp.notification_icon_size)
+            else:
+                icon = self.parentApp.application_icon
+            
+            n.set_icon_from_pixbuf(icon)
             n.show()            
         
 
@@ -1977,7 +1992,7 @@ class CopyPhotos(Thread):
 
     def on_volume_unmount(self,  data1,  data2):
         """ needed for call to unmount volume"""
-        pass
+        pass 
 
 
 class MediaTreeView(gtk.TreeView):
@@ -2169,6 +2184,8 @@ class UseDeviceDialog(gtk.Dialog):
         # Translators: for an explanation of what this means, see http://damonlynch.net/rapid/documentation/index.html#usedeviceprompt
         prompt_label = gtk.Label(_('Should this device or partition be used to download images from?'))
         prompt_label.set_line_wrap(True)
+        prompt_hbox = gtk.HBox()
+        prompt_hbox.pack_start(prompt_label, False, False, padding=6)
         device_label = gtk.Label()
         device_label.set_markup("<b>%s</b>" % volume.get_name(limit=0))
         device_hbox = gtk.HBox()
@@ -2198,7 +2215,7 @@ class UseDeviceDialog(gtk.Dialog):
             self.vbox.pack_start(device_hbox, padding=6)
             self.vbox.pack_start(path_hbox, padding = 6)
             
-        self.vbox.pack_start(prompt_label,  padding=6)
+        self.vbox.pack_start(prompt_hbox, padding=6)
         self.vbox.pack_start(self.always_checkbutton,  padding=6)
 
         self.set_border_width(6)
@@ -2238,7 +2255,7 @@ class UseDeviceDialog(gtk.Dialog):
 class JobCodeDialog(gtk.Dialog):
     """ Dialog prompting for a job code"""
     
-    def __init__(self,  parent_window,  job_codes,  default_job_code,  postJobCodeEntryCB,  autoStart):
+    def __init__(self,  parent_window,  job_codes,  default_job_code,  postJobCodeEntryCB,  autoStart, entryOnly):
         # Translators: for an explanation of what this means, see http://damonlynch.net/rapid/documentation/index.html#jobcode
         gtk.Dialog.__init__(self,  _('Enter a Job Code'), None,
                    gtk.DIALOG_MODAL | gtk.DIALOG_DESTROY_WITH_PARENT,
@@ -2256,7 +2273,7 @@ class JobCodeDialog(gtk.Dialog):
             
         self.job_code_hbox = gtk.HBox(homogeneous = False)
         
-        if len(job_codes):
+        if len(job_codes) and not entryOnly:
             # Translators: for an explanation of what this means, see http://damonlynch.net/rapid/documentation/index.html#jobcode
             task_label = gtk.Label(_('Enter a new job code, or select a previous one.'))
         else:
@@ -2463,7 +2480,14 @@ class RapidApp(gnomeglade.GnomeApp,  dbus.service.Object):
         if self.usingVolumeMonitor():
             self.startVolumeMonitor()
         
-       
+        # flag to indicate whether the user changed some preferences that 
+        # indicate the image and backup devices should be setup again
+        self.rerunSetupAvailableImageAndBackupMedia = False
+        
+        # flag to indicate that the preferences dialog window is being 
+        # displayed to the user
+        self.preferencesDialogDisplayed = False
+        
         # set up tree view display to display image devices and download status
         media_collection_treeview = MediaTreeView(self)        
 
@@ -2606,7 +2630,7 @@ class RapidApp(gnomeglade.GnomeApp,  dbus.service.Object):
         if not self.prompting_for_job_code:
             cmd_line(_("Prompting for Job Code"))
             self.prompting_for_job_code = True
-            j = JobCodeDialog(self.widget,  self.prefs.job_codes,  self.last_chosen_job_code, postJobCodeEntryCB,  autoStart)
+            j = JobCodeDialog(self.widget,  self.prefs.job_codes,  self.last_chosen_job_code, postJobCodeEntryCB,  autoStart, False)
         else:
             cmd_line(_("Already prompting for Job Code, do not prompt again"))
         
@@ -2713,6 +2737,16 @@ class RapidApp(gnomeglade.GnomeApp,  dbus.service.Object):
             capabilities[cap] = True
 
         info = pynotify.get_server_info()
+        
+        if info['name'] == 'Notification Daemon':
+            self.notification_icon_size = 48
+        else:
+            self.notification_icon_size = 128
+            
+        self.application_icon = gtk.gdk.pixbuf_new_from_file_at_size(
+                paths.share_dir('glade3/rapid-photo-downloader-about.png'),
+                self.notification_icon_size,  self.notification_icon_size)
+        
     
     def usingVolumeMonitor(self):
         """
@@ -2833,8 +2867,9 @@ class RapidApp(gnomeglade.GnomeApp,  dbus.service.Object):
         callback run when gnomevfs indicates a volume
         has been unmounted
         """
-        volume = Volume(volume)
-        path = volume.get_path()
+        
+        v = Volume(volume)
+        path = v.get_path()
 
         # four scenarios -
         # volume is waiting to be scanned
@@ -2844,15 +2879,18 @@ class RapidApp(gnomeglade.GnomeApp,  dbus.service.Object):
         
         if path:
             # first scenario
+
             for w in workers.getReadyToStartWorkers():
-                if w.cardMedia.volume == volume:
-                    media_collection_treeview.removeCard(w.thread_id)
-                    workers.disableWorker(w.thread_id)
+                if w.cardMedia.volume:
+                    if w.cardMedia.volume.volume == volume:
+                        media_collection_treeview.removeCard(w.thread_id)
+                        workers.disableWorker(w.thread_id)
             # second scenario
             for w in workers.getReadyToDownloadWorkers():
-                if w.cardMedia.volume == volume:
-                    media_collection_treeview.removeCard(w.thread_id)
-                    workers.disableWorker(w.thread_id)
+                if w.cardMedia.volume:                
+                    if w.cardMedia.volume.volume == volume:
+                        media_collection_treeview.removeCard(w.thread_id)
+                        workers.disableWorker(w.thread_id)
                     
             # fourth scenario - nothing to do
                     
@@ -2861,7 +2899,9 @@ class RapidApp(gnomeglade.GnomeApp,  dbus.service.Object):
             if backupPath in self.backupVolumes:
                 del self.backupVolumes[backupPath]
                 self.rapid_statusbar.push(self.statusbar_context_id, self.displayBackupVolumes())
-
+                
+            # may need to disable download button
+            self.setDownloadButtonSensitivity()
         
     
     def clearCompletedDownloads(self):
@@ -3135,6 +3175,7 @@ class RapidApp(gnomeglade.GnomeApp,  dbus.service.Object):
                 if self.downloadStats.noErrors:
                     message = "%s\n%s " % (message,  self.downloadStats.noErrors) +_("errors")
                 n = pynotify.Notification(PROGRAM_NAME,  message)
+                n.set_icon_from_pixbuf(self.application_icon)
                 n.show()
                 self.displayDownloadSummaryNotification = False # don't show it again unless needed
                 self.downloadStats.clear()
@@ -3289,7 +3330,20 @@ class RapidApp(gnomeglade.GnomeApp,  dbus.service.Object):
         elif key == 'show_log_dialog':
             self.menu_log_window.set_active(value)
         elif key in ['device_autodetection', 'device_autodetection_psd', 'backup_images',  'device_location',
-                      'backup_device_autodetection', 'backup_location' ]:
+                      'backup_device_autodetection', 'backup_location' ]:              
+            self.rerunSetupAvailableImageAndBackupMedia = True
+            if not self.preferencesDialogDisplayed:
+                self.postPreferenceChange()
+
+        elif key in ['subfolder',  'image_rename']:
+            global need_job_code
+            need_job_code = self.needJobCode()
+            
+    def postPreferenceChange(self):
+        """
+        Handle changes in program preferences after the preferences dialog window has been closed
+        """
+        if self.rerunSetupAvailableImageAndBackupMedia:
             if self.usingVolumeMonitor():
                 self.startVolumeMonitor()
             cmd_line("\n" + _("Preferences were changed."))
@@ -3298,9 +3352,8 @@ class RapidApp(gnomeglade.GnomeApp,  dbus.service.Object):
             if is_beta and verbose:
                 print "Current worker status:"
                 workers.printWorkerStatus()
-        elif key in ['subfolder',  'image_rename']:
-            global need_job_code
-            need_job_code = self.needJobCode()
+                
+            self.rerunSetupAvailableImageAndBackupMedia = False
 
 
  
