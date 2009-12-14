@@ -3,7 +3,7 @@ Section: graphics
 Priority: optional
 Maintainer: Julien Valroff <julien@kirya.net>
 Build-Depends: debhelper (>= 7.0.50~),
-               python-all
+               python-dev
 Build-Depends-Indep: python-support (>= 0.90),
                      gettext
 Standards-Version: 3.8.3
