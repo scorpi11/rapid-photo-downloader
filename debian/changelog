@@ -1,3 +1,12 @@
+rapid-photo-downloader (0.1.0+bzr20100101-1) unstable; urgency=low
+
+  * Current development snapshot:
+    + update translations
+    + keyboard accelerators for menu items
+    + add auto delete feature
+
+ -- Julien Valroff <julien@kirya.net>  Fri, 01 Jan 2010 13:22:08 +0100
+
 rapid-photo-downloader (0.1.0-2) unstable; urgency=low
 
   * Switch to dh and python-support from cdbs and python-central
