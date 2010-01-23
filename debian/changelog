@@ -1,3 +1,9 @@
+rapid-photo-downloader (0.1.3-1) unstable; urgency=low
+
+  * New Upstream bugfix release
+
+ -- Julien Valroff <julien@kirya.net>  Sat, 23 Jan 2010 10:19:40 +0100
+
 rapid-photo-downloader (0.1.2-1) unstable; urgency=low
 
   * New Upstream Version:
