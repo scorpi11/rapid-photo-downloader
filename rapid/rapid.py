@@ -27,6 +27,7 @@ import time
 import datetime
 import atexit
 import tempfile
+import types
 import webbrowser
 import operator
 
@@ -46,6 +47,7 @@ import pango
 try:
     import gio
     using_gio = True
+    import gobject
 except ImportError:
     import gnomevfs
     using_gio = False
@@ -68,12 +70,14 @@ import common
 import misc
 import higdefaults as hd
 
-from media import getDefaultPhotoLocation
+from media import getDefaultPhotoLocation, getDefaultVideoLocation
 from media import CardMedia
 
 import media
 
 import metadata
+import videometadata
+from videometadata import DOWNLOAD_VIDEO
 
 import renamesubfolderprefs as rn 
 
@@ -98,6 +102,8 @@ _ = Configi18n._
 
 #Translators: if neccessary, for guidance in how to translate this program, you may see http://damonlynch.net/translate.html 
 PROGRAM_NAME = _('Rapid Photo Downloader')
+
+MAX_THUMBNAIL_SIZE = 100
 
 def today():
     return datetime.date.today().strftime('%Y-%m-%d')
@@ -125,6 +131,7 @@ def updateDisplay(display_queue):
     except tube.EOInformation:
         for w in workers.getStartedWorkers():
             w.join()
+
         gtk.main_quit()
         
         return False
@@ -144,7 +151,7 @@ class Queue(tube.Tube):
 #   this is ugly but I don't know a better way :(
 
 display_queue = Queue()
-media_collection_treeview = image_hbox = log_dialog = None
+media_collection_treeview = thumbnail_hbox = log_dialog = None
 
 job_code = None
 need_job_code = False
@@ -344,10 +351,16 @@ workers = ThreadManager()
 class RapidPreferences(prefs.Preferences):
     defaults = {
         "program_version": prefs.Value(prefs.STRING, ""),
-        "download_folder":  prefs.Value(prefs.STRING, 
+        "download_folder": prefs.Value(prefs.STRING, 
                                         getDefaultPhotoLocation()),
+        "video_download_folder": prefs.Value(prefs.STRING, 
+                                        getDefaultVideoLocation()),                                        
         "subfolder": prefs.ListValue(prefs.STRING_LIST, rn.DEFAULT_SUBFOLDER_PREFS),
+        "video_subfolder": prefs.ListValue(prefs.STRING_LIST, rn.DEFAULT_VIDEO_SUBFOLDER_PREFS),
         "image_rename": prefs.ListValue(prefs.STRING_LIST, [rn.FILENAME, 
+                                        rn.NAME_EXTENSION,
+                                        rn.ORIGINAL_CASE]),
+        "video_rename": prefs.ListValue(prefs.STRING_LIST, [rn.FILENAME, 
                                         rn.NAME_EXTENSION,
                                         rn.ORIGINAL_CASE]),
         "device_autodetection": prefs.Value(prefs.BOOL, True),
@@ -359,6 +372,8 @@ class RapidPreferences(prefs.Preferences):
         "backup_device_autodetection": prefs.Value(prefs.BOOL, True),
         "backup_identifier": prefs.Value(prefs.STRING, 
                                         config.DEFAULT_BACKUP_LOCATION),
+        "video_backup_identifier": prefs.Value(prefs.STRING, 
+                                        config.DEFAULT_VIDEO_BACKUP_LOCATION),                                        
         "backup_location": prefs.Value(prefs.STRING, os.path.expanduser('~')),
         "strip_characters": prefs.Value(prefs.BOOL, True),
         "auto_download_at_startup": prefs.Value(prefs.BOOL, False),
@@ -458,26 +473,45 @@ class RapidPreferences(prefs.Preferences):
         else:
             return ''
             
+    def reset(self):
+        """
+        resets all preferences to default values
+        """
+        
+        prefs.Preferences.reset(self)
+        self.program_version = __version__
+            
 class ImageRenameTable(tpm.TablePlusMinus):
 
-    def __init__(self, parentApp,  adjustScrollWindow):
+    def __init__(self, parentApp, adjustScrollWindow):
   
         tpm.TablePlusMinus.__init__(self, 1, 3)
         self.parentApp = parentApp
         self.adjustScrollWindow = adjustScrollWindow
+        if not hasattr(self, "errorTitle"):
+            self.errorTitle = _("Error in Photo Rename preferences")
+                    
+        self.table_type = self.errorTitle[len("Error in "):]
+        self.i = 0
+
         if adjustScrollWindow:
+            self.scrollBar = self.adjustScrollWindow.get_vscrollbar()
+            #this next line does not work on early versions of pygtk :(
+            self.scrollBar.connect('visibility-notify-event', self.scrollbar_visibility_change)
             self.connect("size-request", self.size_adjustment)
             self.connect("add",  self.size_adjustment)
-            self.tableWidth = self.allocation.width
+            self.connect("remove",  self.size_adjustment)
+
+            # get scrollbar thickness from parent app scrollbar - very hackish, but what to do??
+            self.bump = self.parentApp.parentApp.image_scrolledwindow.get_hscrollbar().allocation.height
+            self.haveVerticalScrollbar = False
+
             # vbar is '1' if there is not vertical scroll bar
             # if there is  a vertical scroll bar, then it will have a the width of the bar
-            self.vbar = self.adjustScrollWindow.get_vscrollbar().allocation.width
+            #self.vbar = self.adjustScrollWindow.get_vscrollbar().allocation.width
 
         self.getParentAppPrefs()
         self.getPrefsFactory()
-        
-        if not hasattr(self, "errorTitle"):
-            self.errorTitle = _("Error in Image Rename preferences")
         
         try:
             self.prefsFactory.checkPrefsForValidity()
@@ -497,7 +531,7 @@ class ImageRenameTable(tpm.TablePlusMinus):
             self.updateParentAppPrefs()
 
             msg = "%s.\n" % e
-            msg += _("Resetting to default values.")
+            msg += _("Resetting to default values." + "\n")
             sys.stderr.write(msg)
             
             
@@ -507,10 +541,7 @@ class ImageRenameTable(tpm.TablePlusMinus):
         
         for row in self.prefsFactory.getWidgetsBasedOnPreferences():
             self.append(row)
-            
-
-
-            
+                      
     def updatePreferences(self):
         prefList = []
         for row in self.pm_rows:                
@@ -535,25 +566,32 @@ class ImageRenameTable(tpm.TablePlusMinus):
         self.updateExample()
             
     
-    def size_adjustment(self,  arg1,  arg2):
-        """ Adjust scrolledwindow width in preferences dialog to reflect width of image rename table
+    def scrollbar_visibility_change(self, widget, event):
+        if event.state == gdk.VISIBILITY_UNOBSCURED:
+            self.haveVerticalScrollbar = True
+            self.adjustScrollWindow.set_size_request(self.adjustScrollWindow.allocation.width + self.bump, -1)
+
+            
+    def size_adjustment(self, widget, arg2):
+        """
+        Adjust scrolledwindow width in preferences dialog to reflect width of image rename table
         
-        The algorithm is complicated by the need to tak into account the presence of a vertical scrollbar"""
+        The algorithm is complicated by the need to take into account the presence of a vertical scrollbar,
+        which might be added as the user adds more rows
+        
+        The pygtk code behaves inconsistently depending on the pygtk version
+        """
         
         if self.adjustScrollWindow:
-            if self.adjustScrollWindow.get_vscrollbar().allocation.width > 1:
-                extra = self.adjustScrollWindow.get_vscrollbar().allocation.width + 10
+            self.haveVerticalScrollbar = self.scrollBar.allocation.width > 1 or self.haveVerticalScrollbar
+            if not self.haveVerticalScrollbar:
+                if self.allocation.width > self.adjustScrollWindow.allocation.width:
+                    self.adjustScrollWindow.set_size_request(self.allocation.width, -1)
             else:
-                extra = 0
-            if self.vbar <= 1:
-                if self.allocation.width > self.tableWidth:
-                    self.adjustScrollWindow.set_size_request(self.allocation.width + extra,  -1) 
-                    self.tableWidth = self.allocation.width + extra
-            elif self.allocation.width - extra > self.tableWidth:
-                self.adjustScrollWindow.set_size_request(self.allocation.width + extra,  -1) 
-                self.tableWidth = self.allocation.width + extra
-            self.vbar = self.adjustScrollWindow.get_vscrollbar().allocation.width
-            
+                if self.allocation.width > self.adjustScrollWindow.allocation.width - self.bump:
+                    self.adjustScrollWindow.set_size_request(self.allocation.width + self.bump, -1)
+                    self.bump = 0
+       
     def getParentAppPrefs(self):
         self.prefList = self.parentApp.prefs.image_rename
         
@@ -634,10 +672,28 @@ class ImageRenameTable(tpm.TablePlusMinus):
         """
         self.updatePreferences()        
 
-class SubfolderTable(ImageRenameTable):
-    def __init__(self, parentApp,  adjustScollWindow):    
-        self.errorTitle = _("Error in Download Subfolder preferences")
+class VideoRenameTable(ImageRenameTable):
+    def __init__(self, parentApp, adjustScollWindow):    
+        self.errorTitle = _("Error in Video Rename preferences")
         ImageRenameTable.__init__(self,  parentApp,  adjustScollWindow)
+
+    def getParentAppPrefs(self):
+        self.prefList = self.parentApp.prefs.video_rename
+    
+    def getPrefsFactory(self):
+        self.prefsFactory = rn.VideoRenamePreferences(self.prefList, self,
+                                                    sequences = sequences)
+        
+    def updateParentAppPrefs(self):
+        self.parentApp.prefs.video_rename = self.prefList
+
+    def updateExample(self):
+        self.parentApp.updateVideoRenameExample()
+
+class SubfolderTable(ImageRenameTable):
+    def __init__(self, parentApp, adjustScollWindow):    
+        self.errorTitle = _("Error in Photo Download Subfolders preferences")
+        ImageRenameTable.__init__(self, parentApp, adjustScollWindow)
 
     def getParentAppPrefs(self):
         self.prefList = self.parentApp.prefs.subfolder
@@ -649,8 +705,24 @@ class SubfolderTable(ImageRenameTable):
         self.parentApp.prefs.subfolder = self.prefList
 
     def updateExample(self):
-        self.parentApp.updateDownloadFolderExample()
+        self.parentApp.updatePhotoDownloadFolderExample()
         
+class VideoSubfolderTable(ImageRenameTable):
+    def __init__(self, parentApp, adjustScollWindow): 
+        self.errorTitle = _("Error in Video Download Subfolders preferences")
+        ImageRenameTable.__init__(self, parentApp, adjustScollWindow)
+
+    def getParentAppPrefs(self):
+        self.prefList = self.parentApp.prefs.video_subfolder
+    
+    def getPrefsFactory(self):
+        self.prefsFactory = rn.VideoSubfolderPreferences(self.prefList, self)
+        
+    def updateParentAppPrefs(self):
+        self.parentApp.prefs.video_subfolder = self.prefList
+
+    def updateExample(self):
+        self.parentApp.updateVideoDownloadFolderExample()        
 
 class PreferencesDialog(gnomeglade.Component):
     def __init__(self, parentApp):
@@ -668,9 +740,13 @@ class PreferencesDialog(gnomeglade.Component):
         self._setupTabSelector()
         
         self._setupControlSpacing()
-
-        # get example image data
         
+        if DOWNLOAD_VIDEO:
+            self.file_types = _("photos and videos")
+        else:
+            self.file_types = _("photos")
+
+        # get example photo and video data
         try:
             w = workers.firstWorkerReadyToDownload()
             root, self.sampleImageName = w.firstImage()
@@ -680,16 +756,31 @@ class PreferencesDialog(gnomeglade.Component):
         except:
             self.sampleImage = metadata.DummyMetaData()
             self.sampleImageName = 'IMG_0524.CR2'
+            
+
+        try:
+            root, self.sampleVideoName = w.firstVideo()
+            video = os.path.join(root, self.sampleVideoName)
+            self.sampleVideo = videometadata.MetaData(video)
+        except:
+            self.sampleVideo = videometadata.DummyMetaData()
+            self.sampleVideoName = 'MVI_1379.MOV'
+            
         
         # setup tabs
-        self._setupDownloadFolderTab()
+        self._setupPhotoDownloadFolderTab()
         self._setupImageRenameTab()
+        self._setupVideoDownloadFolderTab()
+        self._setupVideoRenameTab()                
         self._setupRenameOptionsTab()
         self._setupJobCodeTab()
         self._setupDeviceTab()
         self._setupBackupTab()
         self._setupAutomationTab()
         self._setupErrorTab()
+        
+        if not DOWNLOAD_VIDEO:
+            self.disableVideoControls()
 
         self.widget.realize()
         
@@ -698,7 +789,7 @@ class PreferencesDialog(gnomeglade.Component):
         width_of_widest_sel_row = self.treeview.get_background_area(1, self.treeview_column)[2]
         self.scrolled_window.set_size_request(width_of_widest_sel_row + 2, -1)
 
-        #set the minimum width of the scolled window holding the image rename table
+        #set the minimum width of the scolled window holding the photo rename table
         if self.rename_scrolledwindow.get_vscrollbar():
             extra = self.rename_scrolledwindow.get_vscrollbar().allocation.width + 10
         else:
@@ -732,7 +823,11 @@ class PreferencesDialog(gnomeglade.Component):
     
     def on_download_folder_filechooser_button_selection_changed(self, widget):
         self.prefs.download_folder = widget.get_current_folder()
-        self.updateDownloadFolderExample()
+        self.updatePhotoDownloadFolderExample()
+        
+    def on_video_download_folder_filechooser_button_selection_changed(self, widget):
+        self.prefs.video_download_folder = widget.get_current_folder()
+        self.updateVideoDownloadFolderExample()
     
     def on_backup_folder_filechooser_button_selection_changed(self, widget):
         self.prefs.backup_location = widget.get_current_folder()
@@ -744,15 +839,17 @@ class PreferencesDialog(gnomeglade.Component):
     def _setupControlSpacing(self):
         """
         set spacing of some but not all controls
-        
-        not currently used
         """
         
         self._setupTableSpacing(self.download_folder_table) 
+        self._setupTableSpacing(self.video_download_folder_table) 
         self.download_folder_table.set_row_spacing(2, 
                                 hd.VERTICAL_CONTROL_SPACE)
+        self.video_download_folder_table.set_row_spacing(2, 
+                                hd.VERTICAL_CONTROL_SPACE)
         self._setupTableSpacing(self.rename_example_table)
-        self.devices_table.set_col_spacing(0,   hd.NESTED_CONTROLS_SPACE)        
+        self._setupTableSpacing(self.video_rename_example_table)
+        self.devices_table.set_col_spacing(0, hd.NESTED_CONTROLS_SPACE)        
       
         self._setupTableSpacing(self.backup_table)
         self.backup_table.set_col_spacing(1, hd.NESTED_CONTROLS_SPACE)
@@ -769,11 +866,16 @@ class PreferencesDialog(gnomeglade.Component):
         table.set_col_spacing(1, hd.CONTROL_LABEL_SPACE)
 
     def _setupSubfolderTable(self):
-        self.subfolder_table = SubfolderTable(self,  None)
+        self.subfolder_table = SubfolderTable(self, None)
         self.subfolder_vbox.pack_start(self.subfolder_table)
         self.subfolder_table.show_all()
         
-    def _setupDownloadFolderTab(self):
+    def _setupVideoSubfolderTable(self):
+        self.video_subfolder_table = VideoSubfolderTable(self, None)
+        self.video_subfolder_vbox.pack_start(self.video_subfolder_table)
+        self.video_subfolder_table.show_all()
+
+    def _setupPhotoDownloadFolderTab(self):
         self.download_folder_filechooser_button = gtk.FileChooserButton(
                             _("Select a folder to download photos to"))
         self.download_folder_filechooser_button.set_current_folder(
@@ -789,16 +891,41 @@ class PreferencesDialog(gnomeglade.Component):
         self.download_folder_filechooser_button.show()        
 
         self._setupSubfolderTable()
-        self.updateDownloadFolderExample()
+        self.updatePhotoDownloadFolderExample()
+        
+    def _setupVideoDownloadFolderTab(self):
+        self.video_download_folder_filechooser_button = gtk.FileChooserButton(
+                            _("Select a folder to download videos to"))
+        self.video_download_folder_filechooser_button.set_current_folder(
+                            self.prefs.video_download_folder)
+        self.video_download_folder_filechooser_button.set_action(
+                            gtk.FILE_CHOOSER_ACTION_SELECT_FOLDER)
+        self.video_download_folder_filechooser_button.connect("selection-changed", 
+                    self.on_video_download_folder_filechooser_button_selection_changed)
+                            
+        self.video_download_folder_table.attach(
+                            self.video_download_folder_filechooser_button, 
+                            2, 3, 2, 3, yoptions = gtk.SHRINK)
+        self.video_download_folder_filechooser_button.show()        
+        self._setupVideoSubfolderTable()
+        self.updateVideoDownloadFolderExample()        
     
     def _setupImageRenameTab(self):
 
-        self.rename_table = ImageRenameTable(self,  self.rename_scrolledwindow)
+        self.rename_table = ImageRenameTable(self, self.rename_scrolledwindow)
         self.rename_table_vbox.pack_start(self.rename_table)
         self.rename_table.show_all()
         self.original_name_label.set_markup("<i>%s</i>" % self.sampleImageName)
         self.updateImageRenameExample()
         
+    def _setupVideoRenameTab(self):
+
+        self.video_rename_table = VideoRenameTable(self, self.video_rename_scrolledwindow)
+        self.video_rename_table_vbox.pack_start(self.video_rename_table)
+        self.video_rename_table.show_all()
+        self.video_original_name_label.set_markup("<i>%s</i>" % self.sampleVideoName)
+        self.updateVideoRenameExample()
+                
     def _setupRenameOptionsTab(self):
         
         # sequence numbers
@@ -848,8 +975,9 @@ class PreferencesDialog(gnomeglade.Component):
                                                 gtk.STOCK_CLEAR,
                                                 gtk.ICON_SIZE_BUTTON))  
     def _setupDeviceTab(self):
+
         self.device_location_filechooser_button = gtk.FileChooserButton(
-                            _("Select an image folder"))
+                            _("Select a folder containing %(file_types)s") % {'file_types':self.file_types})
         self.device_location_filechooser_button.set_current_folder(
                             self.prefs.device_location)
         self.device_location_filechooser_button.set_action(
@@ -871,7 +999,7 @@ class PreferencesDialog(gnomeglade.Component):
 
     def _setupBackupTab(self):
         self.backup_folder_filechooser_button = gtk.FileChooserButton(
-                            _("Select a folder in which to backup images"))
+                            _("Select a folder in which to backup %(file_types)s") % {'file_types':self.file_types})
         self.backup_folder_filechooser_button.set_current_folder(
                             self.prefs.backup_location)
         self.backup_folder_filechooser_button.set_action(
@@ -879,9 +1007,10 @@ class PreferencesDialog(gnomeglade.Component):
         self.backup_folder_filechooser_button.connect("selection-changed", 
                     self.on_backup_folder_filechooser_button_selection_changed)
         self.backup_table.attach(self.backup_folder_filechooser_button,
-                            3, 4, 7, 8, yoptions = gtk.SHRINK)
+                            3, 4, 8, 9, yoptions = gtk.SHRINK)
         self.backup_folder_filechooser_button.show()
         self.backup_identifier_entry.set_text(self.prefs.backup_identifier)
+        self.video_backup_identifier_entry.set_text(self.prefs.video_backup_identifier)
         
         #setup controls for manipulating sensitivity
         self._backupControls0 = [self.auto_detect_backup_checkbutton,
@@ -899,6 +1028,9 @@ class PreferencesDialog(gnomeglade.Component):
                                 self.backup_location_explanation_label]
         self._backupControls = self._backupControls0 + self._backupControls1 + \
                                 self._backupControls2
+                                
+        self._backupVideoControls = [self.video_backup_identifier_label,
+                                self.video_backup_identifier_entry]
         
         #assign values to checkbuttons only when other controls
         #have been setup, because their toggle signal is activated
@@ -944,15 +1076,12 @@ class PreferencesDialog(gnomeglade.Component):
         else:
             self.backup_duplicate_skip_radiobutton.set_active(True)
 
-    def updateImageRenameExample(self):
-        """ 
-        Displays example image name to the user 
-        """
-        
-        if hasattr(self, 'rename_table'):
-            self.rename_table.updateExampleJobCode()
-            name, problem = self.rename_table.prefsFactory.generateNameUsingPreferences(
-                    self.sampleImage, self.sampleImageName, 
+    
+    def updateExampleFileName(self, display_table, rename_table, sample, sampleName, example_label):
+        if hasattr(self, display_table):
+            rename_table.updateExampleJobCode()
+            name, problem = rename_table.prefsFactory.generateNameUsingPreferences(
+                    sample, sampleName,
                     self.prefs.strip_characters,  sequencesPreliminary=False)
         else:
             name = problem = ''
@@ -963,33 +1092,54 @@ class PreferencesDialog(gnomeglade.Component):
         if problem:
             text += "\n"
             # Translators: please do not modify or leave out html formatting tags like <i> and <b>. These are used to format the text the users sees
-            text += _("<i><b>Warning:</b> There is insufficient image metadata to fully generate the name. Please use other renaming options.</i>")
+            text += _("<i><b>Warning:</b> There is insufficient metadata to fully generate the name. Please use other renaming options.</i>")
 
-        self.new_name_label.set_markup(text)
+        example_label.set_markup(text)        
+    
+    def updateImageRenameExample(self):
+        """ 
+        Displays example image name to the user 
+        """
+        self.updateExampleFileName('rename_table', self.rename_table, self.sampleImage,  self.sampleImageName, self.new_name_label)
+
+        
+    def updateVideoRenameExample(self):
+        """
+        Displays example video name to the user
+        """
+        self.updateExampleFileName('video_rename_table', self.video_rename_table, self.sampleVideo,  self.sampleVideoName, self.video_new_name_label)
             
-    def updateDownloadFolderExample(self):
+    def updateDownloadFolderExample(self, display_table, subfolder_table, download_folder, sample, sampleName, example_download_path_label, subfolder_warning_label):
         """ 
         Displays example subfolder name(s) to the user 
         """
         
-        if hasattr(self,  'subfolder_table'):
-            self.subfolder_table.updateExampleJobCode()
-            path, problem = self.subfolder_table.prefsFactory.generateNameUsingPreferences(
-                            self.sampleImage, self.sampleImageName,
+        if hasattr(self, display_table):
+            subfolder_table.updateExampleJobCode()
+            path, problem = subfolder_table.prefsFactory.generateNameUsingPreferences(
+                            sample, sampleName,
                             self.prefs.strip_characters)
         else:
             path = problem = ''
         
-        text = os.path.join(self.prefs.download_folder, path)
+        text = os.path.join(download_folder, path)
         # since this is markup, escape it
         path = common.escape(text)
         if problem:
-            warning = _("<i><b>Warning:</b> There is insufficient image metadata to fully generate subfolders. Please use other subfolder naming options.</i>" )
+            warning = _("<i><b>Warning:</b> There is insufficient metadata to fully generate subfolders. Please use other subfolder naming options.</i>" )
         else:
             warning = ""
         # Translators: you should not modify or leave out the %s. This is a code used by the programming language python to insert a value that thes user will see
-        self.example_download_path_label.set_markup(_("<i>Example: %s</i>") % text)
-        self.subfolder_warning_label.set_markup(warning)
+        example_download_path_label.set_markup(_("<i>Example: %s</i>") % text)
+        subfolder_warning_label.set_markup(warning)
+        
+    def updatePhotoDownloadFolderExample(self):
+        if hasattr(self, 'subfolder_table'):
+            self.updateDownloadFolderExample('subfolder_table', self.subfolder_table, self.prefs.download_folder, self.sampleImage, self.sampleImageName, self.example_photo_download_path_label, self.photo_subfolder_warning_label)
+        
+    def updateVideoDownloadFolderExample(self):
+        if hasattr(self, 'video_subfolder_table'):
+            self.updateDownloadFolderExample('video_subfolder_table', self.video_subfolder_table, self.prefs.video_download_folder, self.sampleVideo, self.sampleVideoName, self.example_video_download_path_label, self.video_subfolder_warning_label)
         
     def on_hour_spinbutton_value_changed(self, spinbutton):
         hour = spinbutton.get_value_as_int()
@@ -1037,25 +1187,42 @@ class PreferencesDialog(gnomeglade.Component):
             sequences.setStoredSequenceNo(v)
             self.updateImageRenameExample()
 
+    def _updateSubfolderPrefOnError(self, newPrefList):
+        self.prefs.subfolder = newPrefList
+
+    def _updateVideoSubfolderPrefOnError(self, newPrefList):
+        self.prefs.video_subfolder = newPrefList
+        
+    
+    def checkSubfolderValuesValidOnExit(self, usersPrefList, updatePrefFunction, filetype, defaultPrefList):
+        """
+        Checks that the user has not entered in any inappropriate values
+        
+        If they have, filters out bad values and warns the user 
+        """
+        filtered,  prefList = rn.filterSubfolderPreferences(usersPrefList)
+        if filtered:
+            cmd_line(_("The %(filetype)s subfolder preferences had some unnecessary values removed.") % {'filetype': filetype})
+            if prefList:
+                updatePrefFunction(prefList)
+            else:
+                #Preferences list is now empty
+                msg = _("The %(filetype)s subfolder preferences entered are invalid and cannot be used.\nThey will be reset to their default values.") % {'filetype': filetype}
+                sys.stderr.write(msg + "\n")
+                misc.run_dialog(PROGRAM_NAME, msg)
+                updatePrefFunction(self.prefs.get_default(defaultPrefList))
+    
     def on_response(self, dialog, arg):
         if arg == gtk.RESPONSE_HELP:
             webbrowser.open("http://www.damonlynch.net/rapid/documentation")
         else:
             # arg==gtk.RESPONSE_CLOSE, or the user hit the 'x' to close the window
             self.prefs.backup_identifier = self.backup_identifier_entry.get_property("text")
+            self.prefs.video_backup_identifier = self.video_backup_identifier_entry.get_property("text")
             
             #check subfolder preferences for bad values
-            filtered,  prefList = rn.filterSubfolderPreferences(self.prefs.subfolder)
-            if filtered:
-                cmd_line(_("The subfolder preferences had some unnecessary values removed."))
-                if prefList:
-                    self.prefs.subfolder = prefList
-                else:
-                    #Preferences list is now empty
-                    msg = _("The subfolder preferences entered are invalid and cannot be used.\nThey will be reset to their default values.")
-                    sys.stderr.write(msg + "\n")
-                    misc.run_dialog(PROGRAM_NAME, msg)
-                    self.prefs.subfolder = self.prefs.get_default("subfolder")
+            self.checkSubfolderValuesValidOnExit(self.prefs.subfolder, self._updateSubfolderPrefOnError, _("photo"), "subfolder")
+            self.checkSubfolderValuesValidOnExit(self.prefs.video_subfolder, self._updateVideoSubfolderPrefOnError, _("video"), "video_subfolder")
                     
             self.widget.destroy()
             self.parentApp.preferencesDialogDisplayed = False
@@ -1186,7 +1353,8 @@ class PreferencesDialog(gnomeglade.Component):
     def on_strip_characters_checkbutton_toggled(self, check_button):
         self.prefs.strip_characters = check_button.get_active()
         self.updateImageRenameExample()
-        self.updateDownloadFolderExample()
+        self.updatePhotoDownloadFolderExample()
+        self.updateVideoDownloadFolderExample()
         
     def on_indicate_download_error_checkbutton_toggled(self, check_button):
         self.prefs.indicate_download_error = check_button.get_active()
@@ -1223,13 +1391,12 @@ class PreferencesDialog(gnomeglade.Component):
         """
         
         if not self.backup_checkbutton.get_active():
-            for c in self._backupControls:
+            for c in self._backupControls + self._backupVideoControls:
                 c.set_sensitive(False)
 
         else:
             for c in self._backupControls0:
                 c.set_sensitive(True)
-                
             self.updateBackupControlsAuto()
 
     def updateBackupControlsAuto(self):
@@ -1242,12 +1409,43 @@ class PreferencesDialog(gnomeglade.Component):
                 c.set_sensitive(True)
             for c in self._backupControls2:
                 c.set_sensitive(False)
+            for c in self._backupVideoControls:
+                c.set_sensitive(False)
+            if DOWNLOAD_VIDEO:
+                for c in self._backupVideoControls:
+                    c.set_sensitive(True)
         else:
             for c in self._backupControls1:
                 c.set_sensitive(False)
             for c in self._backupControls2:
                 c.set_sensitive(True)
+            if DOWNLOAD_VIDEO:
+                for c in self._backupVideoControls:
+                    c.set_sensitive(False)                
             
+    def disableVideoControls(self):
+        """
+        Disables video preferences if video downloading is disabled
+        (probably because the appropriate libraries to enable
+        video metadata extraction are not installed)
+        """        
+        controls = [self.example_video_filename_label, 
+                    self.original_video_filename_label,
+                    self.new_video_filename_label,
+                    self.video_new_name_label,
+                    self.video_original_name_label,
+                    self.video_rename_scrolledwindow,
+                    self.video_folders_hbox,
+                    self.video_backup_identifier_label,
+                    self.video_backup_identifier_entry
+                    ]
+        for c in controls:
+            c.set_sensitive(False)
+            
+        self.videos_cannot_be_downloaded_label.show()
+        self.folder_videos_cannot_be_downloaded_label.show()
+        self.folder_videos_cannot_be_downloaded_hbox.show()
+    
     def on_auto_detect_backup_checkbutton_toggled(self, widget):
         self.prefs.backup_device_autodetection = widget.get_active()
         self.updateBackupControlsAuto()
@@ -1258,25 +1456,53 @@ class PreferencesDialog(gnomeglade.Component):
 
     def on_backup_identifier_entry_changed(self, widget):
         self.updateBackupExample()
+    
+    def on_video_backup_identifier_entry_changed(self, widget):
+        self.updateBackupExample()
 
     def on_backup_scan_folder_on_entry_changed(self, widget):
         self.updateBackupExample()        
 
     def updateBackupExample(self):
         # Translators: this value is used as an example device when automatic backup device detection is enabled. You should translate this.
-        path = os.path.join(config.MEDIA_LOCATION, _("externaldrive1"))
+        drive1 = os.path.join(config.MEDIA_LOCATION, _("externaldrive1"))
         # Translators: this value is used as an example device when automatic backup device detection is enabled. You should translate this.
-        path2 = os.path.join(config.MEDIA_LOCATION, _("externaldrive2"))
+        drive2 = os.path.join(config.MEDIA_LOCATION, _("externaldrive2"))
 
-        path = os.path.join(path, self.backup_identifier_entry.get_text())
-        path2 = os.path.join(path2, self.backup_identifier_entry.get_text())
+        path = os.path.join(drive1, self.backup_identifier_entry.get_text())
+        path2 = os.path.join(drive2, self.backup_identifier_entry.get_text())
+        path3 = os.path.join(drive2, self.video_backup_identifier_entry.get_text())
         path = common.escape(path)
         path2 = common.escape(path2)
-        self.example_backup_path_label.set_markup("<i>%s</i>\n<i>%s</i>" % (path,
-                            path2))
+        path3 = common.escape(path3)
+        if DOWNLOAD_VIDEO:
+            example = "<i>%s</i>\n<i>%s</i>\n<i>%s</i>" % (path, path2, path3)
+        else:
+            example = "<i>%s</i>\n<i>%s</i>" % (path, path2)
+        self.example_backup_path_label.set_markup(example)
 
         
-
+def file_types_by_number(noImages, noVideos):
+    """ 
+    returns a string to be displayed to the user that can be used
+    to show if a value refers to photos or videos or both, or just one
+    of each
+    """
+    if (noVideos > 0) and (noImages > 0):
+        v = _('photos and videos')
+    elif (noVideos == 0) and (noImages == 0):
+        v = _('photos or videos')
+    elif noVideos > 0:
+        if noVideos > 1:
+            v = _('videos')
+        else:
+            v = _('video')
+    else:
+        if noImages > 1:
+            v = _('photos')
+        else:
+            v = _('photo')
+    return v
 
 class CopyPhotos(Thread):
     """Copies photos from source to destination, backing up if needed"""
@@ -1324,8 +1550,8 @@ class CopyPhotos(Thread):
             media_collection_treeview.addCard(thread_id, self.cardMedia.prettyName(), 
                                                                 '',  0,  progress=0.0,  
                                                                 # This refers to when a device like a hard drive is having its contents scanned,
-                                                                # looking for images. It is visible initially in the progress bar for each device 
-                                                                # (which normally holds "x of y images copied").
+                                                                # looking for photos or videos. It is visible initially in the progress bar for each device 
+                                                                # (which normally holds "x of y photos").
                                                                 # It maybe displayed only briefly if the contents of the device being scanned is small.
                                                                 progressBarText=_('scanning...'))
 
@@ -1347,29 +1573,37 @@ class CopyPhotos(Thread):
         """
         Setup thread so that user preferences are handled
         """
+        
+        def checkPrefs(prefsFactory):
+            try:
+                prefsFactory.checkPrefsForValidity()
+            except (rn.PrefValueInvalidError, rn.PrefLengthError, 
+                    rn.PrefValueKeyComboError, rn.PrefKeyError), e:
+                if notifyOnError:
+                    self.handlePreferencesError(e, prefsFactory)
+                raise rn.PrefError
+                
         self.prefs = self.parentApp.prefs
+        
+        
+        #Image and Video filename preferences
 
         self.imageRenamePrefsFactory = rn.ImageRenamePreferences(self.prefs.image_rename, self, 
                                                                  self.fileSequenceLock, sequences)
-        try:
-            self.imageRenamePrefsFactory.checkPrefsForValidity()
-        except (rn.PrefValueInvalidError, rn.PrefLengthError, 
-                rn.PrefValueKeyComboError,  rn.PrefKeyError), e:
-            if notifyOnError:
-                self.handlePreferencesError(e, self.imageRenamePrefsFactory)
-            raise rn.PrefError
-            
+        checkPrefs(self.imageRenamePrefsFactory)
+           
+        self.videoRenamePrefsFactory = rn.VideoRenamePreferences(self.prefs.video_rename, self, 
+                                                                 self.fileSequenceLock, sequences)
+        checkPrefs(self.videoRenamePrefsFactory)
+        
+        #Image and Video subfolder preferences
 
-        self.subfolderPrefsFactory = rn.SubfolderPreferences(
-                                                self.prefs.subfolder, self)
-        try:            
-            self.subfolderPrefsFactory.checkPrefsForValidity()
-        except (rn.PrefValueInvalidError, rn.PrefLengthError, 
-                rn.PrefValueKeyComboError,  rn.PrefKeyError), e:
-            if notifyOnError:
-                self.handlePreferencesError(e, self.subfolderPrefsFactory)
-            raise rn.PrefError
-                                                
+        self.subfolderPrefsFactory = rn.SubfolderPreferences(self.prefs.subfolder, self)
+        checkPrefs(self.subfolderPrefsFactory)
+
+        self.videoSubfolderPrefsFactory = rn.VideoSubfolderPreferences(self.prefs.video_subfolder, self)
+        checkPrefs(self.videoSubfolderPrefsFactory)
+        
         # copy this variable, as it is used heavily in the loop
         # and it is perhaps relatively expensive to read
         self.stripCharacters = self.prefs.strip_characters
@@ -1409,6 +1643,32 @@ class CopyPhotos(Thread):
             3.b  if so, user preferences determine whether it should be overwritten or not
         """
 
+        def checkDownloadPath(path):
+            """
+            Checks to see if download folder exists.
+            
+            Creates it if it does not exist.
+            
+            Returns False if the path could not be created.
+            """
+            
+            try:
+                if not os.path.isdir(path):
+                    os.makedirs(path)
+                return True
+                    
+            except:
+                if notifyOnError:
+                    display_queue.put((media_collection_treeview.removeCard,  (self.thread_id, )))
+                    msg = _("The following download path could not be created:\n")
+                    msg += _("%(path)s: ") % {'path': path}
+                    logError(config.CRITICAL_ERROR, _("Download cannot proceed"), msg)
+                    cmd_line(_("Download cannot proceed"))
+                    cmd_line(msg)
+                    display_queue.put((self.parentApp.downloadFailed,  (self.thread_id, )))
+                    display_queue.close("rw")                     
+                return False                
+                
         def getPrefs(notifyOnError):
             try:
                 self.initializeFromPrefs(notifyOnError)
@@ -1424,12 +1684,23 @@ class CopyPhotos(Thread):
                     display_queue.put((self.parentApp.downloadFailed,  (self.thread_id, )))
                     display_queue.close("rw")                     
                 return False
+        
         def scanMedia():
             
-            images = []
-            imageSizeSum = 0
-            for root, dirs, files in os.walk(self.cardMedia.getPath()):
-                for name in files:
+            def downloadFile(name):
+                isImage = media.isImage(name)
+                isVideo = media.isVideo(name)
+                download = (DOWNLOAD_VIDEO and (isImage or isVideo) or 
+                        ((not DOWNLOAD_VIDEO) and isImage))
+                return (download, isImage, isVideo)
+            
+            def gio_scan(path, fileSizeSum):
+                """recursive function to scan a directory and its subdirectories
+                for photos and possibly videos"""
+                
+                children = path.enumerate_children('standard::name,standard::type,standard::size,time::modified')
+
+                for child in children:
                     if not self.running:
                         self.lock.acquire()
                         self.running = True
@@ -1438,44 +1709,105 @@ class CopyPhotos(Thread):
                         self.running = False
                         display_queue.put((media_collection_treeview.removeCard,  (self.thread_id, )))
                         display_queue.close("rw")
-                        return
-                    
-                    if media.isImage(name):
-                        image = os.path.join(root, name)
-                        size = os.path.getsize(image)
-                        modificationTime = os.path.getmtime(image)
-                        images.append((name, root, size,  modificationTime),)
-                        imageSizeSum += size
-            images.sort(key=operator.itemgetter(3))
-            noImages = len(images)
+                        return None
+                        
+                    if child.get_file_type() == gio.FILE_TYPE_DIRECTORY:
+                        fileSizeSum = gio_scan(path.get_child(child.get_name()), fileSizeSum)
+                        if fileSizeSum == None:
+                            # this value will be None only if the thread is exiting
+                            return None
+                    elif child.get_file_type() == gio.FILE_TYPE_REGULAR:
+                        name = child.get_name()
+                        download, isImage, isVideo = downloadFile(name)
+                        if download:
+                            size = child.get_size()
+                            imagesAndVideos.append((name, path.get_path(), size, child.get_modification_time()),)
+                            fileSizeSum += size
+                            if isVideo:
+                                self.noVideos += 1
+                            else:
+                                self.noImages += 1
+                return fileSizeSum
+            
+                        
+            imagesAndVideos = []
+            fileSizeSum = 0
+            self.noVideos = 0
+            self.noImages = 0
+            
+            if not using_gio or not self.cardMedia.volume:
+                for root, dirs, files in os.walk(self.cardMedia.getPath()):
+                    for name in files:
+                        if not self.running:
+                            self.lock.acquire()
+                            self.running = True
+                        
+                        if not self.ctrl:
+                            self.running = False
+                            display_queue.put((media_collection_treeview.removeCard,  (self.thread_id, )))
+                            display_queue.close("rw")
+                            return
+                        
+
+                        download, isImage, isVideo = downloadFile(name)
+                        if download:
+                            image = os.path.join(root, name)
+                            size = os.path.getsize(image)
+                            modificationTime = os.path.getmtime(image)
+                            imagesAndVideos.append((name, root, size, modificationTime),)
+                            fileSizeSum += size
+                            if isVideo:
+                                self.noVideos += 1
+                            else:
+                                self.noImages += 1
+                            
+            else:
+                # using gio and have a volume
+                # make call to recursive function to scan volume
+                fileSizeSum = gio_scan(self.cardMedia.volume.volume.get_root(), fileSizeSum)
+                if fileSizeSum == None:
+                    # thread exiting
+                    return
+                
+            imagesAndVideos.sort(key=operator.itemgetter(3))
+            noFiles = len(imagesAndVideos)
             
             self.scanComplete = True
             
-            if noImages:
-                self.cardMedia.setMedia(images,  imageSizeSum,  noImages)
+            self.display_file_types = file_types_by_number(self.noImages, self.noVideos)
+                    
+            if DOWNLOAD_VIDEO:
+                self.types_searched_for = _('photos or videos')
+            else:
+                self.types_searched_for = _('photos')
+
+            
+            if noFiles:
+                self.cardMedia.setMedia(imagesAndVideos, fileSizeSum, noFiles)
                 # Translators: as already, mentioned the %s value should not be modified or left out. It may be moved if necessary.
-                # It refers to the actual number of images that can be copied. For example, the user might see the following:
-                # '0 of 512 images copied'.
+                # It refers to the actual number of photos that can be copied. For example, the user might see the following:
+                # '0 of 512 photos' or '0 of 10 videos' or '0 of 202 photos and videos'.
                 # This particular text is displayed to the user before the download has started.
-                display = _("0 of %s images copied") % noImages
-                display_queue.put((media_collection_treeview.updateCard,  (self.thread_id,  self.cardMedia.sizeOfImages(), noImages)))
+                display = _("0 of %(number)s %(filetypes)s") % {'number':noFiles, 'filetypes':self.display_file_types}
+                display_queue.put((media_collection_treeview.updateCard, (self.thread_id,  self.cardMedia.sizeOfImagesAndVideos(), noFiles)))
                 display_queue.put((media_collection_treeview.updateProgress, (self.thread_id, 0.0, display, 0)))
-                display_queue.put((self.parentApp.timeRemaining.add,  (self.thread_id,  imageSizeSum)))
+                display_queue.put((self.parentApp.timeRemaining.add, (self.thread_id, fileSizeSum)))
                 display_queue.put((self.parentApp.setDownloadButtonSensitivity, ()))
                 
                 # Translators: as you have already seen, the text can contain values that should not be modified or left out by you, for example %s.
                 # This text is another example of that, but it is is a little more complex. Here there are two values which will be displayed
-                # to the user when they run the program, signifying the number of images found, and the device they were found on.
+                # to the user when they run the program, signifying the number of photos found, and the device they were found on.
                 # %(number)s should be left exactly as is: 'number' should not be translated. The same applies to %(device)s: 'device' should
                 # not be translated. Generally speaking, if translating the sentence requires it, you can move items like '%(xyz)s' around 
                 # in a sentence, but you should never modify them or leave them out.
-                cmd_line(_("Device scan complete: found %(number)s images on %(device)s") % 
-                           {'number': noImages,  'device': self.cardMedia.prettyName(limit=0)})
+                cmd_line(_("Device scan complete: found %(number)s %(filetypes)s on %(device)s") % 
+                           {'number': noFiles, 'filetypes':self.display_file_types,
+                            'device': self.cardMedia.prettyName(limit=0)})
                 return True
             else:
                 # it might be better to display "0 of 0" here
                 display_queue.put((media_collection_treeview.removeCard,  (self.thread_id, )))
-                cmd_line(_("Device scan complete: no images found on %s") % self.cardMedia.prettyName(limit=0))
+                cmd_line(_("Device scan complete: no %(filetypes)s found on %(device)s") % {'device':self.cardMedia.prettyName(limit=0), 'filetypes':self.types_searched_for})
                 return False
 
         def cleanUp():
@@ -1484,13 +1816,16 @@ class CopyPhotos(Thread):
             early or when it has completed its run.
             """
 
-            # possibly delete any lingering files
-            tf = os.listdir(tempWorkingDir)
-            if tf:
-                for f in tf:
-                    os.remove(os.path.join(tempWorkingDir,  f))
-                
-            os.rmdir(tempWorkingDir)
+
+            for tempWorkingDir in (videoTempWorkingDir, photoTempWorkingDir):
+                if tempWorkingDir:
+                    # possibly delete any lingering files
+                    tf = os.listdir(tempWorkingDir)
+                    if tf:
+                        for f in tf:
+                            os.remove(os.path.join(tempWorkingDir, f))
+                        
+                    os.rmdir(tempWorkingDir)
             
             
         def logError(severity, problem, details, resolution=None):
@@ -1502,136 +1837,186 @@ class CopyPhotos(Thread):
                 self.noErrors += 1
 
 
-        def checkProblemWithImageNameGeneration(newName,  destination, image,  problem):
+        def checkProblemWithNameGeneration(newName, destination, source,  problem, filetype):
             if not newName:
                 # a serious problem - a filename should never be blank!
                 logError(config.SERIOUS_ERROR,
-                    _("Image filename could not be generated"),
+                    _("%(filetype)s filename could not be generated") % {'filetype': filetype},
                     # '%(source)s' and '%(problem)s' are two more examples of text that should not be modified or left out
-                    _("Source: %(source)s\nProblem: %(problem)s") % {'source': image, 'problem': problem},
-                    IMAGE_SKIPPED)
+                    _("Source: %(source)s\nProblem: %(problem)s") % {'source': source, 'problem': problem},
+                    fileSkippedDisplay)
             elif problem:
                 logError(config.WARNING, 
-                    _("Image filename could not be properly generated. Check to ensure there is sufficient image metadata."),
+                    _("%(filetype)s filename could not be properly generated. Check to ensure there is sufficient metadata.") % {'filetype': filetype},
                     _("Source: %(source)s\nPartially generated filename: %(newname)s\nDestination: %(destination)s\nProblem: %(problem)s") % 
-                    {'source': image, 'destination': destination, 'newname': newName, 'problem': problem})
+                    {'source': source, 'destination': destination, 'newname': newName, 'problem': problem})
                     
-
-        def imageAlreadyExists(source, destination=None, identifier=None):
-            """ Notify the user that the image could not be downloaded because it already exists"""
+        def fileAlreadyExists(source, fileSkippedDisplay, fileAlreadyExistsDisplay, destination=None, identifier=None):
+            """ Notify the user that the photo or video could not be downloaded because it already exists"""
             if self.prefs.indicate_download_error:
                 if source and destination and identifier:
-                    logError(config.SERIOUS_ERROR, IMAGE_ALREADY_EXISTS,
+                    logError(config.SERIOUS_ERROR, fileAlreadyExistsDisplay,
                         _("Source: %(source)s\nDestination: %(destination)s")
-                        % {'source': image, 'destination': newFile},
+                        % {'source': source, 'destination': newFile},
                         _("Unique identifier '%s' added") % identifier)                    
                 elif source and destination:
-                    logError(config.SERIOUS_ERROR, IMAGE_ALREADY_EXISTS,
+                    logError(config.SERIOUS_ERROR, fileAlreadyExistsDisplay,
                         _("Source: %(source)s\nDestination: %(destination)s")
                         % {'source': source, 'destination': destination},
-                        IMAGE_SKIPPED)
+                        fileSkippedDisplay)
                 else:
-                    logError(config.SERIOUS_ERROR, IMAGE_ALREADY_EXISTS,
+                    logError(config.SERIOUS_ERROR, fileAlreadyExistsDisplay,
                         _("Source: %(source)s")
                         % {'source': source},
-                        IMAGE_SKIPPED)
+                        fileSkippedDisplay)
 
                     
-        def downloadCopyingError(source, destination, errno, strerror):
-            """Notify the user that an error occurred when coyping an image"""
-            logError(config.SERIOUS_ERROR, _('Download copying error'), 
-                        _("Source: %(source)s\nDestination: %(destination)s\nError: %(errorno)s %(strerror)s") 
-                        % {'source': source, 'destination': destination, 'errorno': errno, 'strerror': strerror},
-                        _('The image was not copied.'))
+        def downloadCopyingError(source, destination, filetype, errno=None, strerror=None):
+            """Notify the user that an error occurred when coyping an photo or video"""
+            if errno != None and strerror != None:
+                logError(config.SERIOUS_ERROR, _('Download copying error'), 
+                            _("Source: %(source)s\nDestination: %(destination)s\nError: %(errorno)s %(strerror)s") 
+                            % {'source': source, 'destination': destination, 'errorno': errno, 'strerror': strerror},
+                            _('The %(filetype)s was not copied.') % {'filetype': filetype})
+            else:
+                logError(config.SERIOUS_ERROR, _('Download copying error'), 
+                            _("Source: %(source)s\nDestination: %(destination)s") 
+                            % {'source': source, 'destination': destination},
+                            _('The %(filetype)s was not copied.') % {'filetype': filetype})
+                
                         
         def sameFileNameDifferentExif(image1, image1_date_time, image1_subseconds, image2, image2_date_time, image2_subseconds):
-            logError(config.WARNING, _('Images detected with the same filenames, but taken at different times:'),
-                _("First image: %(image1)s %(image1_date_time)s:%(image1_subseconds)s\nSecond image: %(image2)s %(image2_date_time)s:%(image2_subseconds)s") % 
+            logError(config.WARNING, _('Photos detected with the same filenames, but taken at different times:'),
+                _("First photo: %(image1)s %(image1_date_time)s:%(image1_subseconds)s\nSecond photo: %(image2)s %(image2_date_time)s:%(image2_subseconds)s") % 
                 {'image1': image1, 'image1_date_time': image1_date_time, 'image1_subseconds': image1_subseconds,
                 'image2': image2, 'image2_date_time': image2_date_time, 'image2_subseconds': image2_subseconds})
 
 
 
-        def generateSubfolderAndFileName(image,  name,  needMetaDataToCreateUniqueImageName,  
-                       needMetaDataToCreateUniqueSubfolderName):
-            skipImage = alreadyDownloaded = False
+        def generateSubfolderAndFileName(fullFileName, name, needMetaDataToCreateUniqueImageName,  
+                       needMetaDataToCreateUniqueSubfolderName, fallback_date):
+            """
+            Generates subfolder and file names for photos and videos
+            """
+            
+            skipFile = alreadyDownloaded = False
             sequence_to_use = None
-            try:
-                imageMetadata = metadata.MetaData(image)
-            except IOError:
-                logError(config.CRITICAL_ERROR, _("Could not open image"), 
-                                _("Source: %s") % image, 
-                                IMAGE_SKIPPED)
-                skipImage = True
-                imageMetadata =  newName = newFile = path = subfolder = None
-            else:
-                try:
-                    # this step can fail if the source image is corrupt
-                    imageMetadata.readMetadata()
-                except:
-                    skipImage = True
 
-                if not skipImage:
-                    if not imageMetadata.exifKeys() and (needMetaDataToCreateUniqueSubfolderName or 
-                                                         (needMetaDataToCreateUniqueImageName and 
-                                                         not addUniqueIdentifier)):
-                        skipImage = True
-                        
-                if skipImage:
-                    logError(config.SERIOUS_ERROR, _("Image has no metadata"), 
-                                        _("Metadata is essential for generating subfolders / image names.\nSource: %s") % image, 
-                                        IMAGE_SKIPPED)
-                    newName = newFile = path = subfolder = None
+            if not self.isImage:
+                # file is a video file
+                fileRenameFactory = self.videoRenamePrefsFactory
+                subfolderFactory = self.videoSubfolderPrefsFactory
+                try:
+                    # this step immedidately reads the metadata from the video file
+                    # (which is different than pyexiv2)
+                    fileMetadata = videometadata.VideoMetaData(fullFileName)
+                except:
+                    logError(config.CRITICAL_ERROR, _("Could not open %(filetype)s") % {'filetype': fileBeingDownloadedDisplay}, 
+                                    _("Source: %s") % fullFileName, 
+                                    fileSkippedDisplay)                    
+                    skipFile = True
+                    fileMetadata =  newName = newFile = path = subfolder = sequence_to_use = None
+                    return (skipFile,  fileMetadata,  newName,  newFile,  path,  subfolder, sequence_to_use)
+            else:
+                # file is an photo
+                fileRenameFactory = self.imageRenamePrefsFactory                
+                subfolderFactory = self.subfolderPrefsFactory
+                try:
+                    fileMetadata = metadata.MetaData(fullFileName)
+                except IOError:
+                    logError(config.CRITICAL_ERROR, _("Could not open %(filetype)s") % {'filetype': fileBeingDownloadedDisplay}, 
+                                    _("Source: %s") % fullFileName, 
+                                    fileSkippedDisplay)
+                    skipFile = True
+                    fileMetadata =  newName = newFile = path = subfolder = sequence_to_use = None
+                    return (skipFile,  fileMetadata,  newName,  newFile,  path,  subfolder, sequence_to_use)
                 else:
-                    subfolder, problem = self.subfolderPrefsFactory.generateNameUsingPreferences(
-                                                            imageMetadata, name, 
-                                                            self.stripCharacters)
-        
-                    if problem:
-                        logError(config.WARNING, 
-                            _("Subfolder name could not be properly generated. Check to ensure there is sufficient image metadata."),
-                            _("Subfolder: %(subfolder)s\nImage: %(image)s\nProblem: %(problem)s") % 
-                            {'subfolder': subfolder, 'image': image, 'problem': problem})
+                    try:
+                        # this step can fail if the source photo is corrupt
+                        fileMetadata.read()
+                    except:
+                        skipFile = True
+
                     
-                    if self.prefs.synchronize_raw_jpg and usesSequenceElements:
-                        image_name, image_ext = os.path.splitext(name)
-                        with self.downloadedFilesLock:
-                            i, sequence_to_use = downloaded_files.matching_pair(image_name, image_ext, imageMetadata.dateTime(), imageMetadata.subSeconds())
-                            if i == -1:
-                                # this exact file has already been downloaded (same extension, same filename, and same exif date time subsecond info)
-                                if not addUniqueIdentifier:
-                                    # there is no point to download it, as there is no way a unique filename will be generated
-                                    alreadyDownloaded = skipImage = True
-                            elif i == -99:
-                                i1_ext, i1_date_time, i1_subseconds = downloaded_files.extExifDateTime(image_name)
-                                sameFileNameDifferentExif("%s%s" % (image_name, i1_ext), i1_date_time, i1_subseconds, name, imageMetadata.dateTime(), imageMetadata.subSeconds())
-                           
-                    
-                    # pass the subfolder the image will go into, as this is needed to determine subfolder sequence numbers 
-                    # indicate that sequences chosen should be queued
-                    
-                    if not skipImage or alreadyDownloaded:
-                        newName, problem = self.imageRenamePrefsFactory.generateNameUsingPreferences(
-                                                                imageMetadata, name, self.stripCharacters,  subfolder,  
+            if not skipFile:
+                if self.isImage and not fileMetadata.rpd_keys() and (needMetaDataToCreateUniqueSubfolderName or 
+                                                     (needMetaDataToCreateUniqueImageName and 
+                                                     not addUniqueIdentifier)):
+                    skipFile = True
+                
+                #TODO similar checking for video 
+                
+            if skipFile:
+                logError(config.SERIOUS_ERROR, _("%(filetype)s has no metadata") % {'filetype': fileBeingDownloadedDisplayCap}, 
+                                    _("Metadata is essential for generating subfolder and/or file names.\nSource: %s") % fullFileName, 
+                                    fileSkippedDisplay)                
+                newName = newFile = path = subfolder = None
+            else:
+                # attempt to generate a subfolder name
+                subfolder, problem = subfolderFactory.generateNameUsingPreferences(
+                                                        fileMetadata, name, 
+                                                        self.stripCharacters, fallback_date = fallback_date)
+    
+                if problem:
+                    logError(config.WARNING, 
+                        _("Subfolder name could not be properly generated. Check to ensure there is sufficient metadata."),
+                        _("Subfolder: %(subfolder)s\nFile: %(file)s\nProblem: %(problem)s") % 
+                        {'subfolder': subfolder, 'file': fullFileName, 'problem': problem})
+                
+                if self.prefs.synchronize_raw_jpg and usesImageSequenceElements and self.isImage:
+                    #synchronizing RAW and JPEG only applies to photos, not videos
+                    image_name, image_ext = os.path.splitext(name)
+                    with self.downloadedFilesLock:
+                        i, sequence_to_use = downloaded_files.matching_pair(image_name, image_ext, fileMetadata.dateTime(), fileMetadata.subSeconds())
+                        if i == -1:
+                            # this exact file has already been downloaded (same extension, same filename, and same exif date time subsecond info)
+                            if not addUniqueIdentifier:
+                                # there is no point to download it, as there is no way a unique filename will be generated
+                                alreadyDownloaded = skipFile = True
+                        elif i == -99:
+                            i1_ext, i1_date_time, i1_subseconds = downloaded_files.extExifDateTime(image_name)
+                            sameFileNameDifferentExif("%s%s" % (image_name, i1_ext), i1_date_time, i1_subseconds, name, fileMetadata.dateTime(), fileMetadata.subSeconds())
+                       
+                
+                # pass the subfolder the image will go into, as this is needed to determine subfolder sequence numbers 
+                # indicate that sequences chosen should be queued
+                
+                # TODO check 'or alreadyDownloaded' is meant to be here
+                if not (skipFile or alreadyDownloaded):
+                    newName, problem = fileRenameFactory.generateNameUsingPreferences(
+                                                                fileMetadata, name, self.stripCharacters,  subfolder,  
                                                                 sequencesPreliminary = True,
-                                                                sequence_to_use = sequence_to_use)
-                                                                
-                        path = os.path.join(baseDownloadDir, subfolder)
-                        newFile = os.path.join(path, newName)
+                                                                sequence_to_use = sequence_to_use,
+                                                                fallback_date = fallback_date)
+
+                    path = os.path.join(baseDownloadDir, subfolder)
+                    newFile = os.path.join(path, newName)
+                
+                if not newName:
+                    skipFile = True
+                if not alreadyDownloaded:
+                    checkProblemWithNameGeneration(newName, path, fullFileName,  problem, fileBeingDownloadedDisplayCap)
+                else:
+                    fileAlreadyExists(fullFileName, fileSkippedDisplay, fileAlreadyExistsDisplay, newFile)
+                    newName = newFile = path = subfolder = None
                     
-                    if not newName:
-                        skipImage = True
-                    if not alreadyDownloaded:
-                        checkProblemWithImageNameGeneration(newName, path, image,  problem)
-                    else:
-                        imageAlreadyExists(image, newFile)
-                        newName = newFile = path = subfolder = None
-                    
-            return (skipImage,  imageMetadata,  newName,  newFile,  path,  subfolder, sequence_to_use)
+            return (skipFile, fileMetadata, newName, newFile, path, subfolder, sequence_to_use)
         
-        def downloadImage(path,  newFile,  newName,  originalName,  image,  imageMetadata,  subfolder, sequence_to_use):
+        def downloadFile(path, newFile, newName, originalName, image, fileMetadata, subfolder, sequence_to_use, modificationTime):
+            """
+            Downloads the photo or video file to the specified subfolder 
+            """
+            
+            if not self.isImage:
+                renameFactory = self.videoRenamePrefsFactory
+            else:
+                renameFactory = self.imageRenamePrefsFactory
+                
+            def progress_callback(self, v):
+                pass
+                
             try:
-                imageDownloaded = False
+                fileDownloaded = False
                 if not os.path.isdir(path):
                     os.makedirs(path)
                 
@@ -1644,11 +2029,11 @@ class CopyPhotos(Thread):
                     nameUniqueBeforeCopy = False
                     if not addUniqueIdentifier:
                         downloadNonUniqueFile = False
-                        if usesSequenceElements and not self.prefs.synchronize_raw_jpg:
-                            # potentially, a unique image name could still be generated
+                        if (usesVideoSequenceElements and not self.isImage) or (usesImageSequenceElements and self.isImage and not self.prefs.synchronize_raw_jpg):
+                            # potentially, a unique file name could still be generated
                             # investigate this possibility
                             with self.fileSequenceLock:
-                                for possibleName,  problem in self.imageRenamePrefsFactory.generateNameSequencePossibilities(imageMetadata, 
+                                for possibleName, problem in renameFactory.generateNameSequencePossibilities(fileMetadata, 
                                                                                                                originalName, self.stripCharacters,  subfolder):
                                     if possibleName:
                                         # no need to check for any problems here, it's just a temporary name
@@ -1660,176 +2045,235 @@ class CopyPhotos(Thread):
 
                                         
                     if not downloadNonUniqueFile:
-                        imageAlreadyExists(image, newFile)
+                        fileAlreadyExists(fullFileName, fileSkippedDisplay, fileAlreadyExistsDisplay, newFile)
 
+                copy_succeeded = False
                 if nameUniqueBeforeCopy or downloadNonUniqueFile:
                     tempWorkingfile = os.path.join(tempWorkingDir, newName)
-                    shutil.copy2(image, tempWorkingfile)
+                    if using_gio:
+                        g_dest = gio.File(path=tempWorkingfile)
+                        g_src = gio.File(path=fullFileName)
+                        if not g_src.copy(g_dest, progress_callback, cancellable=gio.Cancellable()):
+                            downloadCopyingError(fullFileName, tempWorkingfile, fileBeingDownloadedDisplay)
+                        else:
+                            copy_succeeded = True
+                    else:
+                        shutil.copy2(fullFileName, tempWorkingfile)
+                        copy_succeeded = True
                     
-                    with self.fileRenameLock:
-                        doRename = True
-                        if usesSequenceElements:
-                            with self.fileSequenceLock:
-                                # get a filename and use this as the "real" filename
-                                if sequence_to_use is None and self.prefs.synchronize_raw_jpg:
-                                    # must check again, just in case the matching pair has been downloaded in the meantime
-                                    image_name, image_ext = os.path.splitext(originalName)
-                                    with self.downloadedFilesLock:
-                                        i, sequence_to_use = downloaded_files.matching_pair(image_name, image_ext, imageMetadata.dateTime(), imageMetadata.subSeconds())
-                                        if i == -99:
-                                            i1_ext, i1_date_time, i1_subseconds = downloaded_files.extExifDateTime(image_name)
-                                            sameFileNameDifferentExif("%s%s" % (image_name, i1_ext), i1_date_time, i1_subseconds, originalName, imageMetadata.dateTime(), imageMetadata.subSeconds())
-
-                                            
-
-                                newName, problem = self.imageRenamePrefsFactory.generateNameUsingPreferences(
-                                                                imageMetadata, originalName, self.stripCharacters,  subfolder,  
-                                                                sequencesPreliminary = False,
-                                                                sequence_to_use = sequence_to_use)
-                            checkProblemWithImageNameGeneration(newName, path, image,  problem)
-                            if not newName:
-                                # there was a serious error generating the filename
-                                doRename = False                            
-                            else:
-                                newFile = os.path.join(path, newName)
-                        # check if the file exists again
-                        if os.path.exists(newFile):
-                            if not addUniqueIdentifier:
-                                doRename = False
-                                imageAlreadyExists(image, newFile)
-                            else:
-                                # add  basic suffix to make the filename unique
-                                name = os.path.splitext(newName)
-                                suffixAlreadyUsed = True
-                                while suffixAlreadyUsed:
-                                    if newFile in duplicate_files:
-                                        duplicate_files[newFile] +=  1
-                                    else:
-                                        duplicate_files[newFile] = 1
-                                    identifier = '_%s' % duplicate_files[newFile]
-                                    newName = name[0] + identifier + name[1]
-                                    possibleNewFile = os.path.join(path,  newName)
-                                    suffixAlreadyUsed = os.path.exists(possibleNewFile)
-
-                                imageAlreadyExists(image, newFile, identifier)
-                                newFile = possibleNewFile
-                                
-
-                        if doRename:
-                            os.rename(tempWorkingfile, newFile)
-                                    
-                            imageDownloaded = True
+                    if copy_succeeded:
+                        with self.fileRenameLock:
+                            doRename = True
                             if usesSequenceElements:
-                                if self.prefs.synchronize_raw_jpg:
-                                    name, ext = os.path.splitext(originalName)
-                                    if sequence_to_use is None:
-                                        with self.fileSequenceLock:
-                                            seq = self.imageRenamePrefsFactory.sequences.getFinalSequence()
-                                    else:
-                                        seq = sequence_to_use
-                                    with self.downloadedFilesLock:
-                                        downloaded_files.add_download(name, ext, imageMetadata.dateTime(), imageMetadata.subSeconds(), seq) 
+                                with self.fileSequenceLock:
+                                    # get a filename and use this as the "real" filename
+                                    if sequence_to_use is None and self.prefs.synchronize_raw_jpg and self.isImage:
+                                        # must check again, just in case the matching pair has been downloaded in the meantime
+                                        image_name, image_ext = os.path.splitext(originalName)
+                                        with self.downloadedFilesLock:
+                                            i, sequence_to_use = downloaded_files.matching_pair(image_name, image_ext, fileMetadata.dateTime(), fileMetadata.subSeconds())
+                                            if i == -99:
+                                                i1_ext, i1_date_time, i1_subseconds = downloaded_files.extExifDateTime(image_name)
+                                                sameFileNameDifferentExif("%s%s" % (image_name, i1_ext), i1_date_time, i1_subseconds, originalName, fileMetadata.dateTime(), fileMetadata.subSeconds())
 
-                                
+                                                
+
+                                    newName, problem = renameFactory.generateNameUsingPreferences(
+                                                                    fileMetadata, originalName, self.stripCharacters,  subfolder,  
+                                                                    sequencesPreliminary = False,
+                                                                    sequence_to_use = sequence_to_use,
+                                                                    fallback_date = fallback_date)
+                                checkProblemWithNameGeneration(newName, path, fullFileName,  problem, fileBeingDownloadedDisplayCap)
+                                if not newName:
+                                    # there was a serious error generating the filename
+                                    doRename = False                            
+                                else:
+                                    newFile = os.path.join(path, newName)
+                            # check if the file exists again
+                            if os.path.exists(newFile):
+                                if not addUniqueIdentifier:
+                                    doRename = False
+                                    fileAlreadyExists(fullFileName, fileSkippedDisplay, fileAlreadyExistsDisplay, newFile)
+                                else:
+                                    # add  basic suffix to make the filename unique
+                                    name = os.path.splitext(newName)
+                                    suffixAlreadyUsed = True
+                                    while suffixAlreadyUsed:
+                                        if newFile in duplicate_files:
+                                            duplicate_files[newFile] +=  1
+                                        else:
+                                            duplicate_files[newFile] = 1
+                                        identifier = '_%s' % duplicate_files[newFile]
+                                        newName = name[0] + identifier + name[1]
+                                        possibleNewFile = os.path.join(path,  newName)
+                                        suffixAlreadyUsed = os.path.exists(possibleNewFile)
+
+                                    fileAlreadyExists(fullFileName, fileSkippedDisplay, fileAlreadyExistsDisplay, newFile, identifier=identifier)
+                                    newFile = possibleNewFile
+                                    
+
+                            if doRename:
+                                if using_gio:
+                                    g_dest = gio.File(path=newFile)
+                                    g_src = gio.File(path=tempWorkingfile)
+                                    if not g_src.move(g_dest, progress_callback, cancellable=gio.Cancellable()):
+                                        downloadCopyingError(tempWorkingfile, newFile, fileBeingDownloadedDisplay)                                  
+                                else:
+                                    os.rename(tempWorkingfile, newFile)
+                                        
+                                fileDownloaded = True
+                                if usesImageSequenceElements:
+                                    if self.prefs.synchronize_raw_jpg and self.isImage:
+                                        name, ext = os.path.splitext(originalName)
+                                        if sequence_to_use is None:
+                                            with self.fileSequenceLock:
+                                                seq = self.imageRenamePrefsFactory.sequences.getFinalSequence()
+                                        else:
+                                            seq = sequence_to_use
+                                        with self.downloadedFilesLock:
+                                            downloaded_files.add_download(name, ext, fileMetadata.dateTime(), fileMetadata.subSeconds(), seq) 
+
+                                    
+                                    with self.fileSequenceLock:
+                                        if sequence_to_use is None:
+                                            renameFactory.sequences.imageCopySucceeded()
+                                            if usesStoredSequenceNo:
+                                                self.prefs.stored_sequence_no += 1
+                                            
                                 with self.fileSequenceLock:
                                     if sequence_to_use is None:
-                                        self.imageRenamePrefsFactory.sequences.imageCopySucceeded()
-                                        if usesStoredSequenceNo:
-                                            self.prefs.stored_sequence_no += 1
-                                        
-                            with self.fileSequenceLock:
-                                if sequence_to_use is None:
-                                    if self.prefs.incrementDownloadsToday():
-                                        # A new day, according the user's preferences of what time a day begins, has started
-                                        cmd_line(_("New day has started - resetting 'Downloads Today' sequence number"))
-                                        
-                                        sequences.setDownloadsToday(0)
+                                        if self.prefs.incrementDownloadsToday():
+                                            # A new day, according the user's preferences of what time a day begins, has started
+                                            cmd_line(_("New day has started - resetting 'Downloads Today' sequence number"))
+                                            
+                                            sequences.setDownloadsToday(0)
                     
             except IOError, (errno, strerror):
-                downloadCopyingError(image, newFile, errno, strerror)
+                downloadCopyingError(fullFileName, newFile, fileBeingDownloadedDisplay, errno, strerror)
 
             except OSError, (errno, strerror):
-                downloadCopyingError(image, newFile, errno, strerror)                
+                downloadCopyingError(fullFileName, newFile, fileBeingDownloadedDisplay, errno, strerror)                
             
-            if usesSequenceElements:
-                if not imageDownloaded and sequence_to_use is None:
+            if usesImageSequenceElements:
+                if not fileDownloaded and sequence_to_use is None:
                     self.imageRenamePrefsFactory.sequences.imageCopyFailed()
                     
 
-            return (imageDownloaded,  newName,  newFile)
+            return (fileDownloaded,  newName,  newFile)
             
 
-        def backupImage(subfolder,  newName,  imageDownloaded,  newFile,  image):
-            """ backup image to path(s) chosen by the user
+        def backupFile(subfolder, newName, fileDownloaded, newFile, originalFile):
+            """ 
+            Backup photo or video to path(s) chosen by the user
             
             there are two scenarios: 
-            (1) image has just been downloaded and should now be backed up
-            (2) image was already downloaded on some previous occassion and should still be backed up, because it hasn't been yet
-            (3) image has been backed up already (or at least, a file with the same name already exists)
+            (1) file has just been downloaded and should now be backed up
+            (2) file was already downloaded on some previous occassion and should still be backed up, because it hasn't been yet
+            (3) file has been backed up already (or at least, a file with the same name already exists)
+            
+            A backup medium can be used to backup photos or videos, or both. 
             """
             
+            #TODO convert to using GIO
             backed_up = False
+            fileNotBackedUpMessageDisplayed = False
             try:
-                for backupDir in self.parentApp.backupVolumes:
-                    backupPath = os.path.join(backupDir, subfolder)
-                    newBackupFile = os.path.join(backupPath,  newName)
-                    copyBackup = True
-                    if os.path.exists(newBackupFile):
-                        # not thread safe -- it doesn't need to be, because the file names are at this stage going to be unique
-                        copyBackup = self.prefs.backup_duplicate_overwrite                                     
-                        if self.prefs.indicate_download_error:
-                            severity = config.SERIOUS_ERROR
-                            problem = _("Backup image already exists")
-                            details = _("Source: %(source)s\nDestination: %(destination)s") \
-                                % {'source': image, 'destination': newBackupFile}
-                            if copyBackup :
-                                resolution = IMAGE_OVERWRITTEN
-                            else:
-                                resolution = IMAGE_SKIPPED
-                            logError(severity, problem, details, resolution)
+                for rootBackupDir in self.parentApp.backupVolumes:
+                    if self.prefs.backup_device_autodetection:
+                        if self.isImage:
+                            backupDir = os.path.join(rootBackupDir, self.prefs.backup_identifier)
+                        else:
+                            backupDir = os.path.join(rootBackupDir, self.prefs.video_backup_identifier)
+                    else:
+                        # photos and videos will be backed up into the same root folder, which the user has manually specified
+                        backupDir = rootBackupDir
+                    # if user has chosen auto detection, then:
+                    # photos should only be backed up to photo backup locations
+                    # videos should only be backed up to video backup locations
+                    # if user did not choose autodetection, and the backup path doesn't exist, then
+                    # will try to create it
+                    if os.path.exists(backupDir) or not self.prefs.backup_device_autodetection:
 
-                    if copyBackup:
-                        if imageDownloaded:
-                            fileToCopy = newFile
-                        else:
-                            fileToCopy = image
-                        if os.path.isdir(backupPath):
-                            pathExists = True
-                        else:
-                            # recreate folder structure in backup location
-                            # cannot do os.makedirs(backupPath) - it can give bad results when using external drives
-                            # we know backupDir exists 
-                            # all the components of subfolder may not
-                            folders = subfolder.split(os.path.sep)
-                            folderToMake = backupDir 
-                            for f in folders:
-                                if f:
-                                    folderToMake = os.path.join(folderToMake,  f)
-                                    if not os.path.isdir(folderToMake):
-                                        try:
-                                            os.mkdir(folderToMake)
-                                            pathExists = True
-                                        except (IOError, OSError), (errno, strerror):
-                                            logError(config.SERIOUS_ERROR, _('Backing up error'), 
-                                                     _("Destination directory could not be created: %(directory)s\n") %
-                                                     {'directory': folderToMake,  } +
-                                                     _("Source: %(source)s\nDestination: %(destination)s\n") % 
-                                                     {'source': image, 'destination': newBackupFile} + 
-                                                     _("Error: %(errno)s %(strerror)s") % {'errno': errno,  'strerror': strerror}, 
-                                                     _('The image was not copied.')
-                                                     )
-                                            pathExists = False
-                                    
-                        if pathExists:
-                            shutil.copy2(fileToCopy,  newBackupFile)
-                            backed_up = True
+                        backupPath = os.path.join(backupDir, subfolder)
+                        newBackupFile = os.path.join(backupPath, newName)
+                        copyBackup = True
+                        if os.path.exists(newBackupFile):
+                            # this check is of course not thread safe -- it doesn't need to be, because at this stage the file names are going to be unique
+                            # (the folder structure is the same as the actual download folders, and the file names are unique in them)
+                            copyBackup = self.prefs.backup_duplicate_overwrite                                     
+                            if self.prefs.indicate_download_error:
+                                severity = config.SERIOUS_ERROR
+                                problem = _("Backup of %(file_type)s already exists") % {'file_type': fileBeingDownloadedDisplay}
+                                details = _("Source: %(source)s\nDestination: %(destination)s") \
+                                    % {'source': originalFile, 'destination': newBackupFile}
+                                if copyBackup :
+                                    resolution = _("Backup %(file_type)s overwritten") % {'file_type': fileBeingDownloadedDisplay}
+                                else:
+                                    fileNotBackedUpMessageDisplayed = True
+                                    if self.prefs.backup_device_autodetection:
+                                        volume = self.parentApp.backupVolumes[rootBackupDir].get_name()
+                                        resolution = _("%(file_type)s not backed up to %(volume)s") % {'file_type': fileBeingDownloadedDisplayCap, 'volume': volume}
+                                    else:
+                                        resolution = _("%(file_type)s not backed up") % {'file_type': fileBeingDownloadedDisplayCap}
+                                logError(severity, problem, details, resolution)
+
+                        if copyBackup:
+                            if fileDownloaded:
+                                fileToCopy = newFile
+                            else:
+                                fileToCopy = originalFile
+                            if os.path.isdir(backupPath):
+                                pathExists = True
+                            else:
+                                # recreate folder structure in backup location
+                                # cannot do os.makedirs(backupPath) - it can give bad results when using external drives
+                                # we know backupDir exists 
+                                # all the components of subfolder may not
+                                folders = subfolder.split(os.path.sep)
+                                folderToMake = backupDir 
+                                for f in folders:
+                                    if f:
+                                        folderToMake = os.path.join(folderToMake,  f)
+                                        if not os.path.isdir(folderToMake):
+                                            try:
+                                                os.mkdir(folderToMake)
+                                                pathExists = True
+                                            except (IOError, OSError), (errno, strerror):
+                                                fileNotBackedUpMessageDisplayed = True
+                                                logError(config.SERIOUS_ERROR, _('Backing up error'), 
+                                                         _("Destination directory could not be created: %(directory)s\n") %
+                                                         {'directory': folderToMake,  } +
+                                                         _("Source: %(source)s\nDestination: %(destination)s\n") % 
+                                                         {'source': originalFile, 'destination': newBackupFile} + 
+                                                         _("Error: %(errno)s %(strerror)s") % {'errno': errno,  'strerror': strerror}, 
+                                                         _('The %(file_type)s was not backed up.') % {'file_type': fileBeingDownloadedDisplay}
+                                                         )
+                                                pathExists = False
+                                                break
+                                        
+                            if pathExists:
+                                shutil.copy2(fileToCopy, newBackupFile)
+                                backed_up = True
                         
             except (IOError, OSError), (errno, strerror):
+                fileNotBackedUpMessageDisplayed = True
                 logError(config.SERIOUS_ERROR, _('Backing up error'), 
                             _("Source: %(source)s\nDestination: %(destination)s\nError: %(errno)s %(strerror)s")
-                            % {'source': image, 'destination': newBackupFile,  'errno': errno,  'strerror': strerror},
-                            _('The image was not copied.'))
+                            % {'source': originalFile, 'destination': newBackupFile,  'errno': errno,  'strerror': strerror},
+                            _('The %(file_type)s was not backed up.')  % {'file_type': fileBeingDownloadedDisplay}
+                        )
 
+            if not backed_up and not fileNotBackedUpMessageDisplayed:
+                # The file has not been backed up to any medium
+                severity = config.SERIOUS_ERROR
+                problem = _("%(file_type)s could not be backed up") % {'file_type': fileBeingDownloadedDisplayCap}
+                details = _("Source: %(source)s") % {'source': originalFile}
+                if self.prefs.backup_device_autodetection:
+                    resolution = _("No suitable backup volume was found")
+                else:
+                    resolution = _("A backup location was not found")
+                logError(severity, problem, details, resolution)    
+                
             return backed_up
 
         def notifyAndUnmount():
@@ -1845,9 +2289,12 @@ class CopyPhotos(Thread):
                 else:
                     unmountMessage = ""
             
-            message = _("%s images downloaded") % noImagesDownloaded
-            if noImagesSkipped:
-                message += "\n" + _("%s images skipped") % noImagesSkipped
+            file_types = file_types_by_number(noImagesDownloaded, noVideosDownloaded)
+            file_types_skipped = file_types_by_number(noImagesSkipped, noVideosSkipped)
+            message = _("%(noFiles)s %(filetypes)s downloaded") % {'noFiles':noFilesDownloaded, 'filetypes': file_types}
+            noFilesSkipped = noImagesSkipped + noVideosSkipped
+            if noFilesSkipped:
+                message += "\n" + _("%(noFiles)s %(filetypes)s skipped") % {'noFiles':noFilesSkipped, 'filetypes':file_types_skipped}
             
             if unmountMessage:
                 message = "%s\n%s" % (message,  unmountMessage)
@@ -1870,26 +2317,70 @@ class CopyPhotos(Thread):
 
         
 
+        def getThumbnail(fileMetadata):
+            thumbnail = orientation = None
+            if self.isImage:
+                try:
+                    thumbnail = fileMetadata.getThumbnailData(MAX_THUMBNAIL_SIZE)
+                    if not isinstance(thumbnail, types.StringType):
+                        thumbnail = None
+                except:
+                    thumbnail = None
+                    
+                if thumbnail is None:
+                    logError(config.WARNING, _("Photo thumbnail could not be extracted"), fullFileName)
+                    orientation = None
+                else:
+                    orientation = fileMetadata.orientation(missing=None)
+            else:
+                # get thumbnail of video
+                # it may need to be generated
+                thumbnail = fileMetadata.getThumbnailData(MAX_THUMBNAIL_SIZE, tempWorkingDir)
+                if thumbnail:
+                    orientation = 1
+            return thumbnail, orientation
+                            
+        def createTempDir(baseDir):
+            """
+            Create a temporary directory in which to download the photos to.
+            
+            Returns the directory if it was created, else returns None.
+            
+            Don't want to put it in system temp folder, as that is likely
+            to be on another partition and hence copying files from it
+            to the actual download folder will be slow!"""
+            try:
+                t = tempfile.mkdtemp(prefix='rapid-tmp-', 
+                                                dir=baseDir)
+                return t
+            except OSError, (errno, strerror):
+                if not self.cardMedia.volume:
+                    image_device = _("Source: %s\n") % self.cardMedia.getPath()
+                else:
+                    _("Device: %s\n") % self.cardMedia.volume.get_name()
+                destination = _("Destination: %s") % baseDir
+                logError(config.CRITICAL_ERROR, _('Could not create temporary download directory'), 
+                             image_device + destination,
+                            _("Download cannot proceed"))
+                cmd_line(_("Error:") + " " + _('Could not create temporary download directory'))
+                cmd_line(image_device + destination)
+                cmd_line(_("Download cannot proceed"))
+                display_queue.put((media_collection_treeview.removeCard,  (self.thread_id, )))
+                display_queue.put((self.parentApp.downloadFailed,  (self.thread_id, )))
+                display_queue.close("rw")
+                self.running = False
+                self.lock.release()
+                return None      
+            
         self.hasStarted = True
         display_queue.open('w')
 
         #Do not try to handle any preference errors here
         getPrefs(False)
         
-        #check for presence of backup meditum
-        if self.prefs.backup_images:
-            if self.prefs.backup_missing <> config.IGNORE:
-                if not len(self.parentApp.backupVolumes):
-                    if self.prefs.backup_missing == config.REPORT_ERROR:
-                        e = config.SERIOUS_ERROR
-                    else:
-                        e = config.WARNING
-                    logError(e,  _("Backup device missing"),  _("No backup device was detected."))
-                
-        
         if not scanMedia():
-            cmd_line(_("This device has no images to download from."))
-            display_queue.put((self.parentApp.downloadFailed,  (self.thread_id, )))
+            cmd_line(_("This device has no %(types_searched_for)s to download from.") % {'types_searched_for': self.types_searched_for})
+            display_queue.put((self.parentApp.downloadFailed, (self.thread_id, )))
             display_queue.close("rw")
             self.running = False
             return 
@@ -1925,17 +2416,47 @@ class CopyPhotos(Thread):
         self.downloadStarted = True
         cmd_line(_("Download has started from %s") % self.cardMedia.prettyName(limit=0))
         
+        #check for presence of backup path or volumes
+        if self.prefs.backup_images:
+            can_backup = True
+            if self.prefs.backup_missing == config.REPORT_ERROR:
+                e = config.SERIOUS_ERROR
+            elif self.prefs.backup_missing == config.REPORT_WARNING:
+                e = config.WARNING            
+            if not self.prefs.backup_device_autodetection:
+                if not os.path.isdir(self.prefs.backup_location):
+                    # the user has manually specified a path, but it
+                    # does not exist. This is a problem.
+                    try:
+                        os.makedirs(self.prefs.backup_location)
+                    except:
+                        if self.prefs.backup_missing <> config.IGNORE:
+                            logError(e, _("Backup path does not exist"),
+                                        _("The path %s could not be created") % path, 
+                                        _("No backups can occur")
+                                    )
+                        can_backup = False
+                        
+            elif self.prefs.backup_missing <> config.IGNORE:
+                if not len(self.parentApp.backupVolumes):
+                    logError(e, _("Backup device missing"), 
+                                _("No backup device was automatically detected"), 
+                                _("No backups can occur"))
+                    can_backup = False        
+        
         if need_job_code and job_code == None:
             sys.stderr.write(str(self.thread_id ) + ": job code should never be None\n")
             self.imageRenamePrefsFactory.setJobCode('unknown-job-code')
             self.subfolderPrefsFactory.setJobCode('unknown-job-code')
         else:
             self.imageRenamePrefsFactory.setJobCode(job_code)
+            self.videoRenamePrefsFactory.setJobCode(job_code)
             self.subfolderPrefsFactory.setJobCode(job_code)
+            self.videoSubfolderPrefsFactory.setJobCode(job_code)
             
-        # Some images may not have metadata (this
-        # is unlikely for images straight out of a 
-        # camera, but it is possible for images that have been edited).  If
+        # Some photos may not have metadata (this
+        # is unlikely for photos straight out of a 
+        # camera, but it is possible for photos that have been edited).  If
         # only non-dynamic components make up the rest of an image name 
         # (e.g. text specified by the user), then relying on metadata will 
         # likely produce duplicate names. 
@@ -1943,65 +2464,56 @@ class CopyPhotos(Thread):
         needMetaDataToCreateUniqueImageName = self.imageRenamePrefsFactory.needImageMetaDataToCreateUniqueName()
         
         # subfolder generation also need to be examined, but here the need is
-        # not so exacting, since subfolders contain images, and naturally the
+        # not so exacting, since subfolders contain photos, and naturally the
         # requirement to be unique is far more relaxed.  However if subfolder 
         # generation relies entirely on metadata, that is a problem worth
         # looking for
         needMetaDataToCreateUniqueSubfolderName = self.subfolderPrefsFactory.needMetaDataToCreateUniqueName()
         
         i = 0
-        sizeDownloaded = noImagesDownloaded =  noImagesSkipped = 0
-        imagesDownloadedSuccessfully = []
+        sizeDownloaded = noFilesDownloaded = noImagesDownloaded = noVideosDownloaded = noImagesSkipped = noVideosSkipped = 0
+        filesDownloadedSuccessfully = []
         
-        sizeImages = self.cardMedia.sizeOfImages(humanReadable = False)
-        display_queue.put((self.parentApp.addToTotalDownloadSize,  (sizeImages, )))
+        sizeFiles = self.cardMedia.sizeOfImagesAndVideos(humanReadable = False)
+        display_queue.put((self.parentApp.addToTotalDownloadSize, (sizeFiles, )))
         display_queue.put((self.parentApp.setOverallDownloadMark, ()))
         display_queue.put((self.parentApp.postStartDownloadTasks,  ()))
         
-        sizeImages = float(sizeImages)
-        noImages = self.cardMedia.numberOfImages()
+        sizeFiles = float(sizeFiles)
+        noFiles = self.cardMedia.numberOfImagesAndVideos()
         
-        baseDownloadDir = self.prefs.download_folder
-        #create a temporary directory in which to download the photos to
-        #don't want to put it in system temp folder, as that is likely
-        #to be on another partition and hence copying files from it
-        #to the download folder will be slow!
-        try:
-            tempWorkingDir = tempfile.mkdtemp(prefix='rapid-tmp-', 
-                                            dir=baseDownloadDir)
-        except OSError, (errno, strerror):
-            if not self.cardMedia.volume:
-                image_device = _("Source: %s\n") % self.cardMedia.getPath()
-            else:
-                _("Image device: %s\n") % self.cardMedia.volume.get_name()
-            destination = _("Destination: %s") % baseDownloadDir
-            logError(config.CRITICAL_ERROR, _('Could not create temporary download directory'), 
-                         image_device + destination,
-                        _("Download cannot proceed"))
-            cmd_line(_("Error:") + " " + _('Could not create temporary download directory'))
-            cmd_line(image_device + destination)
-            cmd_line(_("Download cannot proceed"))
-            display_queue.put((media_collection_treeview.removeCard,  (self.thread_id, )))
-            display_queue.put((self.parentApp.downloadFailed,  (self.thread_id, )))
-            display_queue.close("rw")
-            self.running = False
-            self.lock.release()
-            return 
-            
-                                  
-        IMAGE_SKIPPED = _("Image skipped")
-        IMAGE_OVERWRITTEN = _("Image overwritten")
-        IMAGE_ALREADY_EXISTS = _("Image already exists")
+        if self.noImages > 0:
+            photoBaseDownloadDir = self.prefs.download_folder
+            if not checkDownloadPath(photoBaseDownloadDir):
+                return
+            photoTempWorkingDir = createTempDir(photoBaseDownloadDir)
+            if not photoTempWorkingDir:
+                return
+        else:
+            photoBaseDownloadDir = photoTempWorkingDir = None
+        if DOWNLOAD_VIDEO and self.noVideos > 0:
+            videoBaseDownloadDir = self.prefs.video_download_folder
+            if not checkDownloadPath(videoBaseDownloadDir):
+                return
+            videoTempWorkingDir = createTempDir(videoBaseDownloadDir)
+            if not videoTempWorkingDir:
+                return            
+        else:
+            videoBaseDownloadDir = videoTempWorkingDir = None
         
         addUniqueIdentifier = self.prefs.download_conflict_resolution == config.ADD_UNIQUE_IDENTIFIER
-        usesSequenceElements = self.imageRenamePrefsFactory.usesSequenceElements()
-        usesStoredSequenceNo = self.imageRenamePrefsFactory.usesTheSequenceElement(rn.STORED_SEQ_NUMBER)
-        sequences. setUseOfSequenceElements(
+        usesImageSequenceElements = self.imageRenamePrefsFactory.usesSequenceElements()
+        usesVideoSequenceElements = self.videoRenamePrefsFactory.usesSequenceElements()
+        usesSequenceElements = usesVideoSequenceElements or usesImageSequenceElements
+        
+        usesStoredSequenceNo = (self.imageRenamePrefsFactory.usesTheSequenceElement(rn.STORED_SEQ_NUMBER) or
+                                self.videoRenamePrefsFactory.usesTheSequenceElement(rn.STORED_SEQ_NUMBER))
+        sequences.setUseOfSequenceElements(
             self.imageRenamePrefsFactory.usesTheSequenceElement(rn.SESSION_SEQ_NUMBER), 
             self.imageRenamePrefsFactory.usesTheSequenceElement(rn.SEQUENCE_LETTER))
         
 
-        while i < noImages:
+        while i < noFiles:
             if not self.running:
                 self.lock.acquire()
                 self.running = True
@@ -2013,71 +2525,98 @@ class CopyPhotos(Thread):
                 return
             
             # get information about the image to deduce image name and path
-            name, root, size,  modificationTime = self.cardMedia.images[i]
-            image = os.path.join(root, name)
+            name, root, size,  modificationTime = self.cardMedia.imagesAndVideos[i]
+            fullFileName = os.path.join(root, name)
             
-            skipImage,  imageMetadata,  newName,  newFile,  path,  subfolder, sequence_to_use = generateSubfolderAndFileName(
-                       image,  name,  needMetaDataToCreateUniqueImageName,  
-                       needMetaDataToCreateUniqueSubfolderName)
-
-            if skipImage:
-                noImagesSkipped += 1
+            self.isImage = media.isImage(name)
+            if self.isImage:
+                fileBeingDownloadedDisplay = _('photo')
+                fileBeingDownloadedDisplayCap = _('Photo')
+                fileSkippedDisplay = _("Photo skipped")
+                fileAlreadyExistsDisplay = _("Photo already exists")
+                fallback_date = None
+                tempWorkingDir = photoTempWorkingDir
+                baseDownloadDir = photoBaseDownloadDir
             else:
-                imageDownloaded, newName, newFile  = downloadImage(path,  newFile,  newName,  name,  image,  
-                                                                   imageMetadata,  subfolder, sequence_to_use)
+                fileBeingDownloadedDisplay = _('video')
+                fileBeingDownloadedDisplayCap = _('Video')
+                fileSkippedDisplay = _("Video skipped")
+                fileAlreadyExistsDisplay = _("Video already exists")
+                fallback_date = modificationTime
+                tempWorkingDir = videoTempWorkingDir
+                baseDownloadDir = videoBaseDownloadDir
+                
+            skipFile, fileMetadata, newName, newFile, path, subfolder, sequence_to_use = generateSubfolderAndFileName(
+                       fullFileName, name, needMetaDataToCreateUniqueImageName,  
+                       needMetaDataToCreateUniqueSubfolderName, fallback_date)
+
+            if skipFile:
+                if self.isImage:
+                    noImagesSkipped += 1
+                else:
+                    noVideosSkipped += 1
+            else:
+                fileDownloaded, newName, newFile  = downloadFile(path, newFile, newName, name, fullFileName,  
+                                                                   fileMetadata, subfolder, sequence_to_use, fallback_date)
 
                 if self.prefs.backup_images:
-                    backed_up = backupImage(subfolder,  newName,  imageDownloaded,  newFile,  image)
+                    if can_backup:
+                        backed_up = backupFile(subfolder, newName, fileDownloaded, newFile, fullFileName)
+                    else:
+                        backed_up = False
 
-                if imageDownloaded:
-                    noImagesDownloaded += 1
+                if fileDownloaded:
+                    noFilesDownloaded += 1
+                    if self.isImage:
+                        noImagesDownloaded += 1
+                    else:
+                        noVideosDownloaded += 1
                     if self.prefs.backup_images and backed_up:
-                        imagesDownloadedSuccessfully.append(image)
+                        filesDownloadedSuccessfully.append(fullFileName)
                     elif not self.prefs.backup_images:
-                        imagesDownloadedSuccessfully.append(image)
+                        filesDownloadedSuccessfully.append(fullFileName)
                 else:
-                    noImagesSkipped += 1
-                try:
-                    thumbnailType, thumbnail = imageMetadata.getThumbnailData()
-                except:
-                    logError(config.WARNING, _("Image has no thumbnail"), image)
-                    thumbnail = orientation = None
-                else:
-                    orientation = imageMetadata.orientation(missing=None)
-                display_queue.put((image_hbox.addImage, (self.thread_id, thumbnail, orientation, image,  imageDownloaded)))
+                    if self.isImage:
+                        noImagesSkipped += 1
+                    else:
+                        noVideosSkipped += 1
+                
+                thumbnail, orientation = getThumbnail(fileMetadata)
+
+                display_queue.put((thumbnail_hbox.addImage, (self.thread_id, thumbnail, orientation, fullFileName, fileDownloaded, self.isImage)))
             
             sizeDownloaded += size
-            percentComplete = (sizeDownloaded / sizeImages) * 100
-            if sizeDownloaded == sizeImages:
+            percentComplete = (sizeDownloaded / sizeFiles) * 100
+            if sizeDownloaded == sizeFiles:
                 self.downloadComplete = True
-            progressBarText = _("%(number)s of %(total)s images copied") % {'number':  i + 1, 'total': noImages}
+            progressBarText = _("%(number)s of %(total)s %(filetypes)s") % {'number':  i + 1, 'total': noFiles, 'filetypes':self.display_file_types}
             display_queue.put((media_collection_treeview.updateProgress, (self.thread_id, percentComplete, progressBarText, size)))
             
             i += 1
 
         with self.statsLock:
-            self.downloadStats.adjust(sizeDownloaded,  noImagesDownloaded,  noImagesSkipped,  self.noWarnings,  self.noErrors)
+            self.downloadStats.adjust(sizeDownloaded, noImagesDownloaded, noVideosDownloaded, noImagesSkipped, noVideosSkipped, self.noWarnings, self.noErrors)
             
         if self.prefs.auto_delete:
             j = 0
-            for image in imagesDownloadedSuccessfully:
+            for imageOrVideo in filesDownloadedSuccessfully:
                 try:
-                    os.unlink(image)
+                    os.unlink(imageOrVideo)
                     j += 1
                 except OSError, (errno, strerror):
-                    logError(config.SERIOUS_ERROR,  _("Could not delete image from image device"),  
-                            _("Image: %(source)s\nError: %(errno)s %(strerror)s")
+                    logError(config.SERIOUS_ERROR,  _("Could not delete photo or video from device"),  
+                            _("Photo: %(source)s\nError: %(errno)s %(strerror)s")
                             % {'source': image, 'errno': errno,  'strerror': strerror})
                 except:
-                    logError(config.SERIOUS_ERROR,  _("Could not delete image from image device"),  
-                            _("Image: %(source)s"))
+                    logError(config.SERIOUS_ERROR,  _("Could not delete photo or video from device"),  
+                            _("Photo: %(source)s"))
                     
-            cmd_line(_("Deleted %i images from image device") % j)
+            cmd_line(_("Deleted %(number)i %(filetypes)s from device") % {'number':j, 'filetypes':self.display_file_types})
 
-        # must manually delete these variables, or else the media cannot be unmounted (bug in pyexiv or exiv2)
-        del self.subfolderPrefsFactory,  self.imageRenamePrefsFactory
+        # must manually delete these variables, or else the media cannot be unmounted (bug in some versions of pyexiv2 / exiv2)
+        del self.subfolderPrefsFactory, self.imageRenamePrefsFactory
         try:
-            del imageMetadata
+            del fileMetadata
         except:
             pass
                 
@@ -2091,7 +2630,7 @@ class CopyPhotos(Thread):
         display_queue.close("rw")
         
         self.running = False
-        if noImages:
+        if noFiles:
             self.lock.release()
         
     def startStop(self):
@@ -2171,13 +2710,11 @@ class MediaTreeView(gtk.TreeView):
         self.append_column(column2)
         self.show_all()
         
-    def addCard(self, thread_id, cardName, sizeImages, noImages, progress = 0.0,
+    def addCard(self, thread_id, cardName, sizeFiles, noFiles, progress = 0.0,
                 progressBarText = ''):
-        if not progressBarText:
-            progressBarText = _("0 of %s images copied") % (noImages)
         
         # add the row, and get a temporary pointer to the row
-        iter = self.liststore.append((cardName, sizeImages, noImages, 
+        iter = self.liststore.append((cardName, sizeFiles, noFiles, 
                                                 progress, progressBarText))
         
         self._setThreadMap(thread_id, iter)
@@ -2191,11 +2728,11 @@ class MediaTreeView(gtk.TreeView):
             self.parentApp.media_collection_scrolledwindow.set_size_request(-1,  height)
 
         
-    def updateCard(self,  thread_id,  sizeImages, noImages):
+    def updateCard(self,  thread_id,  sizeFiles, noFiles):
         if thread_id in self.mapThreadToRow:
             iter = self._getThreadMap(thread_id)
-            self.liststore.set_value(iter, 1, sizeImages)
-            self.liststore.set_value(iter, 2, noImages)
+            self.liststore.set_value(iter, 1, sizeFiles)
+            self.liststore.set_value(iter, 2, noFiles)
         else:
             sys.stderr.write("FIXME: this card is unknown")
     
@@ -2245,7 +2782,7 @@ class MediaTreeView(gtk.TreeView):
             col = self.get_column(0)
             return self.get_background_area(path, col)[3]
 
-class ImageHBox(gtk.HBox):
+class ThumbnailHBox(gtk.HBox):
     """
     Displays thumbnails of the images being downloaded
     """
@@ -2256,49 +2793,63 @@ class ImageHBox(gtk.HBox):
         self.padding = hd.CONTROL_IN_TABLE_SPACE / 2
 
         #create image used to lighten thumbnails
-        self.white = gtk.gdk.Pixbuf(gtk.gdk.COLORSPACE_RGB,  False,  8,  width=100, height=100)
+        self.white = gtk.gdk.Pixbuf(gtk.gdk.COLORSPACE_RGB,  False,  8,  width=MAX_THUMBNAIL_SIZE, height=MAX_THUMBNAIL_SIZE)
         #fill with white
         self.white.fill(0xffffffff)
         
         #load missing image 
-        self.missingThumbnail = gtk.gdk.pixbuf_new_from_file_at_size(paths.share_dir('glade3/image-missing.svg'),  100,  100)
+        self.missingThumbnail = gtk.gdk.pixbuf_new_from_file_at_size(paths.share_dir('glade3/image-missing.svg'), MAX_THUMBNAIL_SIZE, MAX_THUMBNAIL_SIZE)
+        self.videoThumbnail = gtk.gdk.pixbuf_new_from_file_at_size(paths.share_dir('glade3/video.svg'), MAX_THUMBNAIL_SIZE,  MAX_THUMBNAIL_SIZE)
         
-    def addImage(self, thread_id, thumbnail, orientation, filename,  imageDownloaded):
+    def addImage(self, thread_id, thumbnail, orientation, filename, fileDownloaded, isImage):
         """ 
         Add thumbnail
         
         Orientation indicates if the thumbnail needs to be rotated or not.
         """
         
-        if not thumbnail:
-            pixbuf = self.missingThumbnail
-        else:
-            try:
-                pbloader = gdk.PixbufLoader()
-                pbloader.write(thumbnail)
-                # Get the resulting pixbuf and build an image to be displayed
-                pixbuf = pbloader.get_pixbuf()
-                pbloader.close()
-                
-            except:
-                log_dialog.addMessage(thread_id, config.WARNING, 
-                                _('Thumbnail cannot be displayed'), filename, 
-                                _('It may be corrupted'))
+        if isImage:
+            if not thumbnail:
                 pixbuf = self.missingThumbnail
+            else:
+                try:
+                    pbloader = gdk.PixbufLoader()
+                    pbloader.write(thumbnail)
+                    pbloader.close()
+                    # Get the resulting pixbuf and build an image to be displayed
+                    pixbuf = pbloader.get_pixbuf()  
+                except:
+                    log_dialog.addMessage(thread_id, config.WARNING, 
+                                    _("Photo thumbnail could not be extracted"), filename, 
+                                    _('It may be corrupted'))
+                    pbloader = None
+                    pixbuf = self.missingThumbnail
+        else:
+            # the file downloaded is a video, not a photo or image
+            # if thumbnail is passed in, it is already in pixbuf format
+            if thumbnail:
+                pixbuf = thumbnail
+            else:
+                pixbuf = self.videoThumbnail
 
         if not pixbuf:
+            # get_pixbuf() can return None if not could not render the image
             log_dialog.addMessage(thread_id, config.WARNING, 
-                            _('Thumbnail cannot be displayed'), filename, 
+                            _("Photo thumbnail could not be extracted"), filename, 
                             _('It may be corrupted'))
             pixbuf = self.missingThumbnail
         else:
             # rotate if necessary
             if orientation == 8:
                 pixbuf = pixbuf.rotate_simple(gdk.PIXBUF_ROTATE_COUNTERCLOCKWISE)
+            elif orientation == 6:
+                pixbuf = pixbuf.rotate_simple(gdk.PIXBUF_ROTATE_CLOCKWISE)
+            elif orientation == 3:
+                pixbuf = pixbuf.rotate_simple(gdk.PIXBUF_ROTATE_UPSIDEDOWN)
     
         # scale to size
-        pixbuf = common.scale2pixbuf(100, 100, pixbuf)
-        if not imageDownloaded:
+        pixbuf = common.scale2pixbuf(MAX_THUMBNAIL_SIZE, MAX_THUMBNAIL_SIZE, pixbuf)
+        if not fileDownloaded:
             # lighten it
             self.white.composite(pixbuf, 0, 0, pixbuf.props.width, pixbuf.props.height, 0, 0, 1.0, 1.0, gtk.gdk.INTERP_HYPER, 180)
 
@@ -2324,7 +2875,7 @@ class UseDeviceDialog(gtk.Dialog):
         
         self.set_icon_from_file(paths.share_dir('glade3/rapid-photo-downloader-about.png'))
         # Translators: for an explanation of what this means, see http://damonlynch.net/rapid/documentation/index.html#usedeviceprompt
-        prompt_label = gtk.Label(_('Should this device or partition be used to download images from?'))
+        prompt_label = gtk.Label(_('Should this device or partition be used to download photos or videos from?'))
         prompt_label.set_line_wrap(True)
         prompt_hbox = gtk.HBox()
         prompt_hbox.pack_start(prompt_label, False, False, padding=6)
@@ -2541,7 +3092,8 @@ class LogDialog(gnomeglade.Component):
         self.log_textview.set_cursor_visible(False)
         self.textbuffer = self.log_textview.get_buffer()
         
-        self.problemTag = self.textbuffer.create_tag(weight=pango.WEIGHT_BOLD)
+        self.errorTag = self.textbuffer.create_tag(weight=pango.WEIGHT_BOLD, foreground="red")
+        self.warningTag = self.textbuffer.create_tag(weight=pango.WEIGHT_BOLD)
         self.resolutionTag = self.textbuffer.create_tag(style=pango.STYLE_ITALIC)
         
     def addMessage(self, thread_id, severity, problem, details, resolution):
@@ -2552,7 +3104,10 @@ class LogDialog(gnomeglade.Component):
         self.parentApp.warning_vseparator.show()
         
         iter = self.textbuffer.get_end_iter()
-        self.textbuffer.insert_with_tags(iter, problem +"\n", self.problemTag)
+        if severity in [config.CRITICAL_ERROR, config.SERIOUS_ERROR]:
+            self.textbuffer.insert_with_tags(iter, problem +"\n", self.errorTag)
+        else:
+            self.textbuffer.insert_with_tags(iter, problem +"\n", self.warningTag)
         if details:
             iter = self.textbuffer.get_end_iter()
             self.textbuffer.insert(iter, details + "\n")
@@ -2609,6 +3164,8 @@ class RapidApp(gnomeglade.GnomeApp,  dbus.service.Object):
 #        sys.exit(0)
 
         self.widget.show()
+        
+        self.checkIfFirstTimeProgramEverRun()
 
         displayPreferences = self.checkForUpgrade(__version__)
         self.prefs.program_version = __version__
@@ -2626,7 +3183,7 @@ class RapidApp(gnomeglade.GnomeApp,  dbus.service.Object):
             displayPreferences = not self.checkPreferencesOnStartup()
         
         # display download information using threads
-        global media_collection_treeview, image_hbox, log_dialog
+        global media_collection_treeview, thumbnail_hbox, log_dialog
         global download_queue, image_queue, log_queue
         global workers
 
@@ -2683,8 +3240,8 @@ class RapidApp(gnomeglade.GnomeApp,  dbus.service.Object):
         self.media_collection_vbox.pack_start(media_collection_treeview)
         
         #thumbnail display
-        image_hbox = ImageHBox(self)
-        self.image_viewport.add(image_hbox)
+        thumbnail_hbox = ThumbnailHBox(self)
+        self.image_viewport.add(thumbnail_hbox)
         self.image_viewport.modify_bg(gtk.STATE_NORMAL, gdk.color_parse("white"))
         self.set_display_thumbnails(self.prefs.display_thumbnails)
         
@@ -2748,23 +3305,33 @@ class RapidApp(gnomeglade.GnomeApp,  dbus.service.Object):
             self.rapidapp.present()
         else:
             self.running = True
+#            if not using_gio:
             self.main()
+#            else:
+#                mainloop = gobject.MainLoop()
+#                mainloop.run()
             self.running = False
             
     def setTestingEnv(self):
-        self.prefs.program_version = '0.0.8~b7'
-        r = ['Date time', 'Image date', 'YYYYMMDD', 'Text', '-', '', 'Date time', 'Image date', 'HHMM', 'Text', '-', '', 'Session number', '1', 'Three digits', 'Text', '-iso', '', 'Metadata', 'ISO', '', 'Text', '-f', '', 'Metadata', 'Aperture', '', 'Text', '-', '', 'Metadata', 'Focal length', '', 'Text', 'mm-', '', 'Metadata', 'Exposure time', '', 'Filename', 'Extension', 'lowercase']
-        self.prefs.image_rename = r
+        #self.prefs.program_version = '0.0.8~b7'
+        p = ['Date time', 'Image date', 'YYYYMMDD', 'Text', '-', '', 'Date time', 'Image date', 'HHMM', 'Text', '-', '', rn.SEQUENCES, rn.DOWNLOAD_SEQ_NUMBER, rn.SEQUENCE_NUMBER_3, 'Text', '-iso', '', 'Metadata', 'ISO', '', 'Text', '-f', '', 'Metadata', 'Aperture', '', 'Text', '-', '', 'Metadata', 'Focal length', '', 'Text', 'mm-', '', 'Metadata', 'Exposure time', '', 'Filename', 'Extension', 'lowercase']
+        v = ['Date time', 'Video date', 'YYYYMMDD', 'Text', '-', '', 'Date time', 'Video date', 'HHMM', 'Text', '-', '', 'Sequences', 'Downloads today', 'One digit', 'Text', '-', '', 'Metadata', 'Width', '', 'Text', 'x', '', 'Metadata', 'Height', '', 'Filename', 'Extension', 'lowercase']
+        f = '/home/damon/store/rapid-dump'
+        self.prefs.image_rename = p
+        self.prefs.video_rename = v
+        self.prefs.download_folder = f
+        self.prefs.video_download_folder = f
+        
         
         
     def checkImageDevicePathOnStartup(self):
         msg = None
         if not os.path.isdir(self.prefs.device_location):
-            msg = _("Sorry, this image location does not exist:\n%(path)s\n\nPlease resolve the problem, or modify your preferences." % {"path": self.prefs.device_location})
+            msg = _("Sorry, this device location does not exist:\n%(path)s\n\nPlease resolve the problem, or modify your preferences." % {"path": self.prefs.device_location})
             
         if msg:
             sys.stderr.write(msg +'\n')
-            misc.run_dialog(_("Problem with Image Location Folder"), msg, 
+            misc.run_dialog(_("Problem with Device Location Folder"), msg, 
                 self,
                 gtk.MESSAGE_ERROR)
             return False
@@ -2772,22 +3339,36 @@ class RapidApp(gnomeglade.GnomeApp,  dbus.service.Object):
             return True
         
     def checkDownloadPathOnStartup(self):
-        msg = None
-        if not os.path.isdir(self.prefs.download_folder):
-            msg = _("Sorry, the Download Folder does not exist. Please create the folder, or modify your preferences")
+        if DOWNLOAD_VIDEO:
+            paths = ((self.prefs.download_folder, _('Photo')), (self.prefs.video_download_folder, _('Video')))
         else:
-            #unfortunately 'os.access(self.prefs.download_folder, os.W_OK)' is not reliable
-            try:
-                tempWorkingDir = tempfile.mkdtemp(prefix='rapid-tmp-', 
-                                            dir=self.prefs.download_folder)
-            except:
-                msg = _("Sorry, the Download Folder exists but cannot be written to. Please check the folder's permissions, or modify your preferences")
+            paths = ((self.prefs.download_folder, _('Photo')),)
+        msg = ''
+        noProblems = 0
+        for path, file_type in paths:
+            if not os.path.isdir(path):
+                msg += _("The %(file_type)s Download Folder does not exist.\n") % {'file_type': file_type}
+                noProblems += 1
             else:
-                os.rmdir(tempWorkingDir)
+                #unfortunately 'os.access(self.prefs.download_folder, os.W_OK)' is not reliable
+                try:
+                    tempWorkingDir = tempfile.mkdtemp(prefix='rapid-tmp-', 
+                                                dir=path)
+                except:
+                    noProblems += 1
+                    msg += _("The %(file_type)s Download Folder exists but cannot be written to.\n") % {'file_type': file_type}
+                else:
+                    os.rmdir(tempWorkingDir)
             
         if msg:
-            sys.stderr.write(msg +'\n')
-            misc.run_dialog(_("Problem with Download Folder"), msg, 
+            msg = _("Sorry, problems were encountered with your download folders. Please fix the problems or modify the preferences.\n\n") + msg
+            sys.stderr.write(msg)
+            if noProblems == 1:
+                title = _("Problem with Download Folder")
+            else:
+                title = _("Problem with Download Folders")
+            
+            misc.run_dialog(title, msg, 
                 self,
                 gtk.MESSAGE_ERROR)
             return False
@@ -2795,7 +3376,7 @@ class RapidApp(gnomeglade.GnomeApp,  dbus.service.Object):
             return True
     
     def checkPreferencesOnStartup(self):
-        prefsOk = rn.checkPreferencesForValidity(self.prefs.image_rename,  self.prefs.subfolder)
+        prefsOk = rn.checkPreferencesForValidity(self.prefs.image_rename,  self.prefs.subfolder, self.prefs.video_rename, self.prefs.video_subfolder)
         if not prefsOk:
             msg = _("There is an error in the program preferences.")
             msg += " " + _("Some preferences will be reset.") 
@@ -2890,7 +3471,31 @@ class RapidApp(gnomeglade.GnomeApp,  dbus.service.Object):
         # FIXME: what happens to these workers that are waiting? How will the user start their download?
         # check if need to add code to start button
                 
-    def checkForUpgrade(self,  runningVersion):
+    def checkIfFirstTimeProgramEverRun(self):
+        """
+        if this is the first time the program has been run, then
+        might need to create default directories
+        """
+        if len(self.prefs.program_version) == 0:
+            path = getDefaultPhotoLocation(ignore_missing_dir=True)
+            if not os.path.isdir(path):
+                cmd_line(_("Creating photo download folder %(folder)s") % {'folder':path})
+                try:
+                    os.makedirs(path)
+                    self.prefs.download_folder = path
+                except:
+                    cmd_line(_("Failed to create default photo download folder %(folder)s") % {'folder':path})
+            if DOWNLOAD_VIDEO:
+                path = getDefaultVideoLocation(ignore_missing_dir=True)
+                if not os.path.isdir(path):
+                    cmd_line(_("Creating video download folder %(folder)s") % {'folder':path})
+                    try:
+                        os.makedirs(path)
+                        self.prefs.video_download_folder = path
+                    except:
+                        cmd_line(_("Failed to create default video download folder %(folder)s") % {'folder':path})
+    
+    def checkForUpgrade(self, runningVersion):
         """ Checks if the running version of the program is different from the version recorded in the preferences.
         
         If the version is different, then the preferences are checked to see whether they should be upgraded or not.
@@ -2900,7 +3505,7 @@ class RapidApp(gnomeglade.GnomeApp,  dbus.service.Object):
         displayPrefs = upgraded = False
         
         previousVersion = self.prefs.program_version
-        if previousVersion:
+        if len(previousVersion) > 0:
             # the program has been run previously for this user
         
             pv = common.pythonifyVersion(previousVersion)
@@ -2911,7 +3516,7 @@ class RapidApp(gnomeglade.GnomeApp,  dbus.service.Object):
             
             if pv != rv:
                 if pv > rv:
-                    prefsOk = rn.checkPreferencesForValidity(self.prefs.image_rename,  self.prefs.subfolder)
+                    prefsOk = rn.checkPreferencesForValidity(self.prefs.image_rename, self.prefs.subfolder, self.prefs.video_rename, self.prefs.video_subfolder)
                         
                     msg = _("A newer version of this program was previously run on this computer.\n\n")
                     if prefsOk:
@@ -2925,8 +3530,8 @@ class RapidApp(gnomeglade.GnomeApp,  dbus.service.Object):
                 else:
                     cmd_line(_("This version of the program is newer than the previously run version. Checking preferences."))
 
-                    if rn.checkPreferencesForValidity(self.prefs.image_rename,  self.prefs.subfolder,  previousVersion):
-                        upgraded,  imageRename,  subfolder = rn.upgradePreferencesToCurrent(self.prefs.image_rename,  self.prefs.subfolder,  previousVersion)
+                    if rn.checkPreferencesForValidity(self.prefs.image_rename, self.prefs.subfolder, self.prefs.video_rename, self.prefs.video_subfolder, previousVersion):
+                        upgraded,  imageRename,  subfolder = rn.upgradePreferencesToCurrent(self.prefs.image_rename, self.prefs.subfolder, previousVersion)
                         if upgraded:
                             self.prefs.image_rename = imageRename
                             self.prefs.subfolder = subfolder
@@ -2941,6 +3546,7 @@ class RapidApp(gnomeglade.GnomeApp,  dbus.service.Object):
                         sys.stderr.write(msg + "\n")
                         misc.run_dialog(title,  msg)
                         displayPrefs = True
+
 
         return displayPrefs
 
@@ -2974,10 +3580,13 @@ class RapidApp(gnomeglade.GnomeApp,  dbus.service.Object):
             cmd_line(_("Warning: desktop environment notification server is incorrectly configured."))
             self.notification_icon_size = 48
         else:
-            if info['name'] == 'Notification Daemon':
+            try:
+                if info['name'] == 'Notification Daemon':
+                    self.notification_icon_size = 128
+                else:
+                    self.notification_icon_size = 48                    
+            except:
                 self.notification_icon_size = 48
-            else:
-                self.notification_icon_size = 128
             
         self.application_icon = gtk.gdk.pixbuf_new_from_file_at_size(
                 paths.share_dir('glade3/rapid-photo-downloader-about.png'),
@@ -3071,12 +3680,11 @@ class RapidApp(gnomeglade.GnomeApp,  dbus.service.Object):
                     isBackupVolume = self.checkIfBackupVolume(path)
                                 
                     if isBackupVolume:
-                        backupPath = os.path.join(path,  self.prefs.backup_identifier)
                         if path not in self.backupVolumes:
-                            self.backupVolumes[backupPath] = volume
+                            self.backupVolumes[path] = volume
                             self.rapid_statusbar.push(self.statusbar_context_id, self.displayBackupVolumes())
 
-                    elif media.isImageMedia(path) or self.searchForPsd():
+                    elif media.is_DCIM_Media(path) or self.searchForPsd():
                         if self.searchForPsd() and path not in self.prefs.device_whitelist:
                             # prompt user if device should be used or not
                             self.getUseDevice(path,  volume, self.prefs.auto_download_upon_device_insertion)
@@ -3132,9 +3740,8 @@ class RapidApp(gnomeglade.GnomeApp,  dbus.service.Object):
             # fourth scenario - nothing to do
                     
             # remove backup volumes
-            backupPath = os.path.join(path,  self.prefs.backup_identifier)
-            if backupPath in self.backupVolumes:
-                del self.backupVolumes[backupPath]
+            if path in self.backupVolumes:
+                del self.backupVolumes[path]
                 self.rapid_statusbar.push(self.statusbar_context_id, self.displayBackupVolumes())
                 
             # may need to disable download button
@@ -3167,9 +3774,12 @@ class RapidApp(gnomeglade.GnomeApp,  dbus.service.Object):
         
         Checks against user preferences.
         """
+        identifiers = [self.prefs.backup_identifier]
+        if DOWNLOAD_VIDEO:
+            identifiers.append(self.prefs.video_backup_identifier)
         if self.prefs.backup_images:
             if self.prefs.backup_device_autodetection:
-                if media.isBackupMedia(path, self.prefs.backup_identifier):
+                if media.isBackupMedia(path, identifiers):
                     return True
             elif path == self.prefs.backup_location:
                 # user manually specified the path
@@ -3226,14 +3836,14 @@ class RapidApp(gnomeglade.GnomeApp,  dbus.service.Object):
                             self._printDetectedDevice(volume.get_name(limit=0), path)
                             isBackupVolume = self.checkIfBackupVolume(path)
                             if isBackupVolume:
-                                backupPath = os.path.join(path,  self.prefs.backup_identifier)
-                                self.backupVolumes[backupPath] = volume
-                            elif self.prefs.device_autodetection and (media.isImageMedia(path) or self.searchForPsd()):
+                                #backupPath = os.path.join(path,  self.prefs.backup_identifier)
+                                self.backupVolumes[path] = volume
+                            elif self.prefs.device_autodetection and (media.is_DCIM_Media(path) or self.searchForPsd()):
                                 volumeList.append((path, volume))
                         
         
         if not self.prefs.device_autodetection:
-            # user manually specified the path from which to download images
+            # user manually specified the path from which to download 
             path = self.prefs.device_location
             if path:
                 cmd_line(_("Using manually specified path") + " %s" %  path)
@@ -3242,8 +3852,9 @@ class RapidApp(gnomeglade.GnomeApp,  dbus.service.Object):
         if self.prefs.backup_images:
             if not self.prefs.backup_device_autodetection:
                 # user manually specified backup location
+                # will backup to this path, but don't need any volume info associated with it
                 self.backupVolumes[self.prefs.backup_location] = None
-                self.rapid_statusbar.push(self.statusbar_context_id, '')
+                self.rapid_statusbar.push(self.statusbar_context_id, _('Backing up to %(path)s') % {'path':self.prefs.backup_location})
             else:
                 self.rapid_statusbar.push(self.statusbar_context_id, self.displayBackupVolumes())
                 
@@ -3404,9 +4015,14 @@ class RapidApp(gnomeglade.GnomeApp,  dbus.service.Object):
         if self.downloadComplete():
             if self.displayDownloadSummaryNotification:
                 message = _("All downloads complete")
-                message += "\n%s " % self.downloadStats.noImagesDownloaded + _("images downloaded")
+                if self.downloadStats.noImagesDownloaded:
+                    message += "\n%s " % self.downloadStats.noImagesDownloaded + _("photos downloaded")
                 if self.downloadStats.noImagesSkipped:
-                    message = "%s\n%s " % (message,  self.downloadStats.noImagesSkipped) + _("images skipped")
+                    message = "%s\n%s " % (message,  self.downloadStats.noImagesSkipped) + _("photos skipped")
+                if self.downloadStats.noVideosDownloaded:
+                    message += "\n%s " % self.downloadStats.noVideosDownloaded + _("videos downloaded")
+                if self.downloadStats.noVideosSkipped:
+                    message = "%s\n%s " % (message,  self.downloadStats.noVideosSkipped) + _("videos skipped")                    
                 if self.downloadStats.noWarnings:
                     message = "%s\n%s " % (message,  self.downloadStats.noWarnings) + _("warnings")
                 if self.downloadStats.noErrors:
@@ -3629,6 +4245,7 @@ class Volume:
     """ Transistion to gvfs from gnomevfs"""
     def __init__(self,  volume):
         self.volume = volume
+        self.using_gio = using_gio
         
     def get_name(self, limit=config.MAX_LENGTH_DEVICE_NAME):
         if using_gio:
@@ -3686,15 +4303,17 @@ class DownloadStats:
     def __init__(self):
         self.clear()
         
-    def adjust(self, size,  noImagesDownloaded,  noImagesSkipped,  noWarnings,  noErrors):
+    def adjust(self, size,  noImagesDownloaded, noVideosDownloaded, noImagesSkipped, noVideosSkipped, noWarnings,  noErrors):
         self.downloadSize += size
         self.noImagesDownloaded += noImagesDownloaded
+        self.noVideosDownloaded += noVideosDownloaded
         self.noImagesSkipped += noImagesSkipped
+        self.noVideosSkipped += noVideosSkipped
         self.noWarnings += noWarnings
         self.noErrors += noErrors
         
     def clear(self):
-        self.noImagesDownloaded = self.noImagesSkipped = 0
+        self.noImagesDownloaded = self.noVideosDownloaded = self.noImagesSkipped = self.noVideosSkipped = 0
         self.downloadSize = 0
         self.noWarnings = self.noErrors = 0
         
@@ -3799,7 +4418,8 @@ def start ():
     parser.add_option("-v",  "--verbose",  action="store_true", dest="verbose",  help=_("display program information on the command line as the program runs (default: %default)"))
     parser.add_option("-q", "--quiet",  action="store_false", dest="verbose",  help=_("only output errors to the command line"))
     # image file extensions are recognized RAW files plus TIFF and JPG
-    parser.add_option("-e",  "--extensions",  action="store_true", dest="extensions", help=_("list image file extensions the program recognizes and exit"))
+    parser.add_option("-e",  "--extensions", action="store_true", dest="extensions", help=_("list photo and video file extensions the program recognizes and exit"))
+    parser.add_option("--reset-settings", action="store_true", dest="reset", help=_("reset all program settings and preferences and exit"))
     (options, args) = parser.parse_args()
     global verbose
     verbose = options.verbose
@@ -3808,23 +4428,43 @@ def start ():
         atexit.register(programStatus)
         
     if options.extensions:
-        exts = config.RAW_FILE_EXTENSIONS + config.NON_RAW_IMAGE_FILE_EXTENSIONS
-        v = ''
-        for e in exts[:-1]:
-            v += '%s, ' % e.upper()
-        v = v[:-1] + ' '+ (_('and %s') % exts[-1].upper())
-        print v
+        extensions = ((metadata.RAW_FILE_EXTENSIONS + metadata.NON_RAW_IMAGE_FILE_EXTENSIONS, _("Photos:")), (videometadata.VIDEO_FILE_EXTENSIONS, _("Videos:")))
+        for exts, file_type in extensions:
+            v = ''
+            for e in exts[:-1]:
+                v += '%s, ' % e.upper()
+            v = file_type + " " + v[:-1] + ' '+ (_('and %s') % exts[-1].upper())
+            print v
+            
+        sys.exit(0)
+        
+    if options.reset:
+        prefs = RapidPreferences()
+        prefs.reset()
+        print _("All settings and preferences have been reset")
         sys.exit(0)
 
+    cmd_line(_("Rapid Photo Downloader") + " %s" % config.version)
+    cmd_line(_("Using") + " pyexiv2 " + metadata.version_info())
+    cmd_line(_("Using") + " exiv2 " + metadata.exiv2_version_info())
+    if DOWNLOAD_VIDEO:
+        cmd_line(_("Using") + " kaa " + videometadata.version_info())
+    else:
+        cmd_line(_("\n" + "Video downloading functionality disabled.\nTo download videos, please install the kaa metadata package for python.") + "\n")
+        
     if using_gio:
         cmd_line(_("Using") + " GIO")
+        gobject.threads_init()
     else:
         # Which volume management code is being used (GIO or GnomeVFS)
         cmd_line(_("Using") + " GnomeVFS")
+        gdk.threads_init()
         
-    gdk.threads_init()
+    
+
     display_queue.open("rw")
     tube.tube_add_watch(display_queue, updateDisplay)
+
     gdk.threads_enter()
 
     # run only a single instance of the application 
@@ -3839,6 +4479,7 @@ def start ():
         app = dbus.Interface (object, config.DBUS_NAME)
     
     app.start()
+
     gdk.threads_leave()    
 
 if __name__ == "__main__":

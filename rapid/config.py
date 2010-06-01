@@ -15,7 +15,7 @@
 ### along with this program; if not, write to the Free Software
 ### Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 
-version = '0.1.3'
+version = '0.2.0'
 
 GCONF_KEY="/apps/rapid-photo-downloader"
 GLADE_FILE = "glade3/rapid.glade"
@@ -36,15 +36,11 @@ IGNORE = "ignore"
 
 DEFAULT_PHOTO_LOCATIONS = ['Pictures',  'Photos']
 DEFAULT_BACKUP_LOCATION = 'Pictures'
+DEFAULT_VIDEO_BACKUP_LOCATION = 'Videos'
+
+DEFAULT_VIDEO_LOCATIONS = ['Videos']
 
 MAX_NO_READERS = 20
-
-RAW_FILE_EXTENSIONS = ['arw', 'dcr', 'cr2', 'crw',  'dng', 'mef', 'mos', 'mrw', 
-                        'nef', 'orf', 'pef', 'raf', 'raw', 'sr2']
-
-#exiv2 0.18.1 introduces support for Panasonic .RW2 files
-
-NON_RAW_IMAGE_FILE_EXTENSIONS = ['jpg', 'jpe', 'jpeg', 'tif', 'tiff']
 
 CRITICAL_ERROR = 1
 SERIOUS_ERROR = 2

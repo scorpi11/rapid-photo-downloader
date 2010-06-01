@@ -43,7 +43,7 @@ class InstallData(install_data):
 
         return data_files
 
-package_data={'rapid': ['glade3/rapid.glade', 'glade3/rapid-photo-downloader-about.png', 'glade3/image-missing.svg']}
+package_data={'rapid': ['glade3/rapid.glade', 'glade3/rapid-photo-downloader-about.png', 'glade3/image-missing.svg', 'glade3/video.svg', 'glade3/filmstrip-100x75.xpm']}
 
 setup(name=name,
     version=version,
@@ -54,11 +54,12 @@ setup(name=name,
     maintainer='Damon Lynch',
     url='http://www.damonlynch.net/rapid',
     long_description=
-"""Rapid Photo Downloader is written by a photographer for
-professional and amateur photographers. It can download photos
-from multiple cameras, memory cards and Portable Storage Devices
-simultaneously. It provides many options for subfolder creation,
-image renaming and backup.""",
+"""Rapid Photo Downloader is written by a photographer for professional and
+amateur photographers. It can  download photos and videos from multiple
+cameras, memory cards and Portable Storage Devices simultaneously. It 
+provides many flexible, user-defined options for subfolder creation,
+photo and video renaming, and backup.
+""",
     packages = ['rapid'], 
     package_data=package_data, 
     scripts=['rapid-photo-downloader'],
