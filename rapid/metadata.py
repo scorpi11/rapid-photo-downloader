@@ -1,7 +1,7 @@
 #!/usr/bin/python
 # -*- coding: latin1 -*-
 
-### Copyright (C) 2007 Damon Lynch <damonlynch@gmail.com>
+### Copyright (C) 2007-10 Damon Lynch <damonlynch@gmail.com>
 
 ### This program is free software; you can redistribute it and/or modify
 ### it under the terms of the GNU General Public License as published by
@@ -20,7 +20,9 @@
 import re
 import datetime
 import sys
+import subprocess
 import config
+import types
 
 try:
     import pyexiv2
@@ -28,18 +30,98 @@ except ImportError:
     sys.stderr.write("You need to install pyexiv2, the python binding for exiv2, to run this program.\n" )
     sys.exit(1)
     
-#only pyexiv2 0.1.2 and 0.1.3 use the "Rational" class 
-#is there a superior way to find which version of pyexiv2 is being used?
+#only pyexiv2 <= 0.1.1 does not use the "Rational" class 
 if 'Rational' in dir(pyexiv2):
     usesRational = True
 else:
     usesRational = False
 
+#get versions of pyexiv2 and exiv2 libraries
+if 'version_info' in dir(pyexiv2):
+    pyexiv2_version = pyexiv2.version_info
+    exiv2_version = pyexiv2.exiv2_version_info
+    baseclass = eval('pyexiv2.metadata.ImageMetadata')
+else:
+    pyexiv2_version = (0,1,'x')
+    # try to determine the version of exiv2 from it's standard output
+    try:
+        proc = subprocess.Popen(['exiv2', '-V'], stdout=subprocess.PIPE)
+        output = proc.communicate()[0]
+    except:
+        output = None
+        exiv2_version = None
+    if output:
+        # assume output contains the line 'exiv2 0.x' or possibly
+        # 'exiv2 0.x.x'
+        start = output.find('exiv2 ')
+        if start < 0:
+            exiv2_version = None            
+        else:
+            end = output.find('\n', start)
+            if end:
+                exiv2_v = output[6:end]
+            else:
+                exiv2_v = output[6:]
+            
+            exiv2_version = []
+            dot = exiv2_v.find('.')
+            while dot > 0:
+                exiv2_version += [int(exiv2_v[:dot])]
+                exiv2_v = exiv2_v[dot+1:]
+                dot = exiv2_v.find('.')
+            exiv2_version += [int(exiv2_v)]
+            exiv2_version = tuple(exiv2_version) 
+            
+        
+    baseclass = eval('pyexiv2.Image')
 
-class MetaData(pyexiv2.Image):
+def __version_info(version):
+    if not version:
+        return ''
+    else:
+        v = ''
+        for i in version:
+            v += '.%s' % i
+        return v[1:]    
+    
+def version_info():
+    return __version_info(pyexiv2_version)
+    
+def exiv2_version_info():
+    return __version_info(exiv2_version)    
+
+RAW_FILE_EXTENSIONS = ['arw', 'dcr', 'cr2', 'crw',  'dng', 'mos', 'mrw', 
+                        'nef', 'orf', 'pef', 'raf', 'raw', 'sr2']
+
+#exiv2 0.18.1 introduces support for Panasonic .RW2 files
+#pyexiv2 in combination with exiv2 0.18 segfaults when trying to read an
+#RW2 files, so we should not read those! exiv2 0.17 & pyexiv2 segfaults
+#with MEF files.
+
+if exiv2_version[0] > 0:
+    RAW_FILE_EXTENSIONS += ['rw2', 'mef']
+else:
+    if exiv2_version[1] > 17:
+        RAW_FILE_EXTENSIONS += ['mef']
+    if exiv2_version[1] > 18:
+        RAW_FILE_EXTENSIONS += ['rw2']
+    else:
+        if len(exiv2_version) > 2:
+            if exiv2_version[2] >= 1:
+                RAW_FILE_EXTENSIONS += ['rw2']
+                
+RAW_FILE_EXTENSIONS.sort()
+
+NON_RAW_IMAGE_FILE_EXTENSIONS = ['jpg', 'jpe', 'jpeg', 'tif', 'tiff']
+
+
+class MetaData(baseclass):
     """
     Class providing human readable access to image metadata
+
     """
+    
+    __version01__ = pyexiv2_version[0] == 0 and pyexiv2_version[1] == 1
 
     def aperture(self, missing=''):
         """ 
@@ -97,10 +179,16 @@ class MetaData(pyexiv2.Image):
 
         try:
             if usesRational:
+
                 e = str(self["Exif.Photo.ExposureTime"])
+
                 e0,  e1 = e.split('/')
                 e0 = int(e0)
                 e1 = int(e1)
+                # some values, e.g. Nikon, are in the format "10/1600"
+                if (e0 > 1) and (e0 < e1):
+                    e1 = e1 / e0
+                    e0 = 1
             else:
                 e0, e1 = self["Exif.Photo.ExposureTime"]
             
@@ -111,7 +199,7 @@ class MetaData(pyexiv2.Image):
                     else:
                         return  str(e0)
                 else:
-                    return e
+                    return "%s/%s" % (e0,e1)
             elif e0 > e1:
                 e = float(e0) / e1
                 if alternativeFormat:
@@ -171,7 +259,7 @@ class MetaData(pyexiv2.Image):
             
     def cameraSerial(self,  missing=''):
         try:
-            keys = self.exifKeys()
+            keys = self.rpd_keys()
             if 'Exif.Canon.SerialNumber' in keys:
                 v = self['Exif.Canon.SerialNumber']
             elif 'Exif.Nikon3.SerialNumber' in keys:
@@ -196,9 +284,11 @@ class MetaData(pyexiv2.Image):
             
     def shutterCount(self,  missing=''):
         try:
-            keys = self.exifKeys()
+            keys = self.rpd_keys()
             if 'Exif.Nikon3.ShutterCount' in keys:
                 v = self['Exif.Nikon3.ShutterCount']
+            elif 'Exif.Canon.FileNumber' in keys:
+                v = self['Exif.Canon.FileNumber']
             elif 'Exif.Canon.ImageNumber' in keys:
                 v = self['Exif.Canon.ImageNumber']
             else:
@@ -290,12 +380,13 @@ class MetaData(pyexiv2.Image):
         
         Returns missing either metadata value is not present.
         """
-        keys = self.exifKeys()
+        keys = self.rpd_keys()
         try:
             if "Exif.Photo.DateTimeOriginal" in keys:
-                return self["Exif.Photo.DateTimeOriginal"]
+                v = self["Exif.Photo.DateTimeOriginal"]
             else:
-                return self["Exif.Image.DateTime"]
+                v = self["Exif.Image.DateTime"]
+            return v
         except:
             return missing
             
@@ -309,11 +400,66 @@ class MetaData(pyexiv2.Image):
     def orientation(self, missing=''):
         """
         Returns the orientation of the image, as recorded by the camera
+        Return type int
         """
         try:
-            return self['Exif.Image.Orientation']
+            v = self['Exif.Image.Orientation']
+            if isinstance(v, types.StringType):
+                # pyexiv2 >= 0.2 returns a string, not an int
+                v = int(v)
+            return v
         except:
             return missing
+            
+    # following class methods are designed to cope with using both
+    # pyexiv2 0.1.x and pyexiv2 0.2.x
+            
+    def getThumbnailData(self, max_size_needed=0):
+        """
+        Returns a thumbnail of the image.
+        
+        If the image supports multiple thumbnails, and max_size_needed
+        is not 0, then it will search for the smallest thumbnail that 
+        matches the size required 
+        
+        The image will be in whatever format the thumbnail itself is, 
+        typically a jpeg or tiff.
+        """
+        if self.__version01__:
+            return pyexiv2.Image.getThumbnailData(self)[1]
+
+        else:
+            if not self.previews:
+                return None, None
+            else:
+                if max_size_needed:
+                    for thumbnail in self.previews:
+                        if thumbnail.dimensions[0] >= max_size_needed or thumbnail.dimensions[1] >= max_size_needed:
+                            break
+                else:
+                    thumbnail = self.previews[-1]
+                        
+                return thumbnail.data
+                
+    def read(self):
+        if self.__version01__:
+            self.readMetadata()
+        else:
+            pyexiv2.metadata.ImageMetadata.read(self)
+            
+    def rpd_keys(self):
+        if self.__version01__:
+            return pyexiv2.Image.exifKeys(self)
+        else:
+            return self.exif_keys
+            
+    def __getitem__(self, key):
+        if self.__version01__:
+            return pyexiv2.Image.__getitem__(self, key)
+        else:
+            return pyexiv2.metadata.ImageMetadata.__getitem__(self, key).raw_value
+        
+        
 
 class DummyMetaData(MetaData):
     """
@@ -376,16 +522,15 @@ class DummyMetaData(MetaData):
 if __name__ == '__main__':
     import sys
     
+    
     if (len(sys.argv) != 2):
         print 'Usage: ' + sys.argv[0] + ' path/to/photo/containing/metadata'
         m = DummyMetaData()
 
     else:
         m = MetaData(sys.argv[1])
-        m.readMetadata()
+        m.read()
         
-#    for i in m.exifKeys():
-#        print i
     print "f"+ m.aperture('missing ')
     print "ISO " + m.iso('missing ')
     print m.exposureTime(missing='missing ') + " sec"
