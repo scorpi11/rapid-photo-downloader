@@ -7,7 +7,7 @@ override_dh_auto_configure:
 
 override_dh_auto_install:
 	dh_auto_install
-	rm -rf debian/rapid-photo-downloader/usr/share/icons/hicolor/scalable/
+	-rm -rf debian/rapid-photo-downloader/usr/share/icons/hicolor/scalable/
 
 override_dh_auto_clean:
 	-rm rapid-photo-downloader.1
