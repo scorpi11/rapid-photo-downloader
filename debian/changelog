@@ -1,3 +1,9 @@
+rapid-photo-downloader (0.3.0-3) unstable; urgency=low
+
+  * Rewrite long description
+
+ -- Julien Valroff <julien@kirya.net>  Sun, 08 Aug 2010 22:24:57 +0200
+
 rapid-photo-downloader (0.3.0-2) unstable; urgency=low
 
   * New Debian Policy 3.9.1 (no changes needed)
