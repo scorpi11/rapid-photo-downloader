@@ -53,7 +53,6 @@ except ImportError:
     import gnomevfs
     using_gio = False
 
-
 import prefs
 import paths
 import gnomeglade
@@ -4275,6 +4274,8 @@ class SelectionVBox(gtk.VBox):
         gtk.VBox.__init__(self)
         self.parentApp = parentApp
         
+        tiny_screen = gtk.gdk.screen_height() <= config.TINY_SCREEN_HEIGHT
+        
         selection_scrolledwindow = gtk.ScrolledWindow()
         selection_scrolledwindow.set_policy(gtk.POLICY_AUTOMATIC, gtk.POLICY_AUTOMATIC)
         selection_viewport = gtk.Viewport()
@@ -4320,7 +4321,8 @@ class SelectionVBox(gtk.VBox):
         self.preview_original_name_label.set_alignment(0, 0.5)
         self.preview_original_name_label.set_ellipsize(pango.ELLIPSIZE_END)
         
-        #Device (where it will be downloaded to)
+        
+        #Device (where it will be downloaded from)
         self.preview_device_expander = gtk.Expander()
         self.preview_device_label = gtk.Label()
         self.preview_device_label.set_alignment(0, 0.5)
@@ -4338,7 +4340,7 @@ class SelectionVBox(gtk.VBox):
         
         self.preview_device_expander.set_label_widget(device_hbox)
         
-        #Filename that has been generated (path in tooltip)
+        #Filename that has been generated
         self.preview_name_label = gtk.Label()
         self.preview_name_label.set_alignment(0, 0.5)
         self.preview_name_label.set_ellipsize(pango.ELLIPSIZE_END)
@@ -4398,29 +4400,44 @@ class SelectionVBox(gtk.VBox):
 
         spacer2 = gtk.Label('')
         
+        #left and right spacers
         self.preview_table.attach(left_spacer, 0, 1, 1, 2, xoptions=gtk.SHRINK, yoptions=gtk.SHRINK)
         self.preview_table.attach(right_spacer, 3, 4, 1, 2, xoptions=gtk.SHRINK, yoptions=gtk.SHRINK)
-                
-        self.preview_table.attach(self.preview_title_label, 0, 3, 0, 1, yoptions=gtk.SHRINK)
-        self.preview_table.attach(self.preview_image, 1, 3, 1, 2, yoptions=gtk.SHRINK)
         
-        self.preview_table.attach(self.preview_original_name_label, 1, 3, 2, 3, xoptions=gtk.EXPAND|gtk.FILL, yoptions=gtk.SHRINK)
-        self.preview_table.attach(self.preview_device_expander, 1, 3, 3, 4, xoptions=gtk.EXPAND|gtk.FILL, yoptions=gtk.SHRINK)
+        row = 0
+        if not tiny_screen:
+            self.preview_table.attach(self.preview_title_label, 0, 3, row, row+1, yoptions=gtk.SHRINK)
+            row += 1
+        self.preview_table.attach(self.preview_image, 1, 3, row, row+1, yoptions=gtk.SHRINK)
+        row += 1
         
-        self.preview_table.attach(self.preview_name_label, 1, 3, 5, 6, xoptions=gtk.EXPAND|gtk.FILL, yoptions=gtk.SHRINK)
-        self.preview_table.attach(self.preview_destination_expander, 1, 3, 6, 7, xoptions=gtk.EXPAND|gtk.FILL, yoptions=gtk.SHRINK)
+        self.preview_table.attach(self.preview_original_name_label, 1, 3, row, row+1, xoptions=gtk.EXPAND|gtk.FILL, yoptions=gtk.SHRINK)
+        row += 1
+        if not tiny_screen:
+            self.preview_table.attach(self.preview_device_expander, 1, 3, row, row+1, xoptions=gtk.EXPAND|gtk.FILL, yoptions=gtk.SHRINK)
+            row += 1
+        
+        self.preview_table.attach(self.preview_name_label, 1, 3, row, row+1, xoptions=gtk.EXPAND|gtk.FILL, yoptions=gtk.SHRINK)
+        row += 1
+        if not tiny_screen:
+            self.preview_table.attach(self.preview_destination_expander, 1, 3, row, row+1, xoptions=gtk.EXPAND|gtk.FILL, yoptions=gtk.SHRINK)
+            row += 1
 
-        self.preview_table.attach(spacer2, 0, 7, 7, 8, yoptions=gtk.SHRINK)
+        if not tiny_screen:
+            self.preview_table.attach(spacer2, 0, 7, row, row+1, yoptions=gtk.SHRINK)
+            row += 1
         
-        self.preview_table.attach(self.preview_status_icon, 1, 2, 8, 9, xoptions=gtk.SHRINK, yoptions=gtk.SHRINK)
-        self.preview_table.attach(self.preview_status_label, 2, 3, 8, 9, yoptions=gtk.SHRINK)
+        self.preview_table.attach(self.preview_status_icon, 1, 2, row, row+1, xoptions=gtk.SHRINK, yoptions=gtk.SHRINK)
+        self.preview_table.attach(self.preview_status_label, 2, 3, row, row+1, yoptions=gtk.SHRINK)
+        row += 1
         
-        self.preview_table.attach(self.preview_problem_title_label, 2, 3, 9, 10, yoptions=gtk.SHRINK)
-        self.preview_table.attach(self.preview_problem_label, 2, 4, 10, 11, xoptions=gtk.EXPAND|gtk.FILL, yoptions=gtk.EXPAND|gtk.FILL)
+        self.preview_table.attach(self.preview_problem_title_label, 2, 3, row, row+1, yoptions=gtk.SHRINK)
+        row += 1
+        self.preview_table.attach(self.preview_problem_label, 2, 4, row, row+1, xoptions=gtk.EXPAND|gtk.FILL, yoptions=gtk.EXPAND|gtk.FILL)
+        row += 1
         
         self.file_hpaned = gtk.HPaned()
         self.file_hpaned.pack1(left_pane_vbox, shrink=False)
-        #self.file_hpaned.pack2(self.preview_vbox, shrink=False)
         self.file_hpaned.pack2(self.preview_table, resize=True, shrink=False)
         self.pack_start(self.file_hpaned, True, True)
         if self.parentApp.prefs.hpaned_pos > 0:
@@ -4641,6 +4658,10 @@ class RapidApp(gnomeglade.GnomeApp,  dbus.service.Object):
             # set a default size
             self.rapidapp.set_default_size(650, 650)
             
+        if gtk.gdk.screen_height() <= config.TINY_SCREEN_HEIGHT:
+            self.prefs.display_preview_folders = False
+            self.menu_preview_folders.set_sensitive(False)
+            
         self.widget.show()
         
         self._setupIcons()
@@ -4793,7 +4814,7 @@ class RapidApp(gnomeglade.GnomeApp,  dbus.service.Object):
             displayPreferences = displayPreferences or displayPreferences_2
         
         #setup download and backup mediums, initiating scans
-        self.setupAvailableImageAndBackupMedia(onStartup=True,  onPreferenceChange=False,  doNotAllowAutoStart = displayPreferences)
+        self.setupAvailableImageAndBackupMedia(onStartup=True, onPreferenceChange=False, doNotAllowAutoStart = displayPreferences)
 
         #adjust viewport size for displaying media
         #this is important because the code in MediaTreeView.addCard() is inaccurate at program startup
@@ -4811,7 +4832,7 @@ class RapidApp(gnomeglade.GnomeApp,  dbus.service.Object):
         
         if displayPreferences:
             PreferencesDialog(self)
-
+            
 
 
     @dbus.service.method (config.DBUS_NAME,
@@ -4854,6 +4875,32 @@ class RapidApp(gnomeglade.GnomeApp,  dbus.service.Object):
         icon_list = [(icon, paths.share_dir('glade3/%s.svg' % icon)) for icon in icons]
         common.register_iconsets(icon_list)
     
+    def displayFreeSpace(self):
+        """
+        Displays the amount of space free on the filesystem the files will be downloaded to.
+        Also displays backup volumes / path being used.
+        """
+        if using_gio:
+            folder = gio.File(self.prefs.download_folder)
+            fileInfo = folder.query_filesystem_info(gio.FILE_ATTRIBUTE_FILESYSTEM_FREE)
+            free = common.formatSizeForUser(fileInfo.get_attribute_uint64(gio.FILE_ATTRIBUTE_FILESYSTEM_FREE))
+            msg = " " + _("%(free)s available") % {'free': free}
+        else:
+            msg = ''
+            
+        if self.prefs.backup_images:
+            if not self.prefs.backup_device_autodetection:
+                # user manually specified backup location
+                msg2 = _('Backing up to %(path)s') % {'path':self.prefs.backup_location}
+            else:
+                msg2 = self.displayBackupVolumes()
+                
+            if msg:
+                msg = _("%(freespace)s. %(backuppaths)s.") % {'freespace': msg, 'backuppaths': msg2}
+            else:
+                msg = msg2
+            
+        self.rapid_statusbar.push(self.statusbar_context_id, msg)
     
     def checkImageDevicePathOnStartup(self):
         msg = None
@@ -5270,7 +5317,7 @@ class RapidApp(gnomeglade.GnomeApp,  dbus.service.Object):
                     if isBackupVolume:
                         if path not in self.backupVolumes:
                             self.backupVolumes[path] = volume
-                            self.rapid_statusbar.push(self.statusbar_context_id, self.displayBackupVolumes())
+                            self.displayFreeSpace()
 
                     elif self.prefs.device_autodetection and (media.is_DCIM_Media(path) or self.searchForPsd()):
                         if self.isCamera(volume.volume):
@@ -5334,7 +5381,7 @@ class RapidApp(gnomeglade.GnomeApp,  dbus.service.Object):
             # remove backup volumes
             if path in self.backupVolumes:
                 del self.backupVolumes[path]
-                self.rapid_statusbar.push(self.statusbar_context_id, self.displayBackupVolumes())
+                self.displayFreeSpace()
                 
             # may need to disable download button
             self.setDownloadButtonSensitivity()
@@ -5447,13 +5494,8 @@ class RapidApp(gnomeglade.GnomeApp,  dbus.service.Object):
                 # user manually specified backup location
                 # will backup to this path, but don't need any volume info associated with it
                 self.backupVolumes[self.prefs.backup_location] = None
-                self.rapid_statusbar.push(self.statusbar_context_id, _('Backing up to %(path)s') % {'path':self.prefs.backup_location})
-            else:
-                self.rapid_statusbar.push(self.statusbar_context_id, self.displayBackupVolumes())
-                
-        else:
-            self.rapid_statusbar.push(self.statusbar_context_id, '')
         
+        self.displayFreeSpace()
         # add each memory card / other device to the list of threads
         
         if doNotAllowAutoStart:
@@ -5489,7 +5531,6 @@ class RapidApp(gnomeglade.GnomeApp,  dbus.service.Object):
                 # user manually specified backup location
                 # will backup to this path, but don't need any volume info associated with it
                 self.backupVolumes[self.prefs.backup_location] = None
-                self.rapid_statusbar.push(self.statusbar_context_id, _('Backing up to %(path)s') % {'path':self.prefs.backup_location})
             else:
                 for v in self.volumeMonitor.get_mounts():
                     volume = Volume(v)
@@ -5517,8 +5558,7 @@ class RapidApp(gnomeglade.GnomeApp,  dbus.service.Object):
                                         
                                 self.backupVolumes[path] = volume
                         
-                self.rapid_statusbar.push(self.statusbar_context_id, self.displayBackupVolumes())
-        
+        self.displayFreeSpace()
         
     def _setupDownloadbuttons(self):
         self.download_hbutton_box = gtk.HButtonBox()
@@ -5658,6 +5698,7 @@ class RapidApp(gnomeglade.GnomeApp,  dbus.service.Object):
                         # of time the download has remainging, e.g. 'About 5:36 minutes remaining'
                         message = _("About %(minutes)i:%(seconds)02i minutes remaining") % {'minutes': secs / 60, 'seconds': secs % 60}
                     
+                    self.rapid_statusbar.pop(self.statusbar_context_id)
                     self.rapid_statusbar.push(self.statusbar_context_id, message)
                     
     
@@ -5666,7 +5707,7 @@ class RapidApp(gnomeglade.GnomeApp,  dbus.service.Object):
             sequences.reset(self.prefs.getDownloadsToday(),  self.prefs.stored_sequence_no)
     
     def notifyUserAllDownloadsComplete(self):
-        """ Possibly notify the user all downloads are complete using libnotify
+        """ If all downloads are complete, if needed notify the user using libnotify 
         
         Reset progress bar info"""
         
@@ -5713,6 +5754,7 @@ class RapidApp(gnomeglade.GnomeApp,  dbus.service.Object):
                 # download statistics are cleared in exitOnDownloadComplete()
             self._resetDownloadInfo()
             self.speed_label.set_text('         ')
+            self.displayFreeSpace()
             
                 
     def exitOnDownloadComplete(self):
