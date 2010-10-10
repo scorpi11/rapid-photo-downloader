@@ -1,3 +1,9 @@
+rapid-photo-downloader (0.3.2-2) experimental; urgency=low
+
+  * Convert copyright file to DEP5 format
+
+ -- Julien Valroff <julien@kirya.net>  Sun, 10 Oct 2010 08:34:41 +0200
+
 rapid-photo-downloader (0.3.2-1) experimental; urgency=low
 
   * Initial release (Closes: #539183)
