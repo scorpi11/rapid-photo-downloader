@@ -29,6 +29,7 @@ Depends: ${python:Depends},
 Recommends:
          python-imaging,
          python-kaa-metadata,
+         python-hachoir-metadata,
          ffmpegthumbnailer
 Description: Photo downloader (importer) from cameras, memory cards other devices
  Rapid Photo Downloader can be used by both professional and amateur
