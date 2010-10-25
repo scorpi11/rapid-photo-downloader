@@ -1,62 +1,62 @@
-# SOME DESCRIPTIVE TITLE.
-# Copyright (C) YEAR THE PACKAGE'S COPYRIGHT HOLDER
-# This file is distributed under the same license as the PACKAGE package.
-# FIRST AUTHOR <EMAIL@ADDRESS>, YEAR.
+# Portuguese translation for rapid
+# Copyright (c) 2010 Rosetta Contributors and Canonical Ltd 2010
+# This file is distributed under the same license as the rapid package.
+# FIRST AUTHOR <EMAIL@ADDRESS>, 2010.
 #
-#, fuzzy
 msgid ""
 msgstr ""
-"Project-Id-Version: PACKAGE VERSION\n"
-"Report-Msgid-Bugs-To: \n"
+"Project-Id-Version: rapid\n"
+"Report-Msgid-Bugs-To: FULL NAME <EMAIL@ADDRESS>\n"
 "POT-Creation-Date: 2010-10-22 21:26-0500\n"
-"PO-Revision-Date: YEAR-MO-DA HO:MI+ZONE\n"
-"Last-Translator: FULL NAME <EMAIL@ADDRESS>\n"
-"Language-Team: LANGUAGE <LL@li.org>\n"
-"Language: \n"
+"PO-Revision-Date: 2010-09-23 05:04+0000\n"
+"Last-Translator: Damon Lynch <damonlynch@gmail.com>\n"
+"Language-Team: Portuguese <pt@li.org>\n"
 "MIME-Version: 1.0\n"
-"Content-Type: text/plain; charset=CHARSET\n"
+"Content-Type: text/plain; charset=UTF-8\n"
 "Content-Transfer-Encoding: 8bit\n"
+"X-Launchpad-Export-Date: 2010-10-25 03:12+0000\n"
+"X-Generator: Launchpad (build Unknown)\n"
 
 #. Translators: if neccessary, for guidance in how to translate this program, you may see http://damonlynch.net/translate.html
 #: rapid/rapid.py:124 rapid/rapid.py:6353 rapid/glade3/rapid.glade.h:71
 msgid "Rapid Photo Downloader"
-msgstr ""
+msgstr "Baixador Rápido de Foto"
 
 #: rapid/rapid.py:456
 msgid "New York"
-msgstr ""
+msgstr "Nova Iorque"
 
 #: rapid/rapid.py:457
 msgid "Manila"
-msgstr ""
+msgstr "Manila"
 
 #: rapid/rapid.py:457
 msgid "Prague"
-msgstr ""
+msgstr "Praga"
 
 #: rapid/rapid.py:457
 msgid "Helsinki"
-msgstr ""
+msgstr "Helsinki"
 
 #: rapid/rapid.py:457
 msgid "Wellington"
-msgstr ""
+msgstr "Wellington"
 
 #: rapid/rapid.py:458
 msgid "Tehran"
-msgstr ""
+msgstr "Teerã"
 
 #: rapid/rapid.py:458
 msgid "Kampala"
-msgstr ""
+msgstr "Kampala"
 
 #: rapid/rapid.py:458
 msgid "Paris"
-msgstr ""
+msgstr "Paris"
 
 #: rapid/rapid.py:458
 msgid "Berlin"
-msgstr ""
+msgstr "Berlim"
 
 #: rapid/rapid.py:458
 msgid "Sydney"
@@ -185,7 +185,8 @@ msgid "<i>Example: %s</i>"
 msgstr ""
 
 #: rapid/rapid.py:1218
-msgid "Downloads today value not updated, as a download is currently occurring"
+msgid ""
+"Downloads today value not updated, as a download is currently occurring"
 msgstr ""
 
 #: rapid/rapid.py:1234
