@@ -580,6 +580,7 @@ class ImageRenameTable(tpm.TablePlusMinus):
 
         self.getParentAppPrefs()
         self.getPrefsFactory()
+        self.prefsFactory.setDownloadStartTime(datetime.datetime.now())
         
         try:
             self.prefsFactory.checkPrefsForValidity()
@@ -1663,7 +1664,7 @@ class CopyPhotos(Thread):
         self.autoStart = autoStart
         self.cardMedia = cardMedia
         
-        self.initializeDisplay(thread_id,  self.cardMedia)
+        self.initializeDisplay(thread_id, self.cardMedia)
                
         self.scanComplete = self.downloadStarted = self.downloadComplete = False
         
@@ -1672,6 +1673,9 @@ class CopyPhotos(Thread):
         # This flag indicates whether that is the case or not
         self.scanResultsStale = False # name and subfolder
         self.scanResultsStaleDownloadFolder = False #download folder only
+        
+        self.noErrors = self.noWarnings = 0
+        self.videoTempWorkingDir = self.photoTempWorkingDir = ''
         
         if DOWNLOAD_VIDEO:
             self.types_searched_for = _('photos or videos')
@@ -1729,21 +1733,26 @@ class CopyPhotos(Thread):
         self.prefs = self.parentApp.prefs
         
         #Image and Video filename preferences
+        sample_download_start_time = datetime.datetime.now()
 
         self.imageRenamePrefsFactory = rn.ImageRenamePreferences(self.prefs.image_rename, self, 
                                                                  self.fileSequenceLock, sequences)
+        self.imageRenamePrefsFactory.setDownloadStartTime(sample_download_start_time)
         checkPrefs(self.imageRenamePrefsFactory)
            
         self.videoRenamePrefsFactory = rn.VideoRenamePreferences(self.prefs.video_rename, self, 
                                                                  self.fileSequenceLock, sequences)
+        self.videoRenamePrefsFactory.setDownloadStartTime(sample_download_start_time)
         checkPrefs(self.videoRenamePrefsFactory)
         
         #Image and Video subfolder preferences
 
         self.subfolderPrefsFactory = rn.SubfolderPreferences(self.prefs.subfolder, self)
+        self.subfolderPrefsFactory.setDownloadStartTime(sample_download_start_time)
         checkPrefs(self.subfolderPrefsFactory)
 
         self.videoSubfolderPrefsFactory = rn.VideoSubfolderPreferences(self.prefs.video_subfolder, self)
+        self.videoSubfolderPrefsFactory.setDownloadStartTime(sample_download_start_time)
         checkPrefs(self.videoSubfolderPrefsFactory)
         
         # copy this variable, as it is used heavily in the loop
@@ -1799,15 +1808,14 @@ class CopyPhotos(Thread):
                 return True
                     
             except:
-                if notifyOnError:
-                    display_queue.put((media_collection_treeview.removeCard,  (self.thread_id, )))
-                    msg = _("The following download path could not be created:\n")
-                    msg += _("%(path)s: ") % {'path': path}
-                    logError(config.CRITICAL_ERROR, _("Download cannot proceed"), msg)
-                    cmd_line(_("Download cannot proceed"))
-                    cmd_line(msg)
-                    display_queue.put((self.parentApp.downloadFailed,  (self.thread_id, )))
-                    display_queue.close("rw")                     
+                display_queue.put((media_collection_treeview.removeCard,  (self.thread_id, )))
+                msg = _("The following download path could not be created:\n")
+                msg += _("%(path)s: ") % {'path': path}
+                logError(config.CRITICAL_ERROR, _("Download cannot proceed"), msg)
+                cmd_line(_("Download cannot proceed"))
+                cmd_line(msg)
+                display_queue.put((self.parentApp.downloadFailed,  (self.thread_id, )))
+                display_queue.close("rw")                     
                 return False                
                 
         def getPrefs(notifyOnError):
@@ -1896,6 +1904,9 @@ class CopyPhotos(Thread):
                 return (download, isImage, isVideo)
                 
             def addFile(name, path, size, modificationTime, device, volume, isImage):
+                #~ if debug_info:
+                    #~ cmd_line("Scanning %s" % name)
+                    
                 if isImage:
                     downloadFolder = self.prefs.download_folder
                 else:
@@ -2763,8 +2774,31 @@ class CopyPhotos(Thread):
                 self.running = False
                 self.lock.acquire()
                 self.running = True
+                
+                # set download started time
+                display_queue.put((self.parentApp.setDownloadStartTime, ()))
 
         while not all_files_downloaded:
+
+            # set the download start time to be the time that the user clicked the download button, or if on auto start, the value just set
+            i = 0
+            while self.parentApp.download_start_time is None or i > 2:
+                time.sleep(0.5)
+                i += 1
+            
+            if self.parentApp.download_start_time:
+                start_time = self.parentApp.download_start_time
+            else:
+                # in a bizarre corner case situation, with mulitple cards of greatly varying size, 
+                # it's possible the start time was set above and then in the meantime unset (very unlikely, but conceivably it could happen)
+                # fall back to the current time in this less than satisfactory situation
+                start_time = datetime.datetime.now()
+                
+            self.imageRenamePrefsFactory.setDownloadStartTime(start_time)
+            self.subfolderPrefsFactory.setDownloadStartTime(start_time)
+            if DOWNLOAD_VIDEO:
+                self.videoRenamePrefsFactory.setDownloadStartTime(start_time)
+                self.videoSubfolderPrefsFactory.setDownloadStartTime(start_time)
             
             self.noErrors = self.noWarnings = 0
             
@@ -2776,10 +2810,10 @@ class CopyPhotos(Thread):
             self.downloadStarted = True
             cmd_line(_("Download has started from %s") % self.cardMedia.prettyName(limit=0))
             
+            
             noFiles, sizeFiles, fileIndex = self.cardMedia.sizeAndNumberDownloadPending()
             cmd_line(_("Attempting to download %s files") % noFiles)
-            
-            
+                        
             no_backup_devices = setupBackup()
 
             # include the time it takes to copy to the backup volumes
@@ -2812,6 +2846,7 @@ class CopyPhotos(Thread):
             # reset the progress bar to update the status of this download attempt
             progressBarText = _("%(number)s of %(total)s %(filetypes)s") % {'number':  0, 'total': noFiles, 'filetypes':self.display_file_types}
             display_queue.put((media_collection_treeview.updateProgress, (self.thread_id, 0.0, progressBarText, 0)))
+            
             
             while i < noFiles:
                 # if the user pauses the download, then this will be triggered
@@ -3680,6 +3715,8 @@ class SelectionTreeView(gtk.TreeView):
             yield self.liststore.get_iter(path)
     
     def add_file(self, mediaFile):
+        if debug_info:
+            cmd_line('Adding file %s' % mediaFile.fullFileName)
         if mediaFile.metadata:
             date = mediaFile.dateTime()
             timestamp = mediaFile.metadata.timeStamp(missing=None)
@@ -3713,6 +3750,19 @@ class SelectionTreeView(gtk.TreeView):
             type_icon = self.icon_video
 
         status_icon = self.get_status_icon(mediaFile.status)
+        
+        if debug_info:
+            cmd_line('Thumbnail icon: %s' % thumbnail_icon)
+            cmd_line('Name: %s' % name)
+            cmd_line('Timestamp: %s' % timestamp)
+            cmd_line('Date: %s' % date_human_readable)
+            cmd_line('Size: %s %s' % (size, common.formatSizeForUser(size)))
+            cmd_line('Is an image: %s' % mediaFile.isImage)
+            cmd_line('Status: %s' % self.status_human_readable(mediaFile))
+            cmd_line('Path: %s' % mediaFile.path)
+            cmd_line('Device name: %s' % mediaFile.deviceName)
+            cmd_line('Thread: %s' % mediaFile.thread_id)
+            cmd_line(' ')
 
         iter = self.liststore.append((thumbnail_icon, name, timestamp, date_human_readable, size, common.formatSizeForUser(size), mediaFile.isImage, type_icon, '', mediaFile, status_icon, mediaFile.status, mediaFile.path, mediaFile.deviceName, mediaFile.thread_id))
         
@@ -3846,12 +3896,17 @@ class SelectionTreeView(gtk.TreeView):
                         self.show_preview(iter)                
 
     def _refreshNameFactories(self):
+        sample_download_start_time = datetime.datetime.now()
         self.imageRenamePrefsFactory = rn.ImageRenamePreferences(self.rapidApp.prefs.image_rename, self, 
                                                                  self.rapidApp.fileSequenceLock, sequences)
+        self.imageRenamePrefsFactory.setDownloadStartTime(sample_download_start_time)
         self.videoRenamePrefsFactory = rn.VideoRenamePreferences(self.rapidApp.prefs.video_rename, self, 
                                                                  self.rapidApp.fileSequenceLock, sequences)
+        self.videoRenamePrefsFactory.setDownloadStartTime(sample_download_start_time)
         self.subfolderPrefsFactory = rn.SubfolderPreferences(self.rapidApp.prefs.subfolder, self)
+        self.subfolderPrefsFactory.setDownloadStartTime(sample_download_start_time)
         self.videoSubfolderPrefsFactory = rn.VideoSubfolderPreferences(self.rapidApp.prefs.video_subfolder, self)
+        self.videoSubfolderPrefsFactory.setDownloadStartTime(sample_download_start_time)
         self.strip_characters = self.rapidApp.prefs.strip_characters
         
     
@@ -3911,29 +3966,29 @@ class SelectionTreeView(gtk.TreeView):
         self.videoRenameUsesJobCode = rn.usesJobCode(self.rapidApp.prefs.video_rename)
         self.videoSubfolderUsesJobCode = rn.usesJobCode(self.rapidApp.prefs.video_subfolder)        
     
-    def show_preview(self, iter):
+    
+    def status_human_readable(self, mediaFile):
+        if mediaFile.status == STATUS_DOWNLOADED:
+            v = _('%(filetype)s was downloaded successfully') % {'filetype': mediaFile.displayNameCap}
+        elif mediaFile.status == STATUS_DOWNLOAD_FAILED:
+            v = _('%(filetype)s was not downloaded') % {'filetype': mediaFile.displayNameCap}
+        elif mediaFile.status == STATUS_DOWNLOADED_WITH_WARNING:
+            v = _('%(filetype)s was downloaded with warnings') % {'filetype': mediaFile.displayNameCap}
+        elif mediaFile.status == STATUS_BACKUP_PROBLEM:
+            v = _('%(filetype)s was downloaded but there were problems backing up') % {'filetype': mediaFile.displayNameCap}
+        elif mediaFile.status == STATUS_DOWNLOAD_AND_BACKUP_FAILED:
+            v = _('%(filetype)s was neither downloaded nor backed up') % {'filetype': mediaFile.displayNameCap}                
+        elif mediaFile.status == STATUS_NOT_DOWNLOADED:
+            v = _('%(filetype)s is ready to be downloaded') % {'filetype': mediaFile.displayNameCap}
+        elif mediaFile.status == STATUS_DOWNLOAD_PENDING:
+            v = _('%(filetype)s is about to be downloaded') % {'filetype': mediaFile.displayNameCap}
+        elif mediaFile.status == STATUS_WARNING:
+            v = _('%(filetype)s will be downloaded with warnings')% {'filetype': mediaFile.displayNameCap}
+        elif mediaFile.status == STATUS_CANNOT_DOWNLOAD:
+            v = _('%(filetype)s cannot be downloaded') % {'filetype': mediaFile.displayNameCap}
+        return v    
         
-        def status_human_readable(mediaFile):
-            if mediaFile.status == STATUS_DOWNLOADED:
-                v = _('%(filetype)s was downloaded successfully') % {'filetype': mediaFile.displayNameCap}
-            elif mediaFile.status == STATUS_DOWNLOAD_FAILED:
-                v = _('%(filetype)s was not downloaded') % {'filetype': mediaFile.displayNameCap}
-            elif mediaFile.status == STATUS_DOWNLOADED_WITH_WARNING:
-                v = _('%(filetype)s was downloaded with warnings') % {'filetype': mediaFile.displayNameCap}
-            elif mediaFile.status == STATUS_BACKUP_PROBLEM:
-                v = _('%(filetype)s was downloaded but there were problems backing up') % {'filetype': mediaFile.displayNameCap}
-            elif mediaFile.status == STATUS_DOWNLOAD_AND_BACKUP_FAILED:
-                v = _('%(filetype)s was neither downloaded nor backed up') % {'filetype': mediaFile.displayNameCap}                
-            elif mediaFile.status == STATUS_NOT_DOWNLOADED:
-                v = _('%(filetype)s is ready to be downloaded') % {'filetype': mediaFile.displayNameCap}
-            elif mediaFile.status == STATUS_DOWNLOAD_PENDING:
-                v = _('%(filetype)s is about to be downloaded') % {'filetype': mediaFile.displayNameCap}
-            elif mediaFile.status == STATUS_WARNING:
-                v = _('%(filetype)s will be downloaded with warnings')% {'filetype': mediaFile.displayNameCap}
-            elif mediaFile.status == STATUS_CANNOT_DOWNLOAD:
-                v = _('%(filetype)s cannot be downloaded') % {'filetype': mediaFile.displayNameCap}
-            return v
-                
+    def show_preview(self, iter):
             
         if not iter:
             # clear everything except the label Preview at the top
@@ -4017,7 +4072,7 @@ class SelectionTreeView(gtk.TreeView):
                 self.parentApp.preview_destination_path_label.set_text(mediaFile.downloadPath)
                 self.parentApp.preview_destination_path_label.set_tooltip_text(mediaFile.downloadPath)
             
-            status_text = status_human_readable(mediaFile)
+            status_text = self.status_human_readable(mediaFile)
             self.parentApp.preview_status_icon.set_from_pixbuf(self.get_status_icon(mediaFile.status, preview=True))
             self.parentApp.preview_status_label.set_markup('<b>' + status_text + '</b>')
             self.parentApp.preview_status_label.set_tooltip_text(status_text)
@@ -4707,6 +4762,8 @@ class RapidApp(gnomeglade.GnomeApp,  dbus.service.Object):
 
         duplicate_files = {}
         downloaded_files = DownloadedFiles()
+        
+        self.download_start_time = None
         
         downloadsToday = self.prefs.getAndMaybeResetDownloadsToday()
         sequences = rn.Sequences(downloadsToday, self.prefs.stored_sequence_no)
@@ -5606,6 +5663,9 @@ class RapidApp(gnomeglade.GnomeApp,  dbus.service.Object):
         self.totalDownloadSizeThisRun = self.totalDownloadedSoFarThisRun = 0 
         # there is no need to clear self.timeRemaining, as when each thread is completed, it removes itself
         
+        # this next value is used by the date time option "Download Time"
+        self.download_start_time = None 
+        
         global job_code
         job_code = None
     
@@ -5630,6 +5690,11 @@ class RapidApp(gnomeglade.GnomeApp,  dbus.service.Object):
         for w in workers.getPausedDownloadingWorkers():
             w.startStop()
             self.timeRemaining.setTimeMark(w)
+        
+        # set the time that the download started - this is used
+        # in the "Download Time" date time renaming option.
+        self.setDownloadStartTime()
+
             
         #start any new workers that have downloads pending
         for i in threads:
@@ -5638,6 +5703,9 @@ class RapidApp(gnomeglade.GnomeApp,  dbus.service.Object):
         if is_beta and verbose and False:
             workers.printWorkerStatus()
     
+    def setDownloadStartTime(self):
+        if not self.download_start_time:
+            self.download_start_time = datetime.datetime.now()
         
     def updateOverallProgress(self, thread_id, bytesDownloaded, percentComplete):
         """
@@ -6268,6 +6336,7 @@ def start ():
     # Translators: this text is displayed to the user when they request information on the command line options. 
     # The text %default should not be modified or left out.
     parser.add_option("-v",  "--verbose",  action="store_true", dest="verbose",  help=_("display program information on the command line as the program runs (default: %default)"))
+    parser.add_option("-d", "--debug", action="store_true", dest="debug", help=_('display debugging information when run from the command line'))
     parser.add_option("-q", "--quiet",  action="store_false", dest="verbose",  help=_("only output errors to the command line"))
     # image file extensions are recognized RAW files plus TIFF and JPG
     parser.add_option("-e",  "--extensions", action="store_true", dest="extensions", help=_("list photo and video file extensions the program recognizes and exit"))
@@ -6275,6 +6344,11 @@ def start ():
     (options, args) = parser.parse_args()
     global verbose
     verbose = options.verbose
+    
+    global debug_info
+    debug_info = options.debug
+    if debug_info:
+        verbose = True
     
     if verbose:
         atexit.register(programStatus)
@@ -6300,7 +6374,7 @@ def start ():
     cmd_line(_("Using") + " pyexiv2 " + metadata.version_info())
     cmd_line(_("Using") + " exiv2 " + metadata.exiv2_version_info())
     if DOWNLOAD_VIDEO:
-        cmd_line(_("Using") + " kaa " + videometadata.version_info())
+        cmd_line(_("Using") + " hachoir " + videometadata.version_info())
     else:
         cmd_line(_("\n" + "Video downloading functionality disabled.\nTo download videos, please install the kaa metadata package for python.") + "\n")
         

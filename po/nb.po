@@ -1,106 +1,106 @@
-# SOME DESCRIPTIVE TITLE.
-# Copyright (C) YEAR THE PACKAGE'S COPYRIGHT HOLDER
-# This file is distributed under the same license as the PACKAGE package.
-# FIRST AUTHOR <EMAIL@ADDRESS>, YEAR.
+# Norwegian Bokmal translation for rapid
+# Copyright (c) 2010 Rosetta Contributors and Canonical Ltd 2010
+# This file is distributed under the same license as the rapid package.
+# FIRST AUTHOR <EMAIL@ADDRESS>, 2010.
 #
-#, fuzzy
 msgid ""
 msgstr ""
-"Project-Id-Version: PACKAGE VERSION\n"
-"Report-Msgid-Bugs-To: \n"
+"Project-Id-Version: rapid\n"
+"Report-Msgid-Bugs-To: FULL NAME <EMAIL@ADDRESS>\n"
 "POT-Creation-Date: 2010-10-22 21:26-0500\n"
-"PO-Revision-Date: YEAR-MO-DA HO:MI+ZONE\n"
-"Last-Translator: FULL NAME <EMAIL@ADDRESS>\n"
-"Language-Team: LANGUAGE <LL@li.org>\n"
-"Language: \n"
+"PO-Revision-Date: 2010-09-23 05:04+0000\n"
+"Last-Translator: Damon Lynch <damonlynch@gmail.com>\n"
+"Language-Team: Norwegian Bokmal <nb@li.org>\n"
 "MIME-Version: 1.0\n"
-"Content-Type: text/plain; charset=CHARSET\n"
+"Content-Type: text/plain; charset=UTF-8\n"
 "Content-Transfer-Encoding: 8bit\n"
+"X-Launchpad-Export-Date: 2010-10-25 03:12+0000\n"
+"X-Generator: Launchpad (build Unknown)\n"
 
 #. Translators: if neccessary, for guidance in how to translate this program, you may see http://damonlynch.net/translate.html
 #: rapid/rapid.py:124 rapid/rapid.py:6353 rapid/glade3/rapid.glade.h:71
 msgid "Rapid Photo Downloader"
-msgstr ""
+msgstr "Rapid Photo Downloader"
 
 #: rapid/rapid.py:456
 msgid "New York"
-msgstr ""
+msgstr "New York"
 
 #: rapid/rapid.py:457
 msgid "Manila"
-msgstr ""
+msgstr "Manila"
 
 #: rapid/rapid.py:457
 msgid "Prague"
-msgstr ""
+msgstr "Praha"
 
 #: rapid/rapid.py:457
 msgid "Helsinki"
-msgstr ""
+msgstr "Helsinki"
 
 #: rapid/rapid.py:457
 msgid "Wellington"
-msgstr ""
+msgstr "Wellington"
 
 #: rapid/rapid.py:458
 msgid "Tehran"
-msgstr ""
+msgstr "Teheran"
 
 #: rapid/rapid.py:458
 msgid "Kampala"
-msgstr ""
+msgstr "Kampala"
 
 #: rapid/rapid.py:458
 msgid "Paris"
-msgstr ""
+msgstr "Paris"
 
 #: rapid/rapid.py:458
 msgid "Berlin"
-msgstr ""
+msgstr "Berlin"
 
 #: rapid/rapid.py:458
 msgid "Sydney"
-msgstr ""
+msgstr "Sydney"
 
 #: rapid/rapid.py:459
 msgid "Budapest"
-msgstr ""
+msgstr "Budapest"
 
 #: rapid/rapid.py:459
 msgid "Rome"
-msgstr ""
+msgstr "Roma"
 
 #: rapid/rapid.py:459
 msgid "Moscow"
-msgstr ""
+msgstr "Moskva"
 
 #: rapid/rapid.py:459
 msgid "Delhi"
-msgstr ""
+msgstr "Delhi"
 
 #: rapid/rapid.py:459
 msgid "Warsaw"
-msgstr ""
+msgstr "Warszawa"
 
 #: rapid/rapid.py:460
 msgid "Jakarta"
-msgstr ""
+msgstr "Jakarta"
 
 #: rapid/rapid.py:460
 msgid "Madrid"
-msgstr ""
+msgstr "Madrid"
 
 #: rapid/rapid.py:460
 msgid "Stockholm"
-msgstr ""
+msgstr "Stockholm"
 
 #: rapid/rapid.py:493
 msgid "Invalid Downloads Today value.\n"
-msgstr ""
+msgstr "Ugyldig verdi for Nedlastinger idag.\n"
 
 #: rapid/rapid.py:494
 msgid "Resetting value to zero.\n"
-msgstr ""
+msgstr "Nullstiller verdien.\n"
 
 #: rapid/rapid.py:533
 msgid "'Start of day' preference value is corrupted.\n"
@@ -108,7 +108,7 @@ msgstr ""
 
 #: rapid/rapid.py:534
 msgid "Resetting to midnight.\n"
-msgstr ""
+msgstr "Nullstiller verdien til midnatt.\n"
 
 #: rapid/rapid.py:560
 msgid "Error in Photo Rename preferences"
@@ -116,20 +116,20 @@ msgstr ""
 
 #: rapid/rapid.py:592 rapid/rapid.py:1714
 msgid "Sorry,these preferences contain an error:\n"
-msgstr ""
+msgstr "Beklager,innstillingene inneholder en feil:\n"
 
 #: rapid/rapid.py:603
 msgid "Resetting to default values."
-msgstr ""
+msgstr "Nullstiller til standardverdier."
 
 #. Translators: for an explanation of what this means, see http://damonlynch.net/rapid/documentation/index.html#jobcode
 #: rapid/rapid.py:678 rapid/renamesubfolderprefs.py:199
 msgid "Job code"
-msgstr ""
+msgstr "Jobbnavn"
 
 #: rapid/rapid.py:746
 msgid "Error in Video Rename preferences"
-msgstr ""
+msgstr "Feil i innstillingene til nytt videonavn"
 
 #: rapid/rapid.py:764
 msgid "Error in Photo Download Subfolders preferences"
@@ -145,20 +145,20 @@ msgstr ""
 
 #: rapid/rapid.py:816 rapid/rapid.py:1555 rapid/rapid.py:1683
 msgid "photos"
-msgstr ""
+msgstr "bilder"
 
 #: rapid/rapid.py:949
 msgid "Select a folder to download photos to"
-msgstr ""
+msgstr "Velg katalog for å laste inn bilder"
 
 #: rapid/rapid.py:967
 msgid "Select a folder to download videos to"
-msgstr ""
+msgstr "Velg katalog for å laste inn video"
 
 #: rapid/rapid.py:1049
 #, python-format
 msgid "Select a folder containing %(file_types)s"
-msgstr ""
+msgstr "Velg katalog med %(file_types)r"
 
 #: rapid/rapid.py:1071
 #, python-format
@@ -185,7 +185,8 @@ msgid "<i>Example: %s</i>"
 msgstr ""
 
 #: rapid/rapid.py:1218
-msgid "Downloads today value not updated, as a download is currently occurring"
+msgid ""
+"Downloads today value not updated, as a download is currently occurring"
 msgstr ""
 
 #: rapid/rapid.py:1234
