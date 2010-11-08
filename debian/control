@@ -1,7 +1,7 @@
 Source: rapid-photo-downloader
 Section: graphics
 Priority: optional
-Maintainer: Julien Valroff <julien@kirya.net>
+Maintainer: Julien Valroff <julien@debian.org>
 Build-Depends: debhelper (>= 7.0.50~),
                python
 Build-Depends-Indep: python-support (>= 0.90),
