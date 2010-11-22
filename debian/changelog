@@ -1,8 +1,9 @@
 rapid-photo-downloader (0.3.3-3) experimental; urgency=low
 
   * Remove DMUA field, now useless 
+  * Add (X-)Python-Version: fields in control file, as per Python Policy 
 
- -- Julien Valroff <julien@debian.org>  Wed, 10 Nov 2010 21:51:35 +0100
+ -- Julien Valroff <julien@debian.org>  Mon, 22 Nov 2010 21:34:48 +0100
 
 rapid-photo-downloader (0.3.3-2) experimental; urgency=low
 
