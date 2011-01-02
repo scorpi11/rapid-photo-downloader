@@ -15,7 +15,7 @@
 ### along with this program; if not, write to the Free Software
 ### Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 
-version = '0.3.3'
+version = '0.3.4'
 
 GCONF_KEY="/apps/rapid-photo-downloader"
 GLADE_FILE = "glade3/rapid.glade"
@@ -45,7 +45,10 @@ SERIOUS_ERROR = 2
 WARNING = 3
 
 MAX_LENGTH_DEVICE_NAME = 15
-MAX_THUMBNAIL_SIZE = 160
+
+MIN_THUMBNAIL_SIZE = 80
+max_thumbnail_size = 320 # will be overridden when the screen is tiny
+THUMBNAIL_INCREMENT = 50
 
 STATUS_DOWNLOAD_PENDING = 0                 # going to try to download it
 STATUS_DOWNLOADED = 1                       # downloaded successfully
