@@ -1,3 +1,32 @@
+Version 0.3.4
+-------------
+
+2010-12-31
+
+You can now change the size of the preview image by zooming in and out using a 
+slider. The maximum size is double that of the previous fixed size, which was
+160px. On computers with small screens such as netbooks, the maximum preview 
+image size is the same as the previous fixed size. Please note that Rapid Photo 
+Downloader only extracts thumbnails of photos; for performance reasons, it does
+not create them. This means for some file formats, the thumbnails will contain
+jpeg artifacts when scaled up (this is particularly true when using a version of
+pyexiv2 < 0.2.0). For users who require larger preview images, this will be of
+little consequence.
+
+When the "Strip compatible characters" feature is enabled in the Preferences 
+(which is the default), any white space (e.g. spaces) beginning or ending a
+folder name will now be removed.
+
+Bug fix: camera serial numbers are now stripped of any spaces preceding or
+following the actual value.
+
+Fixed bug #685335: inaccurate description of python packages required for 
+downloading videos.
+
+Added Croatian translation. Updated French, Norwegian Bokmal, Polish and Russian
+translations.
+
+
 Version 0.3.3
 -------------
 
@@ -22,7 +51,7 @@ download was started.
 
 Fixed bugs related to missing video download directory at program startup.
 
-Added command line option to output to the terminal information usesful for 
+Added command line option to output to the terminal information useful for 
 debugging.
 
 Added Norwegian Bokmal and Portuguese translations. Updated Brazilian 
