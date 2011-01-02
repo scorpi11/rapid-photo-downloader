@@ -1,5 +1,6 @@
-rapid-photo-downloader (0.3.3-3) experimental; urgency=low
+rapid-photo-downloader (0.3.4-1) experimental; urgency=low
 
+  * New Upstream Version
   * Remove DMUA field, now useless 
   * Add (X-)Python-Version: fields in control file, as per Python Policy 
 
