@@ -1,8 +1,9 @@
 rapid-photo-downloader (0.3.4-2) experimental; urgency=low
 
   * Update copyright information 
+  * Bump debhelper compat to 8
 
- -- Julien Valroff <julien@debian.org>  Sat, 08 Jan 2011 13:53:51 +0100
+ -- Julien Valroff <julien@debian.org>  Sun, 13 Feb 2011 21:27:42 +0100
 
 rapid-photo-downloader (0.3.4-1) experimental; urgency=low
 
