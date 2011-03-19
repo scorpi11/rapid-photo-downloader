@@ -7,7 +7,7 @@ Build-Depends: debhelper (>= 8),
 Build-Depends-Indep: python-support (>= 0.90),
                      gettext
 Standards-Version: 3.9.1
-X-Python-Version: >= 2.5
+X-Python-Version: all
 Homepage: http://damonlynch.net/rapid
 Vcs-Git: git://git.kirya.net/git/rapid-photo-downloader.git
 Vcs-Browser: http://git.kirya.net/?p=rapid-photo-downloader.git;a=summary
