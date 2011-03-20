@@ -1,8 +1,10 @@
 rapid-photo-downloader (0.3.4-3) unstable; urgency=low
 
   * Switch from pysupport to dh_python2
+  * Install files in a private directory to avoid file conflicts with
+    rapid-spring package (Closes: #618994) 
 
- -- Julien Valroff <julien@debian.org>  Sun, 20 Mar 2011 15:25:09 +0100
+ -- Julien Valroff <julien@debian.org>  Sun, 20 Mar 2011 15:48:38 +0100
 
 rapid-photo-downloader (0.3.4-2) unstable; urgency=low
 
