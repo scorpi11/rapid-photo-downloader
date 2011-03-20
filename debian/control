@@ -3,9 +3,8 @@ Section: graphics
 Priority: optional
 Maintainer: Julien Valroff <julien@debian.org>
 Build-Depends: debhelper (>= 8),
-               python
-Build-Depends-Indep: python-support (>= 0.90),
-                     gettext
+               python,
+               gettext
 Standards-Version: 3.9.1
 X-Python-Version: all
 Homepage: http://damonlynch.net/rapid
@@ -31,7 +30,6 @@ Recommends:
          python-kaa-metadata,
          python-hachoir-metadata,
          ffmpegthumbnailer
-XB-Python-Version: ${python:Versions}
 Description: Photo downloader (importer) from cameras, memory cards other devices
  Rapid Photo Downloader can be used by both professional and amateur
  photographers to download photos and videos from multiple cameras,
