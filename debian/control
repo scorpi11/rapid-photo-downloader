@@ -25,11 +25,10 @@ Depends: ${python:Depends},
          librsvg2-common,
          gnome-icon-theme,
          librsvg2-common
-Recommends:
-         python-imaging,
-         python-kaa-metadata,
-         python-hachoir-metadata,
-         ffmpegthumbnailer
+Recommends: python-imaging,
+            python-kaa-metadata,
+            python-hachoir-metadata,
+            ffmpegthumbnailer
 Description: Photo downloader (importer) from cameras, memory cards other devices
  Rapid Photo Downloader can be used by both professional and amateur
  photographers to download photos and videos from multiple cameras,
