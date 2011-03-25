@@ -115,6 +115,9 @@ try:
     DROP_SHADOW = True
 except:
     DROP_SHADOW = False
+
+
+#~ DROP_SHADOW = False # for testing
     
 from common import Configi18n
 global _
@@ -1621,6 +1624,11 @@ def generateSubfolderAndName(mediaFile, problem, subfolderPrefsFactory,
     else:
         mediaFile.status = STATUS_NOT_DOWNLOADED
 
+def getGenericPhotoImage():
+    return gtk.gdk.pixbuf_new_from_file(paths.share_dir('glade3/photo.png'))
+    
+def getGenericVideoImage():
+    return gtk.gdk.pixbuf_new_from_file(paths.share_dir('glade3/video.png'))
 
 class NeedAJobCode():
     """
@@ -1850,8 +1858,8 @@ class CopyPhotos(Thread):
                        
             # load images to display for when a thumbnail cannot be extracted or created
             
-            self.photoThumbnail = gtk.gdk.pixbuf_new_from_file(paths.share_dir('glade3/photo.png'))
-            self.videoThumbnail = gtk.gdk.pixbuf_new_from_file(paths.share_dir('glade3/video.png'))
+            self.photoThumbnail = getGenericPhotoImage()
+            self.videoThumbnail = getGenericVideoImage()
                 
             imageRenameUsesJobCode = rn.usesJobCode(self.prefs.image_rename)
             imageSubfolderUsesJobCode = rn.usesJobCode(self.prefs.subfolder)
@@ -1893,11 +1901,19 @@ class CopyPhotos(Thread):
                     mediaFile.generateThumbnail(self.videoTempWorkingDir)
                     
                 if mediaFile.thumbnail is None:
-                    mediaFile.genericThumbnail = True
-                    if mediaFile.isImage:
-                        mediaFile.thumbnail = self.photoThumbnail
-                    else:
-                        mediaFile.thumbnail = self.videoThumbnail
+                    addGenericThumbnail(mediaFile)
+
+            
+            def addGenericThumbnail(mediaFile):
+                """
+                Adds a generic thumbnail to the mediafile, which
+                can be very useful when previews are disabled
+                """
+                mediaFile.genericThumbnail = True
+                if mediaFile.isImage:
+                    mediaFile.thumbnail = self.photoThumbnail
+                else:
+                    mediaFile.thumbnail = self.videoThumbnail                
             
             def downloadable(name):
                 isImage = media.isImage(name)
@@ -1907,9 +1923,10 @@ class CopyPhotos(Thread):
                 return (download, isImage, isVideo)
                 
             def addFile(name, path, size, modificationTime, device, volume, isImage):
-                #~ if debug_info:
-                    #~ cmd_line("Scanning %s" % name)
-                    
+                """
+                Add an image or video to the list of scanned files to be shown to the user for potential downloading
+                """
+
                 if isImage:
                     downloadFolder = self.prefs.download_folder
                 else:
@@ -2336,7 +2353,8 @@ class CopyPhotos(Thread):
                             with self.fileSequenceLock:
                                 for possibleName in renameFactory.generateNameSequencePossibilities(
                                                         mediaFile.metadata, 
-                                                        mediaFile.name, self.stripCharacters, mediaFile.downloadSubfolder):
+                                                        mediaFile.name, self.stripCharacters, mediaFile.downloadSubfolder,
+                                                        fallback_date = mediaFile.modificationTime):
                                     if possibleName:
                                         # no need to check for any problems here, it's just a temporary name
                                         possibleFile = os.path.join(mediaFile.downloadPath, possibleName)
@@ -3601,12 +3619,14 @@ class SelectionTreeView(gtk.TreeView):
         self.icon_photo =  gtk.gdk.pixbuf_new_from_file(paths.share_dir('glade3/photo24.png'))
         self.icon_video =  gtk.gdk.pixbuf_new_from_file(paths.share_dir('glade3/video24.png'))
         #with shadows
-        self.generic_photo_with_shadow = gtk.gdk.pixbuf_new_from_file(paths.share_dir('glade3/photo_small_shadow.png'))
-        self.generic_video_with_shadow = gtk.gdk.pixbuf_new_from_file(paths.share_dir('glade3/video_small_shadow.png'))
-        
         if DROP_SHADOW:
+            self.generic_photo_thumbnail = gtk.gdk.pixbuf_new_from_file(paths.share_dir('glade3/photo_small_shadow.png'))
+            self.generic_video_thumbnail = gtk.gdk.pixbuf_new_from_file(paths.share_dir('glade3/video_small_shadow.png'))
             self.iconDropShadow = DropShadow(offset=(3,3), shadow = (0x34, 0x34, 0x34, 0xff), border=6)
-            
+        else:
+            self.generic_photo_thumbnail = gtk.gdk.pixbuf_new_from_file(paths.share_dir('glade3/photo_small.png'))
+            self.generic_video_thumbnail = gtk.gdk.pixbuf_new_from_file(paths.share_dir('glade3/video_small.png'))
+        
         self.previewed_file_treerowref = None
         self.icontheme = gtk.icon_theme_get_default()
         
@@ -3719,11 +3739,14 @@ class SelectionTreeView(gtk.TreeView):
     def add_file(self, mediaFile):
         if debug_info:
             cmd_line('Adding file %s' % mediaFile.fullFileName)
+            
+        # metadata is loaded when previews are generated before downloading
         if mediaFile.metadata:
             date = mediaFile.dateTime()
             timestamp = mediaFile.metadata.timeStamp(missing=None)
             if timestamp is None:
                 timestamp = mediaFile.modificationTime
+        # if metadata has not been loaded, substitute other values
         else:
             timestamp = mediaFile.modificationTime
             date = datetime.datetime.fromtimestamp(timestamp)
@@ -3734,18 +3757,20 @@ class SelectionTreeView(gtk.TreeView):
         name = mediaFile.name
         size = mediaFile.size
         thumbnail = mediaFile.thumbnail
-        thumbnail_icon = common.scale2pixbuf(60, 36, thumbnail)
-        #thumbnail_icon = common.scale2pixbuf(80, 48, mediaFile.thumbnail)
-        if DROP_SHADOW:
-            if not mediaFile.genericThumbnail:
-                pil_image = pixbuf_to_image(thumbnail_icon)
-                pil_image = self.iconDropShadow.dropShadow(pil_image)
-                thumbnail_icon = image_to_pixbuf(pil_image)
+        
+        if mediaFile.genericThumbnail:
+            if mediaFile.isImage:
+                thumbnail_icon = self.generic_photo_thumbnail
             else:
-                if mediaFile.isImage:
-                    thumbnail_icon = self.generic_photo_with_shadow
-                else:
-                    thumbnail_icon = self.generic_video_with_shadow
+                thumbnail_icon = self.generic_video_thumbnail
+        else:
+            thumbnail_icon = common.scale2pixbuf(60, 36, thumbnail)
+            
+        if DROP_SHADOW and not mediaFile.genericThumbnail:
+            pil_image = pixbuf_to_image(thumbnail_icon)
+            pil_image = self.iconDropShadow.dropShadow(pil_image)
+            thumbnail_icon = image_to_pixbuf(pil_image)
+
         
         if mediaFile.isImage:
             type_icon = self.icon_photo
@@ -3754,7 +3779,7 @@ class SelectionTreeView(gtk.TreeView):
 
         status_icon = self.get_status_icon(mediaFile.status)
         
-        if debug_info:
+        if debug_info and False:
             cmd_line('Thumbnail icon: %s' % thumbnail_icon)
             cmd_line('Name: %s' % name)
             cmd_line('Timestamp: %s' % timestamp)

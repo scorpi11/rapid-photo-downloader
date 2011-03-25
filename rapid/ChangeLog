@@ -1,3 +1,20 @@
+Version 0.3.5
+-------------
+
+2011-03-23
+
+The primary purpose of this release is update translations and fix bug #714039,
+where under certain circumstances the program could crash while downloading 
+files. 
+
+This is intended to be the last release in the 0.3.x series. In the upcoming 
+version 0.4.0, Rapid Photo Downloader is much faster and sports a new user 
+interface.
+
+Added Romanian translation. Updated Brazilian, Chinese, Croatian, Czech, Dutch, 
+Finnish, German, Italian, Polish and Russian translations.
+
+
 Version 0.3.4
 -------------
 
