@@ -57,6 +57,8 @@ import prefsrapid
 import tableplusminus as tpm
 import generatename as gn
 
+import downloadtracker
+
 from metadatavideo import DOWNLOAD_VIDEO
 import metadataphoto
 import metadatavideo
@@ -64,6 +66,8 @@ import metadatavideo
 import scan as scan_process
 import copyfiles
 import subfolderfile
+
+import errorlog
 
 import device as dv
 import utilities
@@ -105,13 +109,6 @@ def date_time_human_readable(date, with_line_break=True):
     else:
         return _("%(date)s %(time)s") % {'date':date.strftime("%x"), 'time':date.strftime("%X")}
         
-def time_subseconds_human_readable(date, subseconds):
-    return _("%(hour)s:%(minute)s:%(second)s:%(subsecond)s") % \
-            {'hour':date.strftime("%H"),
-             'minute':date.strftime("%M"), 
-             'second':date.strftime("%S"),
-             'subsecond': subseconds}
-
 def date_time_subseconds_human_readable(date, subseconds):
     return _("%(date)s %(hour)s:%(minute)s:%(second)s:%(subsecond)s") % \
             {'date':date.strftime("%x"), 
@@ -228,9 +225,9 @@ class DeviceCollection(gtk.TreeView):
         else:
             return None
     
-    def update_progress(self, process_id, percent_complete, progress_bar_text, bytes_downloaded):
+    def update_progress(self, scan_pid, percent_complete, progress_bar_text, bytes_downloaded):
         
-        iter = self._get_process_map(process_id)
+        iter = self._get_process_map(scan_pid)
         if iter:
             if percent_complete:
                 self.liststore.set_value(iter, 3, percent_complete)
@@ -558,6 +555,16 @@ class ThumbnailDisplay(gtk.IconView):
         
         self.total_files += 1
 
+    def get_sample_file(self, file_type):
+        """Returns an rpd_file for of a given file type, or None if it does 
+        not exist"""
+        for unique_id, rpd_file in self.rpd_files.iteritems():
+            if rpd_file.file_type == file_type:
+                if rpd_file.status <> STATUS_CANNOT_DOWNLOAD:
+                    return rpd_file
+                    
+        return None
+    
     def get_unique_id_from_iter(self, iter):
         return self.liststore.get_value(iter, 2)
         
@@ -862,6 +869,7 @@ class TaskManager:
     
     def add_task(self, task):
         pid = self._setup_task(task)
+        logger.debug("TaskManager PID: %s", pid)
         return pid
 
         
@@ -1032,6 +1040,7 @@ class SubfolderFileManager(SingleInstanceTaskManager):
         SingleInstanceTaskManager.__init__(self, results_callback)
         self._subfolder_file = subfolderfile.SubfolderFile(self.task_process_conn, sequence_values)
         self._subfolder_file.start()
+        logger.debug("SubfolderFile PID: %s", self._subfolder_file.pid)
         
     def rename_file_and_move_to_subfolder(self, download_succeeded, 
             download_count, rpd_file):
@@ -1235,7 +1244,8 @@ class RapidApp(dbus.service.Object):
         
         # FIXME: need more fine grained tuning here - must cancel large file
         # copies midstream
-        logger.info("Terminating...")
+        if terminate_file_copies:
+            logger.info("Terminating all processes...")
 
         scan_termination_requested = self.scan_manager.request_termination()        
         thumbnails_termination_requested = self.thumbnails.thumbnail_manager.request_termination()
@@ -1760,11 +1770,7 @@ class RapidApp(dbus.service.Object):
         # Track download sizes and other values for each device.
         # (Scan id acts as an index to each device. A device could be scanned
         #  more than once).
-        self.size_of_download_in_bytes_by_scan_pid = dict()
-        self.no_files_in_download_by_scan_pid = dict()
-        self.file_types_present_by_scan_pid = dict()
-        self.download_count_for_file_by_unique_id = dict()
-        self.download_count_by_scan_pid = dict()
+        self.download_tracker = downloadtracker.DownloadTracker()
         
         # Track which temporary directories are created when downloading files
         self.temp_dirs_by_scan_pid = dict()
@@ -1781,17 +1787,23 @@ class RapidApp(dbus.service.Object):
         
         self.download_start_time = datetime.datetime.now()
         files_by_scan_pid = self.thumbnails.get_files_checked_for_download()
-        folders_valid = self.check_download_folder_validity(files_by_scan_pid)
+        folders_valid, invalid_dirs = self.check_download_folder_validity(files_by_scan_pid)
         
-        #FIXME: if invalid, display some kind of error message to the user
-        
-        if folders_valid:
+        if not folders_valid:
+            if len(invalid_dirs) > 1:
+                msg = _("These download folders are invalid:\n%(folder1)s\n%(folder2)s") % {
+                        'folder1': invalid_dirs[0], 'folder2': invalid_dirs[1]}
+            else:
+                msg = _("This download folder is invalid:\n%s") % invalid_dirs[0]
+            self.log_error(config.CRITICAL_ERROR, _("Download cannot proceed"),
+                msg)
+        else:
             self.thumbnails.mark_download_pending(files_by_scan_pid)
             for scan_pid in files_by_scan_pid:
                 files = files_by_scan_pid[scan_pid]
                 self.download_files(files, scan_pid)
                 
-        self.set_download_action_label(is_download = False)
+            self.set_download_action_label(is_download = False)
         
     def pause_download(self):
         
@@ -1820,8 +1832,10 @@ class RapidApp(dbus.service.Object):
         else:
             video_download_folder = None
             
-        self.size_of_download_in_bytes_by_scan_pid[scan_pid] = self.size_files_to_be_downloaded(files)
-        self.no_files_in_download_by_scan_pid[scan_pid] = len(files)
+        self.download_tracker.init_stats(scan_pid=scan_pid, 
+                                bytes=self.size_files_to_be_downloaded(files),
+                                no_files=len(files))
+            
         self.download_active_by_scan_pid.append(scan_pid)
         # Initiate copy files process
         self.copy_files_manager.add_task((photo_download_folder, 
@@ -1843,16 +1857,18 @@ class RapidApp(dbus.service.Object):
                 self.temp_dirs_by_scan_pid[scan_pid] = (photo_temp_dir, video_temp_dir)                
             elif msg_type == rpdmp.MSG_BYTES:
                 scan_pid, total_downloaded = data
-                percent_complete = (float(total_downloaded) / 
-                                self.size_of_download_in_bytes_by_scan_pid[scan_pid]) * 100
+                self.download_tracker.set_total_bytes_copied(scan_pid, 
+                                                             total_downloaded)
+                percent_complete = self.download_tracker.get_percent_complete(scan_pid)
                 self.device_collection.update_progress(scan_pid, percent_complete,
                                             None, None)
             elif msg_type == rpdmp.MSG_FILE:
                 download_succeeded, rpd_file, download_count, temp_full_file_name = data
                 
-                
-                self.download_count_for_file_by_unique_id[rpd_file.unique_id] = download_count
-                self.download_count_by_scan_pid[rpd_file.scan_pid] = download_count
+                self.download_tracker.set_download_count_for_file(
+                                            rpd_file.unique_id, download_count)
+                self.download_tracker.set_download_count(
+                                            rpd_file.scan_pid, download_count)
                 rpd_file.download_start_time = self.download_start_time
                 
                 if download_succeeded:
@@ -1860,9 +1876,8 @@ class RapidApp(dbus.service.Object):
                     rpd_file = prefsrapid.insert_pref_lists(self.prefs, rpd_file)
                     rpd_file.strip_characters = self.prefs.strip_characters
                     rpd_file.download_folder = self.prefs.get_download_folder_for_file_type(rpd_file.file_type)
-                
-                #~ if not download_succeeded:
-                    #~ logger.error("File was not downloaded: %s", rpd_file.full_file_name)
+                    rpd_file.download_conflict_resolution = self.prefs.download_conflict_resolution
+                    rpd_file.synchronize_raw_jpg = self.prefs.must_synchronize_raw_jpg() 
                 
                 self.subfolder_file_manager.rename_file_and_move_to_subfolder(
                         download_succeeded, 
@@ -1896,17 +1911,25 @@ class RapidApp(dbus.service.Object):
         scan_pid = rpd_file.scan_pid
         unique_id = rpd_file.unique_id
         
-        self._update_file_download_device_progress(scan_pid, unique_id)
-        
         self.thumbnails.update_status_post_download(rpd_file)
         
-        download_count = self.download_count_for_file_by_unique_id[unique_id]
-        if download_count == self.no_files_in_download_by_scan_pid[scan_pid]:
+        # Update error log window if neccessary
+        if not move_succeeded:
+            self.log_error(config.SERIOUS_ERROR, rpd_file.error_title, 
+                           rpd_file.error_msg, rpd_file.error_extra_detail)
+        elif rpd_file.status == config.STATUS_DOWNLOADED_WITH_WARNING:
+            self.log_error(config.WARNING, rpd_file.error_title, 
+                           rpd_file.error_msg, rpd_file.error_extra_detail)
+        
+        self.download_tracker.file_downloaded_increment(scan_pid)
+        self._update_file_download_device_progress(scan_pid, unique_id)
+                
+        download_count = self.download_tracker.get_download_count_for_file(unique_id)
+        if download_count == self.download_tracker.get_no_files_in_download(scan_pid):
             # Last file has been downloaded, so clean temp directory
             logger.debug("Purging temp directories")
             self._clean_temp_dirs_for_scan_pid(scan_pid)
-            del self.no_files_in_download_by_scan_pid[scan_pid]
-            del self.size_of_download_in_bytes_by_scan_pid[scan_pid]
+            self.download_tracker.purge(scan_pid)
             self.download_active_by_scan_pid.remove(scan_pid)
             
             if not self.download_is_occurring():
@@ -1931,13 +1954,15 @@ class RapidApp(dbus.service.Object):
         """
         Increments the progress bar for an individual device
         """
-        #~ scan_pid = rpd_file.scan_pid
-        #~ unique_id = rpd_file.unique_id
         progress_bar_text = _("%(number)s of %(total)s %(filetypes)s") % \
-                             {'number':  self.download_count_for_file_by_unique_id[unique_id], 
-                              'total': self.no_files_in_download_by_scan_pid[scan_pid],
-                              'filetypes': self.file_types_present_by_scan_pid[scan_pid]}
-        self.device_collection.update_progress(scan_pid, None, progress_bar_text, None)        
+                             {'number':  self.download_tracker.get_download_count_for_file(unique_id), 
+                              'total': self.download_tracker.get_no_files_in_download(scan_pid),
+                              'filetypes': self.download_tracker.get_file_types_present(scan_pid)}
+        percent_complete = self.download_tracker.get_percent_complete(scan_pid)
+        self.device_collection.update_progress(scan_pid=scan_pid,
+                                        percent_complete=percent_complete,
+                                        progress_bar_text=progress_bar_text, 
+                                        bytes_downloaded=None)        
 
     def _clean_all_temp_dirs(self):
         """
@@ -1998,7 +2023,7 @@ class RapidApp(dbus.service.Object):
                                                        self.prefs.video_rename,
                                                        self.prefs.video_subfolder)
         if not prefs_ok:
-            logger.error("There is an error in the program preferences. Some preferences will be reset.")
+            logger.error("There is an error in the program preferences relating to file renaming and subfolder creation. Some preferences will be reset.")
         return prefs_ok
         
         
@@ -2096,6 +2121,8 @@ class RapidApp(dbus.service.Object):
             
             self.thumbnails.clear_all()
             self.setup_devices(on_startup = False, on_preference_change = True, do_not_allow_auto_start = True)
+            if self.main_notebook.get_current_page() == 1: # preview of file
+                self.main_notebook.set_current_page(0)
                 
             self.rerun_setup_available_image_and_video_media = False
             
@@ -2139,6 +2166,7 @@ class RapidApp(dbus.service.Object):
         self.device_collection_scrolledwindow = builder.get_object("device_collection_scrolledwindow")
         self.next_image_action = builder.get_object("next_image_action")
         self.prev_image_action = builder.get_object("prev_image_action")
+        self.menu_log_window = builder.get_object("menu_log_window")
         
         # Only enable this action when actually displaying a preview
         self.next_image_action.set_sensitive(False)
@@ -2160,6 +2188,9 @@ class RapidApp(dbus.service.Object):
         self.device_collection_viewport = builder.get_object("device_collection_viewport")
         self.device_collection = DeviceCollection(self)
         self.device_collection_viewport.add(self.device_collection)
+        
+        #error log window
+        self.error_log = errorlog.ErrorLog(self)
         
         # monitor to handle mounts and dismounts
         self.vmonitor = None
@@ -2258,8 +2289,8 @@ class RapidApp(dbus.service.Object):
         
         Also displays backup volumes / path being used. (NOT IMPLEMENTED YET)
         """
-        photo_dir = self.is_valid_download_dir(self.prefs.download_folder)
-        video_dir = self.is_valid_download_dir(self.prefs.video_download_folder)
+        photo_dir = self.is_valid_download_dir(path=self.prefs.download_folder, is_photo_dir=True, show_error_in_log=True)
+        video_dir = self.is_valid_download_dir(path=self.prefs.video_download_folder, is_photo_dir=False, show_error_in_log=True)
         if photo_dir and video_dir:
             same_file_system = self.same_file_system(self.prefs.download_folder,
                                             self.prefs.video_download_folder)
@@ -2272,6 +2303,7 @@ class RapidApp(dbus.service.Object):
         if video_dir and not same_file_system:
             dirs.append((self.prefs.video_download_folder, _("videos")))
         
+        msg = ''
         if len(dirs) > 1:
             msg = ' ' + _('Free space:') + ' '
             
@@ -2313,7 +2345,7 @@ class RapidApp(dbus.service.Object):
                 # user manually specified backup location
                 msg2 = _('Backing up to %(path)s') % {'path':self.prefs.backup_location}
             else:
-                msg2 = self.displayBackupVolumes()
+                msg2 = self.displayBackupVolumes() #FIXME
                 
             if msg:
                 msg = _("%(freespace)s. %(backuppaths)s.") % {'freespace': msg, 'backuppaths': msg2}
@@ -2323,6 +2355,27 @@ class RapidApp(dbus.service.Object):
         msg = msg.rstrip()
             
         self.statusbar_message(msg)
+        
+    def log_error(self, severity, problem, details, extra_detail=None):
+        """
+        Display error and warning messages to user in log window
+        """
+        self.error_log.add_message(severity, problem, details, extra_detail)
+        
+    
+    def on_error_eventbox_button_press_event(self, widget, event):
+        self.prefs.show_log_dialog = True
+        self.error_log.widget.show()     
+        
+        
+    def on_menu_log_window_toggled(self, widget):
+        active = widget.get_active()
+        self.prefs.show_log_dialog = active
+        if active:
+            self.error_log.widget.show()
+        else:
+            self.error_log.widget.hide()
+    
     
     # # #
     # Utility functions
@@ -2352,8 +2405,12 @@ class RapidApp(dbus.service.Object):
         """
         Checks validity of download folders based on the file types the user
         is attempting to download.
+        
+        If valid, returns a tuple of True and an empty list.
+        If invalid, returns a tuple of False and a list of the invalid directores.
         """
         valid = True
+        invalid_dirs = []
         # first, check what needs to be downloaded - photos and / or videos
         need_photo_folder = False
         need_video_folder = False
@@ -2369,14 +2426,18 @@ class RapidApp(dbus.service.Object):
             
         # second, check validity
         if need_photo_folder:
-            if not self.is_valid_download_dir(self.prefs.download_folder):
+            if not self.is_valid_download_dir(self.prefs.download_folder, 
+                                                        is_photo_dir=True):
                 valid = False
+                invalid_dirs.append(self.prefs.download_folder)
                 
         if need_video_folder:
-            if not self.is_valid_download_dir(self.prefs.video_download_folder):
+            if not self.is_valid_download_dir(self.prefs.video_download_folder,
+                                                        is_photo_dir=False):            
                 valid = False
+                invalid_dirs.append(self.prefs.video_download_folder)
                 
-        return valid
+        return (valid, invalid_dirs)
 
     def same_file_system(self, file1, file2):
         """Returns True if the files / diretories are on the same file system
@@ -2403,24 +2464,47 @@ class RapidApp(dbus.service.Object):
         f2_id = f2_info.get_attribute_string(gio.FILE_ATTRIBUTE_ID_FILE)
         return f1_id == f2_id
         
-    def is_valid_download_dir(self, path):
+    def is_valid_download_dir(self, path, is_photo_dir, show_error_in_log=False):
         """
         Checks the following conditions:
         Does the directory exist?
         Is it writable?
+        
+        if show_error_in_log is True, then display warning in log window, using
+        is_photo_dir, which if true means the download directory is for photos,
+        if false, for Videos
         """
         valid = False
+        if is_photo_dir:
+            download_folder_type = _("Photo")
+        else:
+            download_folder_type = _("Video")
+            
         try:
             d = gio.File(path)
             if not d.query_exists(cancellable=None):
-                logger.error("Download directory does not exist: %s", path)
+                logger.error("%s download folder does not exist: %s", 
+                             download_folder_type, path)
+                if show_error_in_log:
+                    severity = config.WARNING
+                    problem = _("%(file_type)s download folder does not exist") % {
+                                'file_type': download_folder_type}
+                    details = _("Folder: %s") % path
+                    self.log_error(severity, problem, details)
             else:
                 file_attributes = "standard::type,access::can-read,access::can-write"
                 file_info = d.query_filesystem_info(file_attributes)
                 file_type = file_info.get_file_type()
                 
                 if file_type != gio.FILE_TYPE_DIRECTORY and file_type != gio.FILE_TYPE_UNKNOWN:
-                    logger.error("%s is an invalid directory", path)
+                    logger.error("%s download folder is invalid: %s", 
+                                 download_folder_type, path)
+                    if show_error_in_log:
+                        severity = config.WARNING
+                        problem = _("%(file_type)s download folder is invalid") % {
+                                    'file_type': download_folder_type}
+                        details = _("Folder: %s") % path
+                        self.log_error(severity, problem, details)                  
                 else:
                     # is the directory writable?
                     try:
@@ -2428,6 +2512,12 @@ class RapidApp(dbus.service.Object):
                         valid = True
                     except:
                         logger.error("%s is not writable", path)
+                        if show_error_in_log:
+                            severity = config.WARNING
+                            problem = _("%(file_type)s download folder is not writable") % {
+                                        'file_type': download_folder_type}
+                            details = _("Folder: %s") % path
+                            self.log_error(severity, problem, details)                          
                     else:
                         f = gio.File(temp_dir)
                         f.delete(cancellable=None)
@@ -2489,7 +2579,7 @@ class RapidApp(dbus.service.Object):
             size, file_type_counter, scan_pid = data
             size = format_size_for_user(bytes=size)
             results_summary, file_types_present = file_type_counter.summarize_file_count()
-            self.file_types_present_by_scan_pid[scan_pid] = file_types_present
+            self.download_tracker.set_file_types_present(scan_pid, file_types_present)
             logger.info('Found %s' % results_summary)
             logger.info('Files total %s' % size)
             self.device_collection.update_device(scan_pid, size)
@@ -2508,7 +2598,7 @@ class RapidApp(dbus.service.Object):
             return False
         else:
             if len(data) > self.batch_size:
-                logger.error("incoming pipe length is %s" % len(data))
+                logger.critical("incoming pipe length is unexpectedly long: %s" % len(data))
             else:
                 for rpd_file in data:
                     self.thumbnails.add_file(rpd_file)
