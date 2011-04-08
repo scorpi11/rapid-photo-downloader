@@ -41,7 +41,6 @@ try:
 except ImportError:
     DOWNLOAD_VIDEO = False
 
-
 if DOWNLOAD_VIDEO:
 
     def version_info():
@@ -76,12 +75,9 @@ if DOWNLOAD_VIDEO:
             
             self.filename = filename
             self.u_filename = unicodeFilename(filename)
-            self.parser = createParser(self.u_filename, self.filename)
-            self.metadata = extractMetadata(self.parser)
-            
+            self.metadata = None
             
         def _kaa_get(self, key, missing, stream=None): 
-            
             if not hasattr(self, 'info'):
                 try:
                     from kaa.metadata import parse
@@ -104,7 +100,14 @@ It is needed to access FPS and codec video file metadata."""
             else:
                 return missing                
         
+        def _load_hachoir_metadata_parser(self):
+            self.parser = createParser(self.u_filename, self.filename)
+            self.metadata = extractMetadata(self.parser) 
+        
         def _get(self, key, missing):
+            if self.metadata is None:
+                self._load_hachoir_metadata_parser()
+                
             try:
                 v = self.metadata.get(key)
             except:
@@ -174,11 +177,11 @@ class DummyMetaData():
     
     See VideoMetaData class for documentation of class methods.        
     """
-    def __init__(self):
+    def __init__(self, filename):
         pass        
     
     def date_time(self, missing=''):
-        return date_time.date_time.now()
+        return datetime.datetime.now()
         
     def codec(self, stream=0, missing=''):
         return 'H.264 AVC'
