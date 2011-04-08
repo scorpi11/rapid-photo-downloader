@@ -1,7 +1,7 @@
 #!/usr/bin/python
 # -*- coding: latin1 -*-
 
-### Copyright (C) 2007-11 Damon Lynch <damonlynch@gmail.com>
+### Copyright (C) 2007-10 Damon Lynch <damonlynch@gmail.com>
 
 ### This program is free software; you can redistribute it and/or modify
 ### it under the terms of the GNU General Public License as published by
@@ -25,29 +25,39 @@ import time
 import subprocess
 import tempfile
 
-import multiprocessing
-import logging
-logger = multiprocessing.get_logger()
-
 import gtk
+import media
 import paths
-
-import rpdfile
+from filmstrip import add_filmstrip
 
 try:
+    import kaa.metadata
     from hachoir_core.cmd_line import unicodeFilename
     from hachoir_parser import createParser
     from hachoir_metadata import extractMetadata
 except ImportError:
     DOWNLOAD_VIDEO = False
 
-if DOWNLOAD_VIDEO:
+VIDEO_THUMBNAIL_FILE_EXTENSIONS = ['thm']
+VIDEO_FILE_EXTENSIONS = ['3gp', 'avi', 'm2t', 'mov', 'mp4', 'mpeg','mpg', 'mod', 'tod']
 
+   
+
+if DOWNLOAD_VIDEO:
+    
+    
+    try:
+        subprocess.check_call(["ffmpegthumbnailer", "-h"], stdout=subprocess.PIPE)
+        ffmpeg = True
+    except:
+        ffmpeg = False
+
+    
     def version_info():
         from hachoir_metadata.version import VERSION
         return VERSION
         
-    def get_video_THM_file(full_filename):
+    def get_video_THM_file(fullFileName):
         """
         Checks to see if a thumbnail file (THM) is in the same directory as the 
         file. Expects a full path to be part of the file name.
@@ -56,8 +66,8 @@ if DOWNLOAD_VIDEO:
         """
         
         f = None
-        name, ext = os.path.splitext(full_filename)
-        for e in rpdfile.VIDEO_THUMBNAIL_FILE_EXTENSIONS:
+        name, ext = os.path.splitext(fullFileName)
+        for e in VIDEO_THUMBNAIL_FILE_EXTENSIONS:
             if os.path.exists(name + '.' + e):
                 f = name + '.' + e
                 break
@@ -66,7 +76,7 @@ if DOWNLOAD_VIDEO:
                 break
             
         return f        
-
+    
     class VideoMetaData():
         def __init__(self, filename):
             """
@@ -75,19 +85,13 @@ if DOWNLOAD_VIDEO:
             
             self.filename = filename
             self.u_filename = unicodeFilename(filename)
-            self.metadata = None
+            self.parser = createParser(self.u_filename, self.filename)
+            self.metadata = extractMetadata(self.parser)
             
-        def _kaa_get(self, key, missing, stream=None): 
+            
+        def _kaa_get(self, key, missing, stream=None):
             if not hasattr(self, 'info'):
-                try:
-                    from kaa.metadata import parse
-                except ImportError:
-                    msg = """The package Kaa metadata does not exist.
-It is needed to access FPS and codec video file metadata."""
-                    logger.error(msg)
-                    self.info = None
-                else:
-                    self.info = parse(self.filename)
+                self.info = kaa.metadata.parse(self.filename)
             if self.info:
                 if stream != None:
                     v = self.info['video'][stream][key]
@@ -100,30 +104,23 @@ It is needed to access FPS and codec video file metadata."""
             else:
                 return missing                
         
-        def _load_hachoir_metadata_parser(self):
-            self.parser = createParser(self.u_filename, self.filename)
-            self.metadata = extractMetadata(self.parser) 
-        
         def _get(self, key, missing):
-            if self.metadata is None:
-                self._load_hachoir_metadata_parser()
-                
             try:
                 v = self.metadata.get(key)
             except:
                 v = missing
             return v
             
-        def date_time(self, missing=''):
+        def dateTime(self, missing=''):
             return self._get('creation_date', missing)
                 
-        def time_stamp(self, missing=''):
+        def timeStamp(self, missing=''):
             """
             Returns a float value representing the time stamp, if it exists
             """
-            dt = self.date_time(missing=None)
+            dt = self.dateTime(missing=None)
             if dt:
-                # convert it to a time stamp (not optimal, but better than nothing!)
+                # convert it to a timestamp (not optimal, but better than nothing!)
                 v = time.mktime(dt.timetuple())
             else:
                 v = missing
@@ -155,7 +152,7 @@ It is needed to access FPS and codec video file metadata."""
             else:
                 return None
             
-        def frames_per_second(self, stream=0, missing=''):
+        def framesPerSecond(self, stream=0, missing=''):
             fps = self._kaa_get('fps', missing, stream)
             try:
                 fps = '%.0f' % float(fps)
@@ -166,8 +163,38 @@ It is needed to access FPS and codec video file metadata."""
         def fourcc(self, stream=0, missing=''):
             return self._kaa_get('fourcc', missing, stream)
             
-
+        def getThumbnailData(self, size, tempWorkingDir):
+            """
+            Returns a pixbuf of the video's thumbnail
             
+            If it cannot be created, returns None
+            """
+            thm = get_video_THM_file(self.filename)
+            if thm:
+                thumbnail = gtk.gdk.pixbuf_new_from_file(thm)
+                aspect = float(thumbnail.get_height()) / thumbnail.get_width()
+                thumbnail = thumbnail.scale_simple(size, int(aspect*size), gtk.gdk.INTERP_BILINEAR)
+                thumbnail = add_filmstrip(thumbnail)
+            else:
+                if ffmpeg:
+                    try:
+                        tmp = tempfile.NamedTemporaryFile(dir=tempWorkingDir, prefix="rpd-tmp")
+                        tmp.close()
+                    except:
+                        return None
+                    
+                    thm = os.path.join(tempWorkingDir, tmp.name)
+                    
+                    try:
+                        subprocess.check_call(['ffmpegthumbnailer', '-i', self.filename, '-t', '10', '-f', '-o', thm, '-s', str(size)])
+                        thumbnail = gtk.gdk.pixbuf_new_from_file_at_size(thm,  size,  size)
+                        os.unlink(thm)
+                    except:
+                        thumbnail = None                    
+                else:
+                    thumbnail = None
+            return thumbnail
+        
 class DummyMetaData():
     """
     Class which gives metadata values for an imaginary video.
@@ -177,10 +204,10 @@ class DummyMetaData():
     
     See VideoMetaData class for documentation of class methods.        
     """
-    def __init__(self, filename):
+    def __init__(self):
         pass        
     
-    def date_time(self, missing=''):
+    def dateTime(self, missing=''):
         return datetime.datetime.now()
         
     def codec(self, stream=0, missing=''):
@@ -195,7 +222,7 @@ class DummyMetaData():
     def height(self, stream=0, missing=''):
         return '1080'
         
-    def frames_per_second(self, stream=0, missing=''):
+    def framesPerSecond(self, stream=0, missing=''):
         return '24'
     
     def fourcc(self, stream=0, missing=''):
@@ -212,12 +239,12 @@ if __name__ == '__main__':
 
     else:
         m = VideoMetaData(sys.argv[1])
-        dt = m.date_time()
+        dt = m.dateTime()
         if dt:
             print dt.strftime('%Y%m%d-%H:%M:%S')
         print "codec: %s" % m.codec()
         print "%s seconds" % m.length()
         print "%sx%s" % (m.width(), m.height())
-        print "%s fps" % m.frames_per_second()
+        print "%s fps" % m.framesPerSecond()
         print "Fourcc: %s" % (m.fourcc())
             

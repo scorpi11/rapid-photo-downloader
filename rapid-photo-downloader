@@ -2,4 +2,4 @@
 
 import rapid.rapid
 
-rapid.rapid.start()
+rapid.rapid.start ()
