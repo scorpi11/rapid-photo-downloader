@@ -5,7 +5,7 @@ Maintainer: Julien Valroff <julien@debian.org>
 Build-Depends: debhelper (>= 8),
                python (>= 2.6.6-3),
                gettext
-Standards-Version: 3.9.1
+Standards-Version: 3.9.2
 X-Python-Version: 2.5, 2.6
 Homepage: http://damonlynch.net/rapid
 Vcs-Git: git://git.kirya.net/git/rapid-photo-downloader.git
