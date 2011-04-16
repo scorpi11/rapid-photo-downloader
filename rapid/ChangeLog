@@ -1,3 +1,51 @@
+Version 0.4.0 beta 1
+--------------------
+
+2011-04-10
+
+Features added since alpha 4:
+
+* Job Code functionality, mimicking that found in version 0.2.3.
+* Eject device button for each unmountable device in main window.
+* When not all files have been downloaded from a device, the number remaining
+  is displayed in the device's progress bar
+* Overall download progress is displayed in progress bar at bottom of window
+* Time remaining and download speed are displayed in the status bar
+* System notification messages
+* Automation features:
+    * Automatically start a download at program startup or when a device
+      is inserted. When this is enabled, to optimize performance instead of
+      thumbnails being generated before the files are downloaded, they are
+      generated during the download.
+    * Eject a device when all files have been downloaded from it.
+    * Exit when all files have been downloaded.
+
+The automation feature to delete downloaded files from a device will be added 
+only when the non-alpha/beta of version 0.4.0 is released.
+
+The major feature currently not implemented is backups.
+
+Note: if videos are downloaded, the device may not be able to be unmounted
+until Rapid Photo Downloader is exited. See bug #744012 for details.
+
+Bug fix: adjust vertical pane position when additional devices are inserted
+Bug fix: display file and subfolder naming warnings in error log
+
+Updated Czech, French and Russian translations.
+
+
+Version 0.3.6
+-------------
+
+2011-04-05
+
+This release contains a minor fix to allow program preferences to be changed
+on upcoming Linux distributions like Ubuntu 11.04 and Fedora 15. 
+
+It also contains a minor packaging change so it can be installed in Ubuntu 
+11.04.
+
+
 Version 0.4.0 alpha 4
 ---------------------
 
@@ -86,7 +134,7 @@ program startup.
 Thanks go to Robert Park for refreshing the translations code.
 
 Added Romanian translation.
- 
+
 
 Version 0.3.5
 -------------

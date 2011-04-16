@@ -15,7 +15,7 @@
 ### along with this program; if not, write to the Free Software
 ### Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 
-version = '0.4.0~a4'
+version = '0.4.0~b1'
 
 GCONF_KEY="/apps/rapid-photo-downloader"
 
@@ -51,7 +51,7 @@ STATUS_DOWNLOAD_FAILED = 6                  # tried to download but failed
 STATUS_WARNING = 7                          # warning (shown in pre-download preview)
 STATUS_CANNOT_DOWNLOAD = 8                  # cannot be downloaded
 
-DEFAULT_WINDOW_WIDTH = 730
+DEFAULT_WINDOW_WIDTH = 670
 DEFAULT_WINDOW_HEIGHT = 650
 
 

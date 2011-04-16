@@ -218,6 +218,12 @@ class RapidPreferences(prefs.Preferences):
                 return True
         return False
         
+    def most_recent_job_code(self):
+        if len(self.job_codes) > 0:
+            return self.job_codes[0]
+        else:
+            return None
+        
     def get_pref_lists_by_file_type(self, file_type):
         """
         Returns tuple of subfolder and file rename pref lists for the given 
@@ -355,20 +361,27 @@ def check_prefs_for_validity(prefs):
     """
     Checks preferences for validity (called at program startup)
     
-    Returns true if the passed in preferences are valid, else returns False
+    Returns tuple with two values:
+    1. true if the passed in preferences are valid, else returns False
+    2. message if prefs are invalid
     """
     
-    try:
-        tests = ((prefs.image_rename, pd.PhotoNamePrefs), 
-                 (prefs.subfolder, pd.PhotoSubfolderPrefs),
-                 (prefs.video_rename, pd.VideoNamePrefs),
-                 (prefs.video_subfolder, pd.VideoSubfolderPrefs))
-        for pref, pref_widgets in tests:
-            p = pref_widgets(pref)
+
+    msg = ''
+    valid = True
+    tests = ((prefs.image_rename, pd.PhotoNamePrefs), 
+             (prefs.subfolder, pd.PhotoSubfolderPrefs),
+             (prefs.video_rename, pd.VideoNamePrefs),
+             (prefs.video_subfolder, pd.VideoSubfolderPrefs))
+    for pref, pref_widgets in tests:
+        p = pref_widgets(pref)
+        try:
             p.check_prefs_for_validity()
-    except:
-        return False
-    return True
+        except pd.PrefError as e:
+            valid = False
+            msg += e.msg + "\n"
+            
+    return (valid, msg)
 
 def insert_pref_lists(prefs, rpd_file):
     """
