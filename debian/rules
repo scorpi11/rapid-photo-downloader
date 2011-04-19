@@ -6,7 +6,7 @@ override_dh_auto_configure:
 	pod2man --section=1 --release=$(VERSION) --center "" doc/rapid-photo-downloader.pod > rapid-photo-downloader.1
 
 override_dh_auto_install:
-	python setup.py install --root=debian/rapid-photo-downloader --install-layout=deb --install-lib=/usr/share/rapid-photo-downloader --install-scripts=/usr/share/rapid-photo-downloader
+	dh_auto_install -- --install-lib=/usr/share/rapid-photo-downloader --install-scripts=/usr/share/rapid-photo-downloader
 
 override_dh_auto_clean:
 	-rm rapid-photo-downloader.1
