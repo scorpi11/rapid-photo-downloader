@@ -67,6 +67,7 @@ import metadatavideo
 import scan as scan_process
 import copyfiles
 import subfolderfile
+import backupfile
 
 import errorlog
 
@@ -212,6 +213,7 @@ class DeviceCollection(gtk.TreeView):
         # please note, at program startup, self.row_height() will be less than it will be when already running
         # e.g. when starting with 3 cards, it could be 18, but when adding 2 cards to the already running program
         # (with one card at startup), it could be 21
+        # must account for header row at the top
         row_height = self.get_background_area(0, self.get_column(0))[3] + 1
         height = (len(self.map_process_to_row) + 1) * row_height
         self.parent_app.device_collection_scrolledwindow.set_size_request(-1, height)
@@ -283,15 +285,16 @@ class DeviceCollection(gtk.TreeView):
         Look for left single click on eject button
         """
         if event.button == 1:
-            x = int(event.x)
-            y = int(event.y)
-            path, column, cell_x, cell_y = self.get_path_at_pos(x, y)
-            if path is not None:
-                if column == self.get_column(0):
-                    if cell_x >= column.get_width() - self.eject_pixbuf.get_width():
-                        iter = self.liststore.get_iter(path)
-                        if self.liststore.get_value(iter, 5) is not None:
-                            self.unmount(process_id = self.liststore.get_value(iter, 6))
+            if len (self.liststore):
+                x = int(event.x)
+                y = int(event.y)
+                path, column, cell_x, cell_y = self.get_path_at_pos(x, y)
+                if path is not None:
+                    if column == self.get_column(0):
+                        if cell_x >= column.get_width() - self.eject_pixbuf.get_width():
+                            iter = self.liststore.get_iter(path)
+                            if self.liststore.get_value(iter, 5) is not None:
+                                self.unmount(process_id = self.liststore.get_value(iter, 6))
             
     def unmount(self, process_id):
         device = self.devices_by_scan_pid[process_id]
@@ -467,6 +470,12 @@ class ThumbnailDisplay(gtk.IconView):
         self.total_thumbs_to_generate = 0
         self.thumbnails_generated = 0
         
+        # dict of scan_pids that are having thumbnails generated
+        # value is the thumbnail process id
+        # this is needed when terminating thumbnailing early such as when
+        # user clicks download before the thumbnailing is finished
+        self.generating_thumbnails = {}
+        
         self.thumbnails = {}
         self.previews = {}
         self.previews_being_fetched = set()
@@ -518,16 +527,11 @@ class ThumbnailDisplay(gtk.IconView):
         self.add_attribute(image, "filename", 3)
         self.add_attribute(image, "status", 8)
 
-
-        
         #set the background color to a darkish grey
         self.modify_base(gtk.STATE_NORMAL, gtk.gdk.Color('#444444'))
         
         self.show_all()
-        
         self._setup_icons()
-                
-
         
         self.connect('item-activated', self.on_item_activated)
         
@@ -870,7 +874,14 @@ class ThumbnailDisplay(gtk.IconView):
         """Initiate thumbnail generation for files scanned in one process
         """
         rpd_files = [self.rpd_files[unique_id] for unique_id in self.process_index[scan_pid]]
-        self.thumbnail_manager.add_task(rpd_files)
+        thumbnail_pid = self.thumbnail_manager.add_task((scan_pid, rpd_files))
+        self.generating_thumbnails[scan_pid] = thumbnail_pid
+    
+    def _set_thumbnail(self, unique_id, icon):
+        treerowref = self.treerow_index[unique_id]
+        path = treerowref.get_path()
+        iter = self.liststore.get_iter(path)
+        self.liststore.set(iter, 0, icon)        
     
     def update_thumbnail(self, thumbnail_data):
         """
@@ -886,24 +897,51 @@ class ThumbnailDisplay(gtk.IconView):
             # get the thumbnail icon in PIL format
             thumbnail_icon = thumbnail_icon.get_image()
             
-            treerowref = self.treerow_index[unique_id]
-            path = treerowref.get_path()
-            iter = self.liststore.get_iter(path)
-            
             if thumbnail_icon:
-                self.liststore.set(iter, 0, thumbnail_icon)
+                self._set_thumbnail(unique_id, thumbnail_icon)
                 
             if len(thumbnail_data) > 2:
                 # get the 2nd image in PIL format
                 self.thumbnails[unique_id] = thumbnail_data[2].get_image()
 
+    def terminate_thumbnail_generation(self, scan_pid):
+        """
+        Terminates thumbnail generation if thumbnails are currently 
+        being generated for this scan_pid
+        """
+        
+        if scan_pid in self.generating_thumbnails:
+            terminated = True
+            self.thumbnail_manager.terminate_process(
+                                        self.generating_thumbnails[scan_pid])
+            del self.generating_thumbnails[scan_pid]
             
+            if len(self.generating_thumbnails) == 0:
+                self._reset_thumbnail_tracking_and_display()
+        else:
+            terminated = False
+            
+        return terminated
+                
+    def mark_thumbnails_needed(self, rpd_files):
+        for rpd_file in rpd_files:
+            if rpd_file.unique_id not in self.thumbnails:
+                rpd_file.generate_thumbnail = True
+        
+    def _reset_thumbnail_tracking_and_display(self):
+        self.rapid_app.download_progressbar.set_fraction(0.0)
+        self.rapid_app.download_progressbar.set_text('')
+        self.thumbnails_generated = 0
+        self.total_thumbs_to_generate = 0
+    
     def thumbnail_results(self, source, condition):
         connection = self.thumbnail_manager.get_pipe(source)
         
         conn_type, data = connection.recv()
         
         if conn_type == rpdmp.CONN_COMPLETE:
+            scan_pid = data
+            del self.generating_thumbnails[scan_pid]
             connection.close()
             return False
         else:
@@ -916,14 +954,11 @@ class ThumbnailDisplay(gtk.IconView):
             # clear progress bar information if all thumbnails have been
             # extracted
             if self.thumbnails_generated == self.total_thumbs_to_generate:
-                self.rapid_app.download_progressbar.set_fraction(0.0)
-                self.rapid_app.download_progressbar.set_text('')
-                self.thumbnails_generated = 0
-                self.total_thumbs_to_generate = 0
-
+                self._reset_thumbnail_tracking_and_display()
             else:
-                self.rapid_app.download_progressbar.set_fraction(
-                    float(self.thumbnails_generated) / self.total_thumbs_to_generate)
+                if self.total_thumbs_to_generate:
+                    self.rapid_app.download_progressbar.set_fraction(
+                        float(self.thumbnails_generated) / self.total_thumbs_to_generate)
             
         
         return True
@@ -937,7 +972,11 @@ class ThumbnailDisplay(gtk.IconView):
             preview_image = preview_full_size.get_image()
             self.previews[unique_id] = preview_image
             self.rapid_app.update_preview_image(unique_id, preview_image)
-                    
+            
+            # user can turn off option for thumbnail generation after a scan
+            if unique_id not in self.thumbnails:
+                self._set_thumbnail(unique_id, preview_small.get_image())
+                
     
     def clear_all(self, scan_pid=None, keep_downloaded_files=False):
         """
@@ -991,7 +1030,7 @@ class TaskManager:
 
         
     def _setup_task(self, task):
-        task_results_conn, task_process_conn = Pipe(duplex=False)
+        task_results_conn, task_process_conn = self._setup_pipe()
         
         source = task_results_conn.fileno()
         self._pipes[source] = task_results_conn
@@ -1001,7 +1040,11 @@ class TaskManager:
         run_event = Event()
         run_event.set()
         
-        return self._initiate_task(task, task_process_conn, terminate_queue, run_event)
+        return self._initiate_task(task, task_results_conn, task_process_conn, 
+                                   terminate_queue, run_event)
+        
+    def _setup_pipe(self):
+        return Pipe(duplex=False)
         
     def _initiate_task(self, task, task_process_conn, terminate_queue, run_event):
         logger.error("Implement child class method!")
@@ -1009,7 +1052,7 @@ class TaskManager:
     
     def processes(self):
         for i in range(len(self._processes)):
-            yield self._processes[i]        
+            yield self._processes[i]
     
     def start(self):
         self.paused = False
@@ -1024,6 +1067,26 @@ class TaskManager:
             run_event = scan[2]
             if run_event.is_set():
                 run_event.clear()
+                
+    def _terminate_process(self, p):
+        self._send_termination_msg(p)
+        # The process might be paused: let it run
+        run_event = p[2]
+        if not run_event.is_set():
+            run_event.set()
+            
+    def _send_termination_msg(self, p):
+        p[1].put(None)
+    
+    def terminate_process(self, process_id):
+        """
+        Send a signal to process with matching process_id that it should
+        immediately terminate
+        """
+        for p in self.processes():
+            if p[0].pid == process_id:
+                if p[0].is_alive():
+                    self._terminate_process(p)
     
     def request_termination(self):
         """
@@ -1033,11 +1096,7 @@ class TaskManager:
         for p in self.processes():
             if p[0].is_alive():
                 requested = True
-                p[1].put(None)
-                # The process might be paused: let it run
-                run_event = p[2]
-                if not run_event.is_set():
-                    run_event.set()
+                self._terminate_process(p)
                     
         return requested
     
@@ -1053,6 +1112,8 @@ class TaskManager:
         
         for p in self.processes():
             if p[0].is_alive():
+                logger.info("Forcefully terminating %s in %s" , p[0].name, 
+                                                self.__class__.__name__)
                 p[0].terminate()
 
             
@@ -1078,7 +1139,9 @@ class ScanManager(TaskManager):
         self.add_device_function = add_device_function
         self.generate_folder = generate_folder
         
-    def _initiate_task(self, device, task_process_conn, terminate_queue, run_event):
+    def _initiate_task(self, device, task_results_conn, task_process_conn, 
+                       terminate_queue, run_event):
+                           
         scan = scan_process.Scan(device.get_path(), self.batch_size, self.generate_folder, 
                                 task_process_conn, terminate_queue, run_event)
         scan.start()
@@ -1094,16 +1157,16 @@ class ScanManager(TaskManager):
             
 class CopyFilesManager(TaskManager):
     
-    def _initiate_task(self, task, task_process_conn, terminate_queue, run_event):
+    def _initiate_task(self, task, task_results_conn, 
+                       task_process_conn, terminate_queue, run_event):
         photo_download_folder = task[0]
         video_download_folder = task[1]
         scan_pid = task[2]
         files = task[3]
-        generate_thumbnails = task[4]
         
         copy_files = copyfiles.CopyFiles(photo_download_folder,
                                 video_download_folder,
-                                files, generate_thumbnails,
+                                files, 
                                 scan_pid, self.batch_size, 
                                 task_process_conn, terminate_queue, run_event)
         copy_files.start()
@@ -1111,14 +1174,68 @@ class CopyFilesManager(TaskManager):
         return copy_files.pid
         
 class ThumbnailManager(TaskManager):
-        
-    def _initiate_task(self, files, task_process_conn, terminate_queue, run_event):
-        generator = tn.GenerateThumbnails(files, self.batch_size, task_process_conn, terminate_queue, run_event)
+    def _initiate_task(self, task, task_results_conn,
+                       task_process_conn, terminate_queue, run_event):
+        scan_pid = task[0]
+        files = task[1]
+        generator = tn.GenerateThumbnails(scan_pid, files, self.batch_size, 
+                                          task_process_conn, terminate_queue, 
+                                          run_event)
         generator.start()
         self._processes.append((generator, terminate_queue, run_event))
         return generator.pid
+        
+class BackupFilesManager(TaskManager):
+    """
+    Handles backup processes. This is a little different from other Task
+    Manager classes in that its pipe is Duplex, and the work done by it
+    is not pre-assigned when the process is started.
+    """
+    def __init__(self, results_callback, batch_size):
+        TaskManager.__init__(self, results_callback, batch_size)
+        self.backup_devices_by_path = {}
 
-
+    def _setup_pipe(self):
+        return Pipe(duplex=True)
+        
+    def _send_termination_msg(self, p):
+        p[1].put(None)
+        p[3].send((None, None, None, None))
+        
+    def _initiate_task(self, task, task_results_conn, task_process_conn, 
+                       terminate_queue, run_event):
+        path = task[0]
+        name = task[1]
+        backup_files = backupfile.BackupFiles(path, name, self.batch_size, 
+                                        task_process_conn, terminate_queue, 
+                                        run_event)
+        backup_files.start()
+        self._processes.append((backup_files, terminate_queue, run_event, 
+                                task_results_conn))
+        
+        self.backup_devices_by_path[path] = (task_results_conn, backup_files.pid)
+        
+        return backup_files.pid
+        
+    def backup_file(self, move_succeeded, rpd_file, path_suffix, 
+                                                backup_duplicate_overwrite):
+        for path in self.backup_devices_by_path:
+            task_results_conn = self.backup_devices_by_path[path][0]
+            task_results_conn.send((move_succeeded, rpd_file, path_suffix, 
+                                    backup_duplicate_overwrite))
+            
+    def add_device(self, path, name):
+        """
+        Convenience function to setup adding a backup device
+        """
+        return self.add_task((path, name))
+    
+    def remove_device(self, path):
+        pid = self.backup_devices_by_path[path][1]
+        self.terminate_process(pid)
+        del self.backup_devices_by_path[path]
+        
+                
 class SingleInstanceTaskManager:
     """
     Base class to manage single instance processes. Examples are daemon
@@ -1174,8 +1291,6 @@ class SubfolderFileManager(SingleInstanceTaskManager):
         self.results_callback(move_succeeded, rpd_file)
         return True
         
-
-
 class ResizblePilImage(gtk.DrawingArea):
     def __init__(self, bg_color=None):
         gtk.DrawingArea.__init__(self)
@@ -1361,27 +1476,30 @@ class RapidApp(dbus.service.Object):
         
     def _terminate_processes(self, terminate_file_copies=False):
         
-        # FIXME: need more fine grained tuning here - must cancel large file
-        # copies midstream
         if terminate_file_copies:
             logger.info("Terminating all processes...")
 
         scan_termination_requested = self.scan_manager.request_termination()        
         thumbnails_termination_requested = self.thumbnails.thumbnail_manager.request_termination()
+        backup_termination_requested = self.backup_manager.request_termination()
+        
         if terminate_file_copies:
             copy_files_termination_requested = self.copy_files_manager.request_termination()
         else:
             copy_files_termination_requested = False
         
-        if scan_termination_requested or thumbnails_termination_requested:
+        if (scan_termination_requested or thumbnails_termination_requested or
+                                                backup_termination_requested):
             time.sleep(1)
             if (self.scan_manager.get_no_active_processes() > 0 or 
-                self.thumbnails.thumbnail_manager.get_no_active_processes() > 0):
+                self.thumbnails.thumbnail_manager.get_no_active_processes() > 0 or
+                self.backup_manager.get_no_active_processes() > 0):
                 time.sleep(1)
                 # must try again, just in case a new scan has meanwhile started!
                 self.scan_manager.request_termination()
                 self.thumbnails.thumbnail_manager.terminate_forcefully()
                 self.scan_manager.terminate_forcefully()
+                self.backup_manager.terminate_forcefully()
                 
         if terminate_file_copies and copy_files_termination_requested:
             time.sleep(1)
@@ -1497,7 +1615,14 @@ class RapidApp(dbus.service.Object):
             self.vmonitor.connect("mount-added", self.on_mount_added)
             self.vmonitor.connect("mount-removed", self.on_mount_removed) 
     
-            
+    
+    def _backup_device_name(self, path):
+        if self.backup_devices[path] is None:
+            name = path
+        else:
+            name = self.backup_devices[path].get_name()
+        return name
+        
     def setup_devices(self, on_startup, on_preference_change, block_auto_start):
         """
         
@@ -1526,9 +1651,6 @@ class RapidApp(dbus.service.Object):
         
         mounts = []
         self.backup_devices = {}
-        
-        # Clear download statistics and tracking
-        # FIXME
         
         if self.using_volume_monitor():
             # either using automatically detected backup devices
@@ -1567,6 +1689,12 @@ class RapidApp(dbus.service.Object):
                 # will backup to this path, but don't need any volume info 
                 # associated with it
                 self.backup_devices[self.prefs.backup_location] = None
+                
+            for path in self.backup_devices:
+                name = self._backup_device_name(path)
+                self.backup_manager.add_device(path, name)
+                
+        self.update_no_backup_devices()
         
         # Display amount of free space in a status bar message
         self.display_free_space()
@@ -1580,12 +1708,6 @@ class RapidApp(dbus.service.Object):
                                       (self.prefs.auto_download_upon_device_insertion and
                                        not on_startup)))
         
-
-        self.testing_auto_exit = False
-        self.testing_auto_exit_trip = len(mounts)
-        self.testing_auto_exit_trip_counter = 0
-        
-
         for m in mounts:
             path, mount = m
             device = dv.Device(path=path, mount=mount)
@@ -1654,6 +1776,43 @@ class RapidApp(dbus.service.Object):
                 # user manually specified the path
                 return True
         return False        
+
+    def update_no_backup_devices(self):
+        self.download_tracker.set_no_backup_devices(len(self.backup_devices))
+
+    def refresh_backup_media(self):
+        """
+        Setup the backup media
+        
+        Assumptions: this is being called after the user has changed their 
+        preferences AND download media has already been setup
+        """
+        
+        # terminate any running backup processes
+        self.backup_manager.request_termination()
+        
+        self.backup_devices = {}
+        if self.prefs.backup_images:
+            if not self.prefs.backup_device_autodetection:
+                # user manually specified backup location
+                # will backup to this path, but don't need any volume info associated with it
+                self.backup_devices[self.prefs.backup_location] = None
+            else:
+                for mount in self.vmonitor.get_mounts():
+                    if not mount.is_shadowed():
+                        path = mount.get_root().get_path()
+                        if path:
+                            if self.check_if_backup_mount(path):
+                                # is a backup volume
+                                if path not in self.backup_devices:
+                                    self.backup_devices[path] = mount
+            
+            for path in self.backup_devices:
+                name = self._backup_device_name(path)
+                self.backup_manager.add_device(path, name)
+
+        self.update_no_backup_devices()
+        self.display_free_space()
             
     def using_volume_monitor(self):
         """
@@ -1688,6 +1847,9 @@ class RapidApp(dbus.service.Object):
                 if is_backup_mount:
                     if path not in self.backup_devices:
                         self.backup_devices[path] = mount
+                        name = self._backup_device_name(path)
+                        self.backup_manager.add_device(path, name)
+                        self.update_no_backup_devices()
                         self.display_free_space()
 
                 elif self.prefs.device_autodetection and (dv.is_DCIM_device(path) or 
@@ -1720,8 +1882,6 @@ class RapidApp(dbus.service.Object):
             del self.mounts_by_path[path]
             # temp directory should be cleaned by finishing of process
             
-            #~ if scan_pid in self.download_active_by_scan_pid:
-                #~ self._clean_temp_dirs_for_scan_pid(scan_pid)
             self.thumbnails.clear_all(scan_pid = scan_pid, 
                                       keep_downloaded_files = True)
             self.device_collection.remove_device(scan_pid)
@@ -1732,6 +1892,8 @@ class RapidApp(dbus.service.Object):
         elif path in self.backup_devices:
             del self.backup_devices[path]
             self.display_free_space()
+            self.backup_manager.remove_device(path)
+            self.update_no_backup_devices()
                 
         # may need to disable download button and menu
         self.set_download_action_sensitivity()
@@ -1892,8 +2054,9 @@ class RapidApp(dbus.service.Object):
         # Track which temporary directories are created when downloading files
         self.temp_dirs_by_scan_pid = dict()
         
-        # Track which downloads are running
+        # Track which downloads and backups are running
         self.download_active_by_scan_pid = []
+        self.backups_active_by_scan_pid = []
         
 
     
@@ -1920,10 +2083,19 @@ class RapidApp(dbus.service.Object):
             # it is unset when all downloads are completed
             if self.download_start_time is None:
                 self.download_start_time = datetime.datetime.now()  
-            
+
+            # Set status to download pending 
             self.thumbnails.mark_download_pending(files_by_scan_pid)
+            
+            # disable refresh and preferences change while download is occurring
+            self.enable_prefs_and_refresh(enabled=False)
+            
             for scan_pid in files_by_scan_pid:
                 files = files_by_scan_pid[scan_pid]
+                # if generating thumbnails for this scan_pid, stop it
+                if self.thumbnails.terminate_thumbnail_generation(scan_pid):
+                    self.thumbnails.mark_thumbnails_needed(files)
+                
                 self.download_files(files, scan_pid)
                 
             self.set_download_action_label(is_download = False)
@@ -1967,6 +2139,9 @@ class RapidApp(dbus.service.Object):
                                 bytes=download_size,
                                 no_files=len(files))
         
+        if self.prefs.backup_images:
+            download_size = download_size * (len(self.backup_devices) + 1)
+            
         self.time_remaining.set(scan_pid, download_size)
         self.time_check.set_download_mark()
             
@@ -1976,10 +2151,14 @@ class RapidApp(dbus.service.Object):
         if len(self.download_active_by_scan_pid) > 1:
             self.display_summary_notification = True
             
+        if self.auto_start_is_on and self.prefs.generate_thumbnails:
+            for rpd_file in files:
+                rpd_file.generate_thumbnail = True
+            
         # Initiate copy files process
         self.copy_files_manager.add_task((photo_download_folder, 
                               video_download_folder, scan_pid,
-                              files, self.auto_start_is_on))
+                              files))
                               
     def copy_files_results(self, source, condition):
         """
@@ -2002,9 +2181,14 @@ class RapidApp(dbus.service.Object):
                 percent_complete = self.download_tracker.get_percent_complete(scan_pid)
                 self.device_collection.update_progress(scan_pid, percent_complete,
                                             None, None)
-                self.time_remaining.update(scan_pid, total_downloaded)
+                self.time_remaining.update(scan_pid, bytes_downloaded=chunk_downloaded)
             elif msg_type == rpdmp.MSG_FILE:
-                download_succeeded, rpd_file, download_count, temp_full_file_name = data
+                download_succeeded, rpd_file, download_count, temp_full_file_name, thumbnail_icon, thumbnail = data
+                
+                if thumbnail is not None or thumbnail_icon is not None:
+                    self.thumbnails.update_thumbnail((rpd_file.unique_id, 
+                                                      thumbnail_icon, 
+                                                      thumbnail))
                 
                 self.download_tracker.set_download_count_for_file(
                                             rpd_file.unique_id, download_count)
@@ -2025,11 +2209,7 @@ class RapidApp(dbus.service.Object):
                         download_succeeded, 
                         download_count, 
                         rpd_file
-                        )
-            elif msg_type == rpdmp.MSG_THUMB:
-                #~ unique_id, thumbnail, thumbnail_icon = data
-                #~ thumbnail_data = (unique_id
-                self.thumbnails.update_thumbnail(data)    
+                        ) 
                 
             return True
         else:
@@ -2040,11 +2220,10 @@ class RapidApp(dbus.service.Object):
 
     
     def download_is_occurring(self):
-        """Returns True if a file is currently being downloaded or renamed
+        """Returns True if a file is currently being downloaded, renamed or 
+           backed up
         """
-        v = not len(self.download_active_by_scan_pid) == 0
-        #~ logger.info("Download is occurring: %s", v)
-        return v
+        return not len(self.download_active_by_scan_pid) == 0
     
     # # #
     # Create folder and file names for downloaded files
@@ -2058,16 +2237,65 @@ class RapidApp(dbus.service.Object):
         scan_pid = rpd_file.scan_pid
         unique_id = rpd_file.unique_id
         
-        self.thumbnails.update_status_post_download(rpd_file)
-        
-        # Update error log window if neccessary
-        if not move_succeeded:
-            self.log_error(config.SERIOUS_ERROR, rpd_file.error_title, 
-                           rpd_file.error_msg, rpd_file.error_extra_detail)
-        elif rpd_file.status == config.STATUS_DOWNLOADED_WITH_WARNING:
+        if rpd_file.status == config.STATUS_DOWNLOADED_WITH_WARNING:
             self.log_error(config.WARNING, rpd_file.error_title, 
                            rpd_file.error_msg, rpd_file.error_extra_detail)
-        
+            self.error_title = ''
+            self.error_msg = ''
+            self.error_extra_detail = ''
+                           
+                           
+        if self.prefs.backup_images and len(self.backup_devices):
+            if self.prefs.backup_device_autodetection:
+                if rpd_file.file_type == rpdfile.FILE_TYPE_PHOTO:
+                    path_suffix = self.prefs.backup_identifier
+                else:
+                    path_suffix = self.prefs.video_backup_identifier
+            else:
+                path_suffix = None
+            
+            self.backup_manager.backup_file(move_succeeded, rpd_file, 
+                                    path_suffix,
+                                    self.prefs.backup_duplicate_overwrite)
+        else:
+            self.file_download_finished(move_succeeded, rpd_file)
+     
+     
+    def backup_results(self, source, condition):
+        connection = self.backup_manager.get_pipe(source)
+        conn_type, msg_data = connection.recv()
+        if conn_type == rpdmp.CONN_PARTIAL:
+            msg_type, data = msg_data
+            
+            if msg_type == rpdmp.MSG_BYTES:
+                scan_pid, backup_pid, total_downloaded, chunk_downloaded = data
+                self.download_tracker.increment_bytes_backed_up(scan_pid, 
+                                                             chunk_downloaded)
+                self.time_check.increment(bytes_downloaded=chunk_downloaded)
+                percent_complete = self.download_tracker.get_percent_complete(scan_pid)
+                self.device_collection.update_progress(scan_pid, percent_complete,
+                                            None, None)
+                self.time_remaining.update(scan_pid, bytes_downloaded=chunk_downloaded)
+                
+            elif msg_type == rpdmp.MSG_FILE:
+                backup_succeeded, rpd_file = data
+                self.download_tracker.file_backed_up(rpd_file.unique_id)
+                if self.download_tracker.all_files_backed_up(rpd_file.unique_id):
+                    self.file_download_finished(backup_succeeded, rpd_file)
+            return True
+        else:
+            return False
+
+    
+    def file_download_finished(self, succeeded, rpd_file):
+        scan_pid = rpd_file.scan_pid
+        unique_id = rpd_file.unique_id
+        # Update error log window if neccessary
+        if not succeeded:
+            self.log_error(config.SERIOUS_ERROR, rpd_file.error_title, 
+                           rpd_file.error_msg, rpd_file.error_extra_detail)
+                           
+        self.thumbnails.update_status_post_download(rpd_file)
         self.download_tracker.file_downloaded_increment(scan_pid, 
                                                         rpd_file.file_type,
                                                         rpd_file.status)
@@ -2090,6 +2318,7 @@ class RapidApp(dbus.service.Object):
             
             if not self.download_is_occurring():
                 logger.debug("Download completed")
+                self.enable_prefs_and_refresh(enabled=True)
                 self.notify_download_complete()
                 self.download_progressbar.set_fraction(0.0)
                 
@@ -2101,6 +2330,7 @@ class RapidApp(dbus.service.Object):
                 if ((self.prefs.auto_exit and self.download_tracker.no_errors_or_warnings()) 
                                                 or self.prefs.auto_exit_force):
                     if not self.thumbnails.files_remain_to_download():
+                        self._terminate_processes()
                         gtk.main_quit()
                         
                 self.download_tracker.purge_all()
@@ -2113,8 +2343,8 @@ class RapidApp(dbus.service.Object):
                 
                 self.job_code = ''
                 self.download_start_time = None
-                
-                
+        
+        
     def update_time_remaining(self):
         update, download_speed = self.time_check.check_for_update()
         if update:
@@ -2167,9 +2397,11 @@ class RapidApp(dbus.service.Object):
         device = self.device_collection.get_device(scan_pid)
         
         if device.mount is None:
-            notificationName = PROGRAM_NAME
+            notification_name = PROGRAM_NAME
+            icon = self.application_icon
         else:
-            notificationName  = device.get_name()
+            notification_name  = device.get_name()
+            icon = device.get_icon(self.notification_icon_size)
         
         no_photos_downloaded = self.download_tracker.get_no_files_downloaded(
                                             scan_pid, rpdfile.FILE_TYPE_PHOTO)
@@ -2194,8 +2426,8 @@ class RapidApp(dbus.service.Object):
         if no_warnings:
             message = "%s\n%s " % (message,  no_warnings) + _("warnings") 
   
-        n = pynotify.Notification(notificationName,  message)
-        n.set_icon_from_pixbuf(device.get_icon(self.notification_icon_size))
+        n = pynotify.Notification(notification_name, message)
+        n.set_icon_from_pixbuf(icon)
         
         n.show()
     
@@ -2265,6 +2497,8 @@ class RapidApp(dbus.service.Object):
         files_to_download = self.download_tracker.get_no_files_in_download(scan_pid)
         file_types = self.download_tracker.get_file_types_present(scan_pid)
         completed = files_downloaded == files_to_download
+        if completed and self.prefs.backup_images:
+            completed = self.download_tracker.all_files_backed_up(unique_id)
         
         if completed:
             files_remaining = self.thumbnails.get_no_files_remaining(scan_pid)
@@ -2393,7 +2627,6 @@ class RapidApp(dbus.service.Object):
         Called when user changes the program's preferences
         """
         logger.debug("Preference change detected: %s", key)
-        
 
         if key == 'show_log_dialog':
             self.menu_log_window.set_active(value)
@@ -2423,10 +2656,6 @@ class RapidApp(dbus.service.Object):
             # Check if stored sequence no is being used
             self._check_for_sequence_value_use()
             
-        #~ elif key == 'job_codes':
-            #~ # update job code list in left pane
-            #~ self.selection_vbox.update_job_code_combo()
-            
         elif key in ['download_folder', 'video_download_folder']:
             self.display_free_space()
     
@@ -2449,7 +2678,7 @@ class RapidApp(dbus.service.Object):
                 self.start_volume_monitor()          
             logger.info("Backup preferences were changed.")
             
-            logger.info("self.refreshBackupMedia()")
+            self.refresh_backup_media()
             
             self.rerun_setup_available_backup_media = False
             
@@ -2516,6 +2745,8 @@ class RapidApp(dbus.service.Object):
         self.prev_image_action = builder.get_object("prev_image_action")
         self.menu_log_window = builder.get_object("menu_log_window")
         self.speed_label = builder.get_object("speed_label")
+        self.refresh_action = builder.get_object("refresh_action")
+        self.preferences_action = builder.get_object("preferences_action")
         
         # Only enable this action when actually displaying a preview
         self.next_image_action.set_sensitive(False)
@@ -2583,11 +2814,10 @@ class RapidApp(dbus.service.Object):
         """
         Set the size of the device collection scrolled window widget
         """
-        
-        
         if self.device_collection.map_process_to_row:
             height = self.device_collection_viewport.size_request()[1]
             self.device_collection_scrolledwindow.set_size_request(-1,  height)
+            self.main_vpaned.set_position(height)
         else:
             # don't allow the media collection to be absolutely empty
             self.device_collection_scrolledwindow.set_size_request(-1, 47)
@@ -2633,18 +2863,56 @@ class RapidApp(dbus.service.Object):
         self.warning_image.hide()
         self.warning_vseparator.hide()
         
+    def enable_prefs_and_refresh(self, enabled):
+        """
+        If enable is true, then the user is able to activate the preferences
+        or refresh command.
+        The intention is to be able to disable this during a download
+        """
+        self.refresh_action.set_sensitive(enabled)
+        self.preferences_action.set_sensitive(enabled)
+    
     def statusbar_message(self, msg):
         self.rapid_statusbar.push(self.statusbar_context_id, msg)
         
     def statusbar_message_remove(self):
         self.rapid_statusbar.pop(self.statusbar_context_id)
+
+    def display_backup_mounts(self):
+        """
+        Create a message to be displayed to the user showing which backup 
+        mounts will be used
+        """
+        message =  ''
+        
+        paths = self.backup_devices.keys()
+        i = 0
+        v = len(paths)
+        prefix = ''
+        for b in paths:
+            if v > 1:
+                if i < (v -1)  and i > 0:
+                    prefix = ', '
+                elif i == (v - 1) :
+                    prefix = " " + _("and")  + " "
+            i += 1
+            message = "%s%s'%s'" % (message,  prefix, self.backup_devices[b].get_name())
+        
+        if v > 1:
+            message = _("Using backup devices") + " %s" % message
+        elif v == 1:
+            message = _("Using backup device") + " %s"  % message
+        else:
+            message = _("No backup devices detected")
+            
+        return message
         
     def display_free_space(self):
         """
         Displays the amount of space free on the filesystem the files will be 
         downloaded to.
         
-        Also displays backup volumes / path being used. (NOT IMPLEMENTED YET)
+        Also displays backup volumes / path being used. 
         """
         photo_dir = self.is_valid_download_dir(path=self.prefs.download_folder, is_photo_dir=True, show_error_in_log=True)
         video_dir = self.is_valid_download_dir(path=self.prefs.video_download_folder, is_photo_dir=False, show_error_in_log=True)
@@ -2697,12 +2965,12 @@ class RapidApp(dbus.service.Object):
                 msg = " " + _("%(free)s free") % {'free': free}
         
             
-        if self.prefs.backup_images and False: #FIXME: skip this for now!
+        if self.prefs.backup_images: 
             if not self.prefs.backup_device_autodetection:
                 # user manually specified backup location
                 msg2 = _('Backing up to %(path)s') % {'path':self.prefs.backup_location}
             else:
-                msg2 = self.displayBackupVolumes() #FIXME
+                msg2 = self.display_backup_mounts() 
                 
             if msg:
                 msg = _("%(freespace)s. %(backuppaths)s.") % {'freespace': msg, 'backuppaths': msg2}
@@ -2927,7 +3195,10 @@ class RapidApp(dbus.service.Object):
         self.scan_manager = ScanManager(self.scan_results, self.batch_size, 
                     self.generate_folder, self.device_collection.add_device)
         self.copy_files_manager = CopyFilesManager(self.copy_files_results, 
-                                                   self.batch_size_MB)        
+                                                   self.batch_size_MB)
+        self.backup_manager = BackupFilesManager(self.backup_results,
+                                                 self.batch_size_MB)
+        
         
     def scan_results(self, source, condition):
         """
@@ -2948,20 +3219,17 @@ class RapidApp(dbus.service.Object):
             logger.info('Files total %s' % size)
             self.device_collection.update_device(scan_pid, size)
             self.device_collection.update_progress(scan_pid, 0.0, results_summary, 0)
-            self.testing_auto_exit_trip_counter += 1
             self.set_download_action_sensitivity()
                         
-            if self.testing_auto_exit_trip_counter == self.testing_auto_exit_trip and self.testing_auto_exit:
-                self.on_rapidapp_destroy(self.rapidapp)
-            else:
-                if not self.testing_auto_exit and not self.auto_start_is_on:
-                    self.download_progressbar.set_text(_("Thumbnails"))
-                    self.thumbnails.generate_thumbnails(scan_pid)
-                elif self.auto_start_is_on:
-                    if self.need_job_code_for_naming and not self.job_code:
-                        self.get_job_code()
-                    else:
-                        self.start_download(scan_pid=scan_pid)
+            if (not self.auto_start_is_on and
+                self.prefs.generate_thumbnails):
+                self.download_progressbar.set_text(_("Thumbnails"))
+                self.thumbnails.generate_thumbnails(scan_pid)
+            elif self.auto_start_is_on:
+                if self.need_job_code_for_naming and not self.job_code:
+                    self.get_job_code()
+                else:
+                    self.start_download(scan_pid=scan_pid)
 
             self.set_thumbnail_sort()
             
