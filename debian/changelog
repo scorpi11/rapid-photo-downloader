@@ -2,8 +2,9 @@ rapid-photo-downloader (0.3.6-2) unstable; urgency=low
 
   * Update to new policy 3.9.2 (no changes needed)
   * Add menu file 
+  * Update VCS fields 
 
- -- Julien Valroff <julien@debian.org>  Wed, 20 Apr 2011 18:40:49 +0200
+ -- Julien Valroff <julien@debian.org>  Sun, 24 Apr 2011 08:30:59 +0200
 
 rapid-photo-downloader (0.3.6-1) unstable; urgency=low
 

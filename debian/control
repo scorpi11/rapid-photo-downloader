@@ -8,8 +8,8 @@ Build-Depends: debhelper (>= 8),
 Standards-Version: 3.9.2
 X-Python-Version: 2.5, 2.6
 Homepage: http://damonlynch.net/rapid
-Vcs-Git: git://git.kirya.net/git/rapid-photo-downloader.git
-Vcs-Browser: http://git.kirya.net/?p=rapid-photo-downloader.git;a=summary
+Vcs-Git: git://git.kirya.net/debian/rapid-photo-downloader.git
+Vcs-Browser: http://git.kirya.net/?p=debian/rapid-photo-downloader.git;a=summary
 
 Package: rapid-photo-downloader
 Architecture: all
