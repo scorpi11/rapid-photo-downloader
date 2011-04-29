@@ -1,3 +1,22 @@
+Version 0.4.0
+-------------
+
+2011-04-28
+
+Features added since Release Candiate 1:
+
+* Allow multiple selection of files to check or uncheck for downloading.
+* Automation feature to delete downloaded files from a device.
+
+Bug fix: translation fixes.
+
+Bug fix: don't crash when completing download with backups enabled and no backup
+devices detected.
+
+Updated Dutch, French, German, Polish, Russian, Serbian and Spanish 
+translations.
+
+
 Version 0.4.0 RC 1
 ------------------
 
@@ -16,8 +35,8 @@ will rendered during the download itself.
 Added preferences option to disable thumbnail generation. When auto start is
 enabled, this can speed-up transfers when downloading from high-speed devices.
 
-Access to the preferences window is now disable while a download is occurring, 
-as changing preferences when files are being download can cause prolems.
+Access to the preferences window is now disabled while a download is occurring, 
+as changing preferences when files are being download can cause problems.
 
 Bug fix: don't crash when downloading some files after having previously 
 downloaded some others in the same session.

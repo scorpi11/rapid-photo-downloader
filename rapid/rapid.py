@@ -83,7 +83,7 @@ import gettext
 gettext.bindtextdomain(config.APP_NAME)
 gettext.textdomain(config.APP_NAME)
 
-from gettext import gettext as _
+_ = gettext.gettext
 
 
 from utilities import format_size_for_user
@@ -454,7 +454,11 @@ class ThumbnailDisplay(gtk.IconView):
         self.set_spacing(0)
         self.set_row_spacing(5)
         self.set_margin(25)
-                
+        
+        self.set_selection_mode(gtk.SELECTION_MULTIPLE)
+        self.connect('selection-changed', self.on_selection_changed)
+        self._selected_items = []
+        
         self.rapid_app = parent_app
         
         self.batch_size = 10
@@ -591,11 +595,24 @@ class ThumbnailDisplay(gtk.IconView):
     
     def sort_by_timestamp(self):
         self.liststore.set_sort_column_id(self.TIMESTAMP_COL, gtk.SORT_ASCENDING)
+    
+    def on_selection_changed(self, iconview):
+        self._selected_items = self.get_selected_items()
         
     def on_checkbutton_toggled(self, cellrenderertoggle, path):
-        iter = self.liststore.get_iter(path)
-        self.liststore.set_value(iter, self.SELECTED_COL, not cellrenderertoggle.get_active())
+        paths = [p[0] for p in self._selected_items]
+        if int(path) not in paths:
+            self._selected_items = [path,]
+            
+        for path in self._selected_items:
+            iter = self.liststore.get_iter(path)
+            status = self.liststore.get_value(iter, self.DOWNLOAD_STATUS_COL)
+            if status == STATUS_NOT_DOWNLOADED:
+                self.liststore.set_value(iter, self.SELECTED_COL, not cellrenderertoggle.get_active())
+            self.select_path(path)
+            
         self.rapid_app.set_download_action_sensitivity()
+        
         
     def set_selected(self, unique_id, value):
         iter = self.get_iter_from_unique_id(unique_id)
@@ -2294,6 +2311,10 @@ class RapidApp(dbus.service.Object):
         if not succeeded:
             self.log_error(config.SERIOUS_ERROR, rpd_file.error_title, 
                            rpd_file.error_msg, rpd_file.error_extra_detail)
+        elif self.prefs.auto_delete:
+            # record which files to automatically delete when download 
+            # completes
+            self.download_tracker.add_to_auto_delete(rpd_file)
                            
         self.thumbnails.update_status_post_download(rpd_file)
         self.download_tracker.file_downloaded_increment(scan_pid, 
@@ -2309,6 +2330,10 @@ class RapidApp(dbus.service.Object):
             # Last file for this scan pid has been downloaded, so clean temp directory
             logger.debug("Purging temp directories")
             self._clean_temp_dirs_for_scan_pid(scan_pid)
+            if self.prefs.auto_delete:
+                logger.debug("Auto deleting files")
+                self.auto_delete(scan_pid)
+                self.download_tracker.clear_auto_delete(scan_pid)
             self.download_active_by_scan_pid.remove(scan_pid)
             self.time_remaining.remove(scan_pid)
             self.notify_downloaded_from_device(scan_pid)
@@ -2371,6 +2396,16 @@ class RapidApp(dbus.service.Object):
                 self.rapid_statusbar.pop(self.statusbar_context_id)
                 self.rapid_statusbar.push(self.statusbar_context_id, message)         
             
+    def auto_delete(self, scan_pid):
+        """Delete files from download device at completion of download"""
+        for file in self.download_tracker.get_files_to_auto_delete(scan_pid):
+            f = gio.File(file)
+            try:
+                f.delete(cancellable=None)
+            except gio.Error, inst:
+                logger.error("Failure deleting file %s", file)
+                logger.error(inst)            
+    
     def file_types_by_number(self, no_photos, no_videos):
         """ 
         returns a string to be displayed to the user that can be used
@@ -2497,7 +2532,7 @@ class RapidApp(dbus.service.Object):
         files_to_download = self.download_tracker.get_no_files_in_download(scan_pid)
         file_types = self.download_tracker.get_file_types_present(scan_pid)
         completed = files_downloaded == files_to_download
-        if completed and self.prefs.backup_images:
+        if completed and (self.prefs.backup_images and len(self.backup_devices)):
             completed = self.download_tracker.all_files_backed_up(unique_id)
         
         if completed:
@@ -2730,6 +2765,7 @@ class RapidApp(dbus.service.Object):
         Initialize widgets in the main window, and variables that point to them
         """
         builder = gtk.Builder()
+        builder.set_translation_domain(config.APP_NAME)
         self.builder = builder
         builder.add_from_file(paths.share_dir("glade3/rapid.ui"))
         self.rapidapp = builder.get_object("rapidapp")
@@ -2952,7 +2988,7 @@ class RapidApp(dbus.service.Object):
                     #Used to differentiate between two different file systems
                     #e.g. Free space: 21.3GB (photos); 14.7GB (videos).
                     msg += _("; ")
-                else:
+                elif not self.prefs.backup_images:
                     #Inserted at the end of the statusbar message concerning the amount of freespace
                     #Used to differentiate between two different file systems
                     #e.g. Free space: 21.3GB (photos); 14.7GB (videos).                    
