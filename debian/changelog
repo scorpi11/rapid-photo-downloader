@@ -1,10 +1,31 @@
-rapid-photo-downloader (0.3.6-2) unstable; urgency=low
+rapid-photo-downloader (0.4.0~rc1-1) experimental; urgency=low
 
-  * Update to new policy 3.9.2 (no changes needed)
+  * New upstream Release Candidate 
   * Add menu file 
-  * Update VCS fields 
 
- -- Julien Valroff <julien@debian.org>  Sun, 24 Apr 2011 08:30:59 +0200
+ -- Julien Valroff <julien@debian.org>  Sat, 23 Apr 2011 09:21:23 +0200
+
+rapid-photo-downloader (0.4.0~beta1-1) experimental; urgency=low
+
+  * New upstream beta release
+  * Update to new policy 3.9.2 (no changes needed)
+
+ -- Julien Valroff <julien@debian.org>  Sat, 16 Apr 2011 16:39:37 +0200
+
+rapid-photo-downloader (0.4.0~alpha4-1) experimental; urgency=low
+
+  * New upstream alpha version
+
+ -- Julien Valroff <julien@debian.org>  Fri, 08 Apr 2011 07:09:56 +0200
+
+rapid-photo-downloader (0.4.0~alpha1-1) experimental; urgency=low
+
+  * New upstream alpha version:
+    + New user interface
+    + Improve speed
+  * Update dependencies for the new release
+
+ -- Julien Valroff <julien@debian.org>  Fri, 25 Mar 2011 22:10:10 +0100
 
 rapid-photo-downloader (0.3.6-1) unstable; urgency=low
 
