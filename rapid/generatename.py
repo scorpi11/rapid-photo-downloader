@@ -199,10 +199,15 @@ class PhotoName:
             
         elif self.L1 == OWNER_NAME:
             v = self.rpd_file.metadata.owner_name()
+        elif self.L1 == ARTIST:
+            v = self.rpd_file.metadata.artist()
+        elif self.L1 == COPYRIGHT:
+            v = self.rpd_file.metadata.copyright()
         else:
             raise TypeError("Invalid metadata option specified")
         if self.L1 in [CAMERA_MAKE, CAMERA_MODEL, SHORT_CAMERA_MODEL,
-                        SHORT_CAMERA_MODEL_HYPHEN,  OWNER_NAME]:
+                       SHORT_CAMERA_MODEL_HYPHEN, OWNER_NAME, ARTIST, 
+                       COPYRIGHT]:
             if self.L2 == UPPERCASE:
                 v = v.upper()
             elif self.L2 == LOWERCASE:
@@ -296,6 +301,9 @@ class PhotoName:
             v = self._get_component()
             if v:
                 name += v
+                
+        # remove any null characters - they are bad news in filenames
+        name = name.replace('\x00', '')
 
         if self.rpd_file.strip_characters:
             for c in r'\:*?"<>|':
