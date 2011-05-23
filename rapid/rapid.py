@@ -1618,7 +1618,7 @@ class RapidApp(dbus.service.Object):
         """
         If all the scans are complete, sets the sort order
         """
-        if self.scan_manager.get_no_active_processes() == 0:
+        if self.scan_manager.no_tasks == 0:
             self.thumbnails.sort_by_timestamp()
 
 
@@ -2071,10 +2071,8 @@ class RapidApp(dbus.service.Object):
         # Track which temporary directories are created when downloading files
         self.temp_dirs_by_scan_pid = dict()
         
-        # Track which downloads and backups are running
+        # Track which downloads are running
         self.download_active_by_scan_pid = []
-        self.backups_active_by_scan_pid = []
-        
 
     
     def start_download(self, scan_pid=None):
@@ -2688,6 +2686,7 @@ class RapidApp(dbus.service.Object):
                 self.stored_sequence_value.value = value
                 
         elif key in ['image_rename', 'subfolder', 'video_rename', 'video_subfolder']:
+            self.need_job_code_for_naming = self.prefs.any_pref_uses_job_code()
             # Check if stored sequence no is being used
             self._check_for_sequence_value_use()
             
@@ -2736,8 +2735,8 @@ class RapidApp(dbus.service.Object):
         """
         
         if not pynotify.init("TestCaps"):
-            logger.critical("Problem using pynotify.")
-            gtk.main_quit()
+            logger.warning("There might be problems using pynotify.")
+            #~ sys.exit(1)
 
         do_not_size_icon = False
         self.notification_icon_size = 48 

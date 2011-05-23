@@ -1,3 +1,26 @@
+Version 0.4.1
+-------------
+
+2011-05-19
+
+Added exif Artist and Copyright metadata options to file and subfoler name
+generation.
+
+Fixed bug #774476: thumbnails occassionally not sorted by file modification
+time.
+
+Fixed bug #784399: job code not prompted for after preference change.
+
+Fixed bug #778085: crash when trying to scan inaccessible files on mounted
+camera.
+
+Relaxed startup test to check whether pynotify is working. On some systems,
+pynotify reports it is not working even though it is.
+
+Added the start of an Indonesian translation. Updated Brazilian, Dutch, French, 
+German, Hungarian, Italian, Polish, Russian, Spanish and Ukrainian translations.
+
+
 Version 0.4.0
 -------------
 
