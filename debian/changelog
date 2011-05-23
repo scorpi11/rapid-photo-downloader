@@ -2,8 +2,9 @@ rapid-photo-downloader (0.4.1-1) unstable; urgency=low
 
   * New upstream release
   * Fix duplicate entries in dependencies 
+  * Point to GPL-2 license text in debian/copyright 
 
- -- Julien Valroff <julien@debian.org>  Mon, 23 May 2011 21:14:50 +0200
+ -- Julien Valroff <julien@debian.org>  Mon, 23 May 2011 21:17:07 +0200
 
 rapid-photo-downloader (0.4.0-1) unstable; urgency=low
 
