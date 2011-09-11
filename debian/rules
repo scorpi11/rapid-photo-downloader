@@ -1,4 +1,8 @@
 #!/usr/bin/make -f
+
+DEBVERS := $(shell dpkg-parsechangelog | sed -n -e 's/^Version: //p')
+VERSION := $(shell echo '$(DEBVERS)' | sed -e 's/^[[:digit:]]*://' -e 's/[~-].*//')
+
 %:
 	dh $@ --with python2
 
@@ -12,4 +16,3 @@ override_dh_auto_clean:
 	-rm rapid-photo-downloader.1
 	-rm -rf build/
 	dh_auto_clean
-
