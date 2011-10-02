@@ -31,6 +31,9 @@ import rpdfile
 import problemnotification as pn
 import config
 
+PHOTO_BACKUP = 1
+VIDEO_BACKUP = 2
+PHOTO_VIDEO_BACKUP = 3
 
 from gettext import gettext as _
 
@@ -149,7 +152,7 @@ class BackupFiles(multiprocessing.Process):
                 if backup_duplicate_overwrite:
                     flags = gio.FILE_COPY_OVERWRITE
                 else:
-                    flags = gio.FILE_COPY_NONE            
+                    flags = gio.FILE_COPY_NONE
                     
                 try:
                     source.copy(dest, self.progress_callback, flags, 
