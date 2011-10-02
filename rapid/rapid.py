@@ -68,6 +68,7 @@ import scan as scan_process
 import copyfiles
 import subfolderfile
 import backupfile
+from backupfile import PHOTO_BACKUP, VIDEO_BACKUP, PHOTO_VIDEO_BACKUP
 
 import errorlog
 
@@ -890,9 +891,10 @@ class ThumbnailDisplay(gtk.IconView):
     def generate_thumbnails(self, scan_pid):
         """Initiate thumbnail generation for files scanned in one process
         """
-        rpd_files = [self.rpd_files[unique_id] for unique_id in self.process_index[scan_pid]]
-        thumbnail_pid = self.thumbnail_manager.add_task((scan_pid, rpd_files))
-        self.generating_thumbnails[scan_pid] = thumbnail_pid
+        if scan_pid in self.process_index:
+            rpd_files = [self.rpd_files[unique_id] for unique_id in self.process_index[scan_pid]]
+            thumbnail_pid = self.thumbnail_manager.add_task((scan_pid, rpd_files))
+            self.generating_thumbnails[scan_pid] = thumbnail_pid
     
     def _set_thumbnail(self, unique_id, icon):
         treerowref = self.treerow_index[unique_id]
@@ -991,7 +993,7 @@ class ThumbnailDisplay(gtk.IconView):
             self.rapid_app.update_preview_image(unique_id, preview_image)
             
             # user can turn off option for thumbnail generation after a scan
-            if unique_id not in self.thumbnails:
+            if unique_id not in self.thumbnails and preview_small is not None:
                 self._set_thumbnail(unique_id, preview_small.get_image())
                 
     
@@ -1229,6 +1231,7 @@ class BackupFilesManager(TaskManager):
                        terminate_queue, run_event):
         path = task[0]
         name = task[1]
+        backup_type = task[2]
         backup_files = backupfile.BackupFiles(path, name, self.batch_size, 
                                         task_process_conn, terminate_queue, 
                                         run_event)
@@ -1236,22 +1239,36 @@ class BackupFilesManager(TaskManager):
         self._processes.append((backup_files, terminate_queue, run_event, 
                                 task_results_conn))
         
-        self.backup_devices_by_path[path] = (task_results_conn, backup_files.pid)
+        self.backup_devices_by_path[path] = (task_results_conn, backup_files.pid,
+                                            backup_type)
         
         return backup_files.pid
         
     def backup_file(self, move_succeeded, rpd_file, path_suffix, 
                                                 backup_duplicate_overwrite):
+
+        if rpd_file.file_type == rpdfile.FILE_TYPE_PHOTO:
+            logger.debug("Backing up photo %s", rpd_file.download_name)
+        else:
+            logger.debug("Backing up video %s", rpd_file.download_name)
+
         for path in self.backup_devices_by_path:
-            task_results_conn = self.backup_devices_by_path[path][0]
-            task_results_conn.send((move_succeeded, rpd_file, path_suffix, 
+            backup_type = self.backup_devices_by_path[path][2]
+            if ((backup_type == PHOTO_VIDEO_BACKUP) or 
+                    (rpd_file.file_type == rpdfile.FILE_TYPE_PHOTO and backup_type == PHOTO_BACKUP) or
+                    (rpd_file.file_type == rpdfile.FILE_TYPE_VIDEO and backup_type == VIDEO_BACKUP)):
+                logger.debug("Backing up to %s", path)
+                task_results_conn = self.backup_devices_by_path[path][0]
+                task_results_conn.send((move_succeeded, rpd_file, path_suffix, 
                                     backup_duplicate_overwrite))
+            else:
+                logger.debug("Not backing up to %s", path)
             
-    def add_device(self, path, name):
+    def add_device(self, path, name, backup_type):
         """
         Convenience function to setup adding a backup device
         """
-        return self.add_task((path, name))
+        return self.add_task((path, name, backup_type))
     
     def remove_device(self, path):
         pid = self.backup_devices_by_path[path][1]
@@ -1643,10 +1660,10 @@ class RapidApp(dbus.service.Object):
     
     
     def _backup_device_name(self, path):
-        if self.backup_devices[path] is None:
+        if self.backup_devices[path][0] is None:
             name = path
         else:
-            name = self.backup_devices[path].get_name()
+            name = self.backup_devices[path][0].get_name()
         return name
         
     def start_device_scan(self, device):
@@ -1699,9 +1716,9 @@ class RapidApp(dbus.service.Object):
                             logger.info("%s ignored", mount.get_name())
                         else:
                             logger.info("Detected %s", mount.get_name())
-                            is_backup_mount = self.check_if_backup_mount(path)
+                            is_backup_mount, backup_file_type = self.check_if_backup_mount(path)
                             if is_backup_mount:
-                                self.backup_devices[path] = mount
+                                self.backup_devices[path] = (mount, backup_file_type)
                             elif (self.prefs.device_autodetection and 
                                  (dv.is_DCIM_device(path) or 
                                   self.search_for_PSD())):
@@ -1723,14 +1740,8 @@ class RapidApp(dbus.service.Object):
 
         if self.prefs.backup_images:
             if not self.prefs.backup_device_autodetection:
-                # user manually specified backup location
-                # will backup to this path, but don't need any volume info 
-                # associated with it
-                self.backup_devices[self.prefs.backup_location] = None
-                
-            for path in self.backup_devices:
-                name = self._backup_device_name(path)
-                self.backup_manager.add_device(path, name)
+                self._setup_manual_backup()
+            self._add_backup_devices()
                 
         self.update_no_backup_devices()
         
@@ -1759,6 +1770,38 @@ class RapidApp(dbus.service.Object):
                     self.mounts_by_path[path] = scan_pid
         if not mounts:
             self.set_download_action_sensitivity()
+        
+    def _setup_manual_backup(self):
+        """
+        Setup backup devices that the user has manually specified.
+        Depending on the folder the user has chosen, the paths for photo and
+        video backup will either be the same or they will differ.
+        """
+        # user manually specified backup locations
+        # will backup to these paths, but don't need any volume info 
+        # associated with them        
+        self.backup_devices[self.prefs.backup_location] = (None, PHOTO_BACKUP)
+        if DOWNLOAD_VIDEO:
+            if self.prefs.backup_location <> self.prefs.backup_video_location:
+                self.backup_devices[self.prefs.backup_video_location] = (None, VIDEO_BACKUP)
+                logger.info("Backing up photos to %s", self.prefs.backup_location)
+                logger.info("Backing up videos to %s", self.prefs.backup_video_location)
+            else:
+                # videos and photos are being backed up to the same location
+                self.backup_devices[self.prefs.backup_location] = (None, PHOTO_VIDEO_BACKUP)
+                logger.info("Backing up photos and videos to %s", self.prefs.backup_location)
+        else:
+            logger.info("Backing up photos to %s", self.prefs.backup_location)
+            
+    def _add_backup_devices(self):
+        """
+        Add each backup devices / path to backup manager
+        """
+        for path in self.backup_devices:
+            name = self._backup_device_name(path)
+            backup_type = self.backup_devices[path][1]
+            self.backup_manager.add_device(path, name, backup_type)
+        
         
     def get_use_device(self, device):  
         """ Prompt user whether or not to download from this device """
@@ -1797,26 +1840,67 @@ class RapidApp(dbus.service.Object):
         """
         return self.prefs.device_autodetection_psd and self.prefs.device_autodetection
 
-    def check_if_backup_mount(self,  path):
+    def check_if_backup_mount(self, path):
         """
-        Checks to see if backups are enabled and path represents a valid backup location
+        Checks to see if backups are enabled and path represents a valid backup 
+        location. It must be writeable.
         
         Checks against user preferences.
+        
+        Returns a tuple:
+        (True, <backup-type> (one of PHOTO_VIDEO_BACKUP, PHOTO_BACKUP, or VIDEO_BACKUP)) or
+        (False, None) 
         """
-        identifiers = [self.prefs.backup_identifier]
-        if DOWNLOAD_VIDEO:
-            identifiers.append(self.prefs.video_backup_identifier)
         if self.prefs.backup_images:
             if self.prefs.backup_device_autodetection:
-                if dv.is_backup_media(path, identifiers):
-                    return True
+                # Determine if the auto-detected backup device is 
+                # to be used to backup only photos, or videos, or both.
+                # Use the presence of a corresponding directory to 
+                # determine this.
+                # The directory must be writable.
+                photo_path = os.path.join(path, self.prefs.backup_identifier)
+                p_backup = os.path.isdir(photo_path) and os.access(photo_path, os.W_OK)
+                if DOWNLOAD_VIDEO:
+                    video_path = os.path.join(path, self.prefs.video_backup_identifier)
+                    v_backup = os.path.isdir(video_path) and os.access(video_path, os.W_OK)
+                else:
+                    v_backup = False
+                if p_backup and v_backup:
+                    logger.info("Photos and videos will be backed up to %s", path)
+                    return (True, PHOTO_VIDEO_BACKUP)
+                elif p_backup:
+                    logger.info("Photos will be backed up to %s", path)
+                    return (True, PHOTO_BACKUP)
+                elif v_backup:
+                    logger.info("Videos will be backed up to %s", path)
+                    return (True, VIDEO_BACKUP)
             elif path == self.prefs.backup_location:
+                # user manually specified the path    
+                if os.access(self.prefs.backup_location, os.W_OK):
+                    return (True, PHOTO_BACKUP)
+            elif path == self.prefs.backup_video_location:
                 # user manually specified the path
-                return True
-        return False        
+                if os.access(self.prefs.backup_video_location, os.W_OK):
+                    return (True, VIDEO_BACKUP)
+        return (False, None)
 
     def update_no_backup_devices(self):
-        self.download_tracker.set_no_backup_devices(len(self.backup_devices))
+        self.no_photo_backup_devices = 0
+        self.no_video_backup_devices = 0
+        for path, value in self.backup_devices.iteritems():
+            backup_type = value[1]
+            if backup_type == PHOTO_BACKUP:
+                self.no_photo_backup_devices += 1
+            elif backup_type == VIDEO_BACKUP:
+                self.no_video_backup_devices += 1
+            else:
+                #both videos and photos are backed up to this device / path
+                self.no_photo_backup_devices += 1
+                self.no_video_backup_devices += 1
+        logger.info("# photo backup devices: %s; # video backup devices: %s", 
+                    self.no_photo_backup_devices, self.no_video_backup_devices)
+        self.download_tracker.set_no_backup_devices(self.no_photo_backup_devices, 
+                                                    self.no_video_backup_devices)
 
     def refresh_backup_media(self):
         """
@@ -1832,22 +1916,19 @@ class RapidApp(dbus.service.Object):
         self.backup_devices = {}
         if self.prefs.backup_images:
             if not self.prefs.backup_device_autodetection:
-                # user manually specified backup location
-                # will backup to this path, but don't need any volume info associated with it
-                self.backup_devices[self.prefs.backup_location] = None
+                self._setup_manual_backup()
             else:
                 for mount in self.vmonitor.get_mounts():
                     if not mount.is_shadowed():
                         path = mount.get_root().get_path()
                         if path:
-                            if self.check_if_backup_mount(path):
+                            is_backup_mount, backup_file_type = self.check_if_backup_mount(path)
+                            if is_backup_mount:
                                 # is a backup volume
                                 if path not in self.backup_devices:
-                                    self.backup_devices[path] = mount
+                                    self.backup_devices[path] = (mount, backup_file_type)
             
-            for path in self.backup_devices:
-                name = self._backup_device_name(path)
-                self.backup_manager.add_device(path, name)
+            self._add_backup_devices()
 
         self.update_no_backup_devices()
         self.display_free_space()
@@ -1880,13 +1961,13 @@ class RapidApp(dbus.service.Object):
                 logger.info("Device %(device)s (%(path)s) ignored" % {
                             'device': mount.get_name(), 'path': path})
             else:
-                is_backup_mount = self.check_if_backup_mount(path)
+                is_backup_mount, backup_file_type = self.check_if_backup_mount(path)
                             
                 if is_backup_mount:
                     if path not in self.backup_devices:
                         self.backup_devices[path] = mount
                         name = self._backup_device_name(path)
-                        self.backup_manager.add_device(path, name)
+                        self.backup_manager.add_device(path, name, backup_file_type)
                         self.update_no_backup_devices()
                         self.display_free_space()
 
@@ -2158,25 +2239,40 @@ class RapidApp(dbus.service.Object):
         """
         Initiate downloading and renaming of files
         """
-        
         # Check which file types will be downloaded for this particular process
-        if self.files_of_type_present(files, rpdfile.FILE_TYPE_PHOTO):
+        no_photos_to_download = self.files_of_type_present(files, 
+                                                    rpdfile.FILE_TYPE_PHOTO, 
+                                                    return_file_count=True)
+        if no_photos_to_download:
             photo_download_folder = self.prefs.download_folder
         else:
             photo_download_folder = None
             
-        if self.files_of_type_present(files, rpdfile.FILE_TYPE_VIDEO):
-            video_download_folder = self.prefs.video_download_folder
+        if DOWNLOAD_VIDEO:
+            no_videos_to_download = self.files_of_type_present(files, 
+                                        rpdfile.FILE_TYPE_VIDEO,
+                                        return_file_count=True)
+            if no_videos_to_download:
+                video_download_folder = self.prefs.video_download_folder
+            else:
+                video_download_folder = None
         else:
             video_download_folder = None
+            no_videos_to_download = 0
         
-        download_size = self.size_files_to_be_downloaded(files)
+        photo_download_size, video_download_size = self.size_files_to_be_downloaded(files)
         self.download_tracker.init_stats(scan_pid=scan_pid, 
-                                bytes=download_size,
-                                no_files=len(files))
+                                photo_size_in_bytes=photo_download_size, 
+                                video_size_in_bytes=video_download_size,
+                                no_photos_to_download=no_photos_to_download,
+                                no_videos_to_download=no_videos_to_download)
+        
+        
+        download_size = photo_download_size + video_download_size
         
         if self.prefs.backup_images:
-            download_size = download_size * (len(self.backup_devices) + 1)
+            download_size = download_size + ((self.no_photo_backup_devices * photo_download_size) +
+                                             (self.no_video_backup_devices * video_download_size))
             
         self.time_remaining.set(scan_pid, download_size)
         self.time_check.set_download_mark()
@@ -2276,10 +2372,6 @@ class RapidApp(dbus.service.Object):
         if rpd_file.status == config.STATUS_DOWNLOADED_WITH_WARNING:
             self.log_error(config.WARNING, rpd_file.error_title, 
                            rpd_file.error_msg, rpd_file.error_extra_detail)
-            self.error_title = ''
-            self.error_msg = ''
-            self.error_extra_detail = ''
-                           
                            
         if self.prefs.backup_images and len(self.backup_devices):
             if self.prefs.backup_device_autodetection:
@@ -2296,8 +2388,20 @@ class RapidApp(dbus.service.Object):
         else:
             self.file_download_finished(move_succeeded, rpd_file)
      
-     
+    
+    def multiple_backup_devices(self, file_type):
+        """Returns true if more than one backup device is being used for that
+        file type
+        """
+        return ((file_type == rpdfile.FILE_TYPE_PHOTO and 
+                 self.no_photo_backup_devices > 1) or
+                (file_type == rpdfile.FILE_TYPE_VIDEO and 
+                 self.no_video_backup_devices > 1))
+                                 
     def backup_results(self, source, condition):
+        """
+        Handle results sent from backup processes
+        """
         connection = self.backup_manager.get_pipe(source)
         conn_type, msg_data = connection.recv()
         if conn_type == rpdmp.CONN_PARTIAL:
@@ -2315,8 +2419,20 @@ class RapidApp(dbus.service.Object):
                 
             elif msg_type == rpdmp.MSG_FILE:
                 backup_succeeded, rpd_file = data
+                
+                # Only show an error message if there is more than one device
+                # backing up files of this type - if that is the case,
+                # do not want to reply on showing an error message in the 
+                # function file_download_finished, as it is only called once,
+                # when all files have been backed up
+                if not backup_succeeded and self.multiple_backup_devices(rpd_file.file_type):
+                    self.log_error(config.SERIOUS_ERROR, 
+                        rpd_file.error_title, 
+                        rpd_file.error_msg, rpd_file.error_extra_detail)
+                
                 self.download_tracker.file_backed_up(rpd_file.unique_id)
-                if self.download_tracker.all_files_backed_up(rpd_file.unique_id):
+                if self.download_tracker.all_files_backed_up(rpd_file.unique_id,
+                                                             rpd_file.file_type):
                     self.file_download_finished(backup_succeeded, rpd_file)
             return True
         else:
@@ -2324,10 +2440,13 @@ class RapidApp(dbus.service.Object):
 
     
     def file_download_finished(self, succeeded, rpd_file):
+        """
+        Called when a file has been downloaded i.e. copied, renamed, and backed up
+        """
         scan_pid = rpd_file.scan_pid
         unique_id = rpd_file.unique_id
         # Update error log window if neccessary
-        if not succeeded:
+        if not succeeded and not self.multiple_backup_devices(rpd_file.file_type):
             self.log_error(config.SERIOUS_ERROR, rpd_file.error_title, 
                            rpd_file.error_msg, rpd_file.error_extra_detail)
         elif self.prefs.auto_delete:
@@ -2340,7 +2459,7 @@ class RapidApp(dbus.service.Object):
                                                         rpd_file.file_type,
                                                         rpd_file.status)
                                                         
-        completed, files_remaining = self._update_file_download_device_progress(scan_pid, unique_id)
+        completed, files_remaining = self._update_file_download_device_progress(scan_pid, unique_id, rpd_file.file_type)
         
         if self.download_is_occurring():
             self.update_time_remaining()
@@ -2538,7 +2657,7 @@ class RapidApp(dbus.service.Object):
             self.display_summary_notification = False # don't show it again unless needed
       
         
-    def _update_file_download_device_progress(self, scan_pid, unique_id):
+    def _update_file_download_device_progress(self, scan_pid, unique_id, file_type):
         """
         Increments the progress bar for an individual device
         
@@ -2552,7 +2671,7 @@ class RapidApp(dbus.service.Object):
         file_types = self.download_tracker.get_file_types_present(scan_pid)
         completed = files_downloaded == files_to_download
         if completed and (self.prefs.backup_images and len(self.backup_devices)):
-            completed = self.download_tracker.all_files_backed_up(unique_id)
+            completed = self.download_tracker.all_files_backed_up(unique_id, file_type)
         
         if completed:
             files_remaining = self.thumbnails.get_no_files_remaining(scan_pid)
@@ -2649,6 +2768,11 @@ class RapidApp(dbus.service.Object):
         # related values in the preferences dialog window
         self.refresh_downloads_today = False
         
+        # these values are used to track the number of backup devices / 
+        # locations for each file type
+        self.no_photo_backup_devices = 0
+        self.no_video_backup_devices = 0
+        
         self.downloads_today_tracker = self.prefs.get_downloads_today_tracker()
         
         downloads_today = self.downloads_today_tracker.get_and_maybe_reset_downloads_today()
@@ -2669,12 +2793,40 @@ class RapidApp(dbus.service.Object):
         self.uses_session_sequece_no_value = Value(c_bool, self.prefs.any_pref_uses_session_sequece_no())
         self.uses_sequence_letter_value = Value(c_bool, self.prefs.any_pref_uses_sequence_letter_value())
         
+        self.check_prefs_upgrade(__version__)
         self.prefs.program_version = __version__
         
     def _check_for_sequence_value_use(self):
         self.uses_stored_sequence_no_value.value = self.prefs.any_pref_uses_stored_sequence_no()
         self.uses_session_sequece_no_value.value = self.prefs.any_pref_uses_session_sequece_no()
         self.uses_sequence_letter_value.value = self.prefs.any_pref_uses_sequence_letter_value()    
+    
+    def check_prefs_upgrade(self, running_version):
+        """
+        Checks if the running version of the program is different from the 
+        version recorded in the preferences.
+        
+        If the version is different, the preferences are checked to see
+        whether they should be upgraded or not.
+        """
+        previous_version = self.prefs.program_version
+        if len(previous_version) > 0:
+            # the program has been run previously for this user
+        
+            pv = utilities.pythonify_version(previous_version)
+            rv = utilities.pythonify_version(running_version)
+        
+            if pv <> rv:
+                # 0.4.1 and below had only one manual backup location
+                # 0.4.2 introduced a distinct video back up location that can be manually set
+                # Therefore must duplicate the previous photo & video manual backup location into the 
+                # new video field, unless it has already been changed already.
+                
+                if pv < utilities.pythonify_version('0.4.2'):
+                    if self.prefs.backup_video_location == os.path.expanduser('~'):
+                        self.prefs.backup_video_location = self.prefs.backup_location
+                        logger.info("Migrated manual backup location preference to videos: %s", 
+                                    self.prefs.backup_video_location)
     
     def on_preference_changed(self, key, value):
         """
@@ -2691,7 +2843,9 @@ class RapidApp(dbus.service.Object):
             if not self.preferences_dialog_displayed:
                 self.post_preference_change()
                 
-        elif key in ['backup_images', 'backup_device_autodetection', 'backup_location', 'backup_identifier', 'video_backup_identifier']:
+        elif key in ['backup_images', 'backup_device_autodetection', 
+                     'backup_location', 'backup_video_location', 
+                     'backup_identifier', 'video_backup_identifier']:
             self.rerun_setup_available_backup_media = True
             if not self.preferences_dialog_displayed:
                 self.post_preference_change()
@@ -2954,7 +3108,7 @@ class RapidApp(dbus.service.Object):
                 elif i == (v - 1) :
                     prefix = " " + _("and")  + " "
             i += 1
-            message = "%s%s'%s'" % (message,  prefix, self.backup_devices[b].get_name())
+            message = "%s%s'%s'" % (message,  prefix, self.backup_devices[b][0].get_name())
         
         if v > 1:
             message = _("Using backup devices") + " %s" % message
@@ -3025,8 +3179,18 @@ class RapidApp(dbus.service.Object):
             
         if self.prefs.backup_images: 
             if not self.prefs.backup_device_autodetection:
-                # user manually specified backup location
-                msg2 = _('Backing up to %(path)s') % {'path':self.prefs.backup_location}
+                if self.prefs.backup_location == self.prefs.backup_video_location:
+                    if DOWNLOAD_VIDEO:
+                        # user manually specified the same location for photos and video backups
+                        msg2 = _('Backing up photos and videos to %(path)s') % {'path':self.prefs.backup_location}
+                    else:
+                        # user manually specified backup location
+                        msg2 = _('Backing up to %(path)s') % {'path':self.prefs.backup_location}
+                else:
+                    # user manually specified different locations for photo and video backups
+                    msg2 = _('Backing up photos to %(path)s and videos to %(path2)s') % {
+                             'path':self.prefs.backup_location,
+                             'path2': self.prefs.backup_video_location}
             else:
                 msg2 = self.display_backup_mounts() 
                 
@@ -3070,25 +3234,39 @@ class RapidApp(dbus.service.Object):
     # Utility functions
     # # #
 
-    def files_of_type_present(self, files, file_type):
+    def files_of_type_present(self, files, file_type, return_file_count=False):
         """
         Returns true if there is at least one instance of the file_type
         in the list of files to be copied
+        
+        If return_file_count is True, then the number of files of that type
+        will be counted and returned instead of True or False
         """
+        i = 0
         for rpd_file in files:
             if rpd_file.file_type == file_type:
-                return True
-        return False
-        
+                if return_file_count:
+                    i += 1
+                else:
+                    return True
+        if not return_file_count:
+            return False
+        else:
+            return i
+                
     def size_files_to_be_downloaded(self, files):
         """
-        Returns the total size of the files to be downloaded in bytes
+        Returns the total sizes of the photos and videos to be downloaded in bytes
         """
-        size = 0
-        for i in range(len(files)):
-            size += files[i].size
+        photo_size = 0
+        video_size = 0
+        for rpd_file in files:
+            if rpd_file.file_type == rpdfile.FILE_TYPE_PHOTO:
+                photo_size += rpd_file.size
+            else:
+                video_size += rpd_file.size
 
-        return size
+        return (photo_size, video_size)
                                               
     def check_download_folder_validity(self, files_by_scan_pid):
         """
