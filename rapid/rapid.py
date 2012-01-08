@@ -60,9 +60,12 @@ import generatename as gn
 
 import downloadtracker
 
-from metadatavideo import DOWNLOAD_VIDEO
+import filemodify
+
+from metadatavideo import DOWNLOAD_VIDEO, file_types_to_download
 import metadataphoto
 import metadatavideo
+import metadataexiftool
 
 import scan as scan_process
 import copyfiles
@@ -143,12 +146,14 @@ class DeviceCollection(gtk.TreeView):
         # make it impossible to select a row
         selection = self.get_selection()
         selection.set_mode(gtk.SELECTION_NONE)
+        self.set_headers_visible(False)
         
         
         # Device refers to a thing like a camera, memory card in its reader, 
         # external hard drive, Portable Storage Device, etc.
         column0 = gtk.TreeViewColumn(_("Device"))
         pixbuf_renderer = gtk.CellRendererPixbuf()
+        pixbuf_renderer.set_padding(2, 0)
         text_renderer = gtk.CellRendererText()
         text_renderer.props.ellipsize = pango.ELLIPSIZE_MIDDLE
         text_renderer.set_fixed_size(160, -1)
@@ -216,7 +221,7 @@ class DeviceCollection(gtk.TreeView):
         # (with one card at startup), it could be 21
         # must account for header row at the top
         row_height = self.get_background_area(0, self.get_column(0))[3] + 1
-        height = (len(self.map_process_to_row) + 1) * row_height
+        height = max(((len(self.map_process_to_row) + 1) * row_height), 24)
         self.parent_app.device_collection_scrolledwindow.set_size_request(-1, height)
         
     def update_device(self, process_id, total_size_files):
@@ -683,9 +688,13 @@ class ThumbnailDisplay(gtk.IconView):
             #check if preview should be from a downloaded file, or the source
             if rpd_file.status in DOWNLOADED:
                 file_location = rpd_file.download_full_file_name
+                thm_file_name = rpd_file.download_thm_full_name
             else:
                 file_location = rpd_file.full_file_name
+                thm_file_name = rpd_file.thm_full_name
+                
             self.preview_manager.get_preview(unique_id, file_location,
+                                            thm_file_name,
                                             rpd_file.file_type, size_max=None,)
                                             
             self.previews_being_fetched.add(unique_id)
@@ -1188,10 +1197,14 @@ class CopyFilesManager(TaskManager):
         video_download_folder = task[1]
         scan_pid = task[2]
         files = task[3]
+        modify_files_during_download = task[4]
+        modify_pipe = task[5]
         
         copy_files = copyfiles.CopyFiles(photo_download_folder,
                                 video_download_folder,
                                 files, 
+                                modify_files_during_download,
+                                modify_pipe,
                                 scan_pid, self.batch_size, 
                                 task_process_conn, terminate_queue, run_event)
         copy_files.start()
@@ -1209,12 +1222,51 @@ class ThumbnailManager(TaskManager):
         generator.start()
         self._processes.append((generator, terminate_queue, run_event))
         return generator.pid
+
+class FileModifyManager(TaskManager):
+    """Handles the modification of downloaded files before they are renamed
+    Duplex, multiprocess, similar to BackupFilesManager
+    """
+    def __init__(self, results_callback):
+        TaskManager.__init__(self, results_callback=results_callback, 
+                            batch_size=0)
+        self.file_modify_by_scan_pid = {}
+                            
+    def _initiate_task(self, task, task_results_conn, task_process_conn, 
+                       terminate_queue, run_event):
+        scan_pid = task[0]
+        auto_rotate_jpeg = task[1]
+        focal_length = task[2]
+        
+        file_modify = filemodify.FileModify(auto_rotate_jpeg, focal_length,
+                                        task_process_conn, terminate_queue, 
+                                        run_event)
+        file_modify.start()
+        self._processes.append((file_modify, terminate_queue, run_event, 
+                                task_results_conn))
+                                
+        self.file_modify_by_scan_pid[scan_pid] = (task_results_conn, file_modify.pid)
+        
+        return file_modify.pid
+
+    def _setup_pipe(self):
+        return Pipe(duplex=True)
+        
+    def _send_termination_msg(self, p):
+        p[1].put(None)
+        p[3].send((None, None))
+        
+    def get_modify_pipe(self, scan_pid):
+        return self.file_modify_by_scan_pid[scan_pid][0]
+        
         
 class BackupFilesManager(TaskManager):
     """
-    Handles backup processes. This is a little different from other Task
+    Handles backup processes. This is a little different from some other Task
     Manager classes in that its pipe is Duplex, and the work done by it
     is not pre-assigned when the process is started.
+    
+    Duplex, multiprocess.
     """
     def __init__(self, results_callback, batch_size):
         TaskManager.__init__(self, results_callback, batch_size)
@@ -1300,8 +1352,8 @@ class PreviewManager(SingleInstanceTaskManager):
         self._get_preview = tn.GetPreviewImage(self.task_process_conn)
         self._get_preview.start()
         
-    def get_preview(self, unique_id, full_file_name, file_type, size_max):
-        self.task_results_conn.send((unique_id, full_file_name, file_type, size_max))
+    def get_preview(self, unique_id, full_file_name, thm_file_name, file_type, size_max):
+        self.task_results_conn.send((unique_id, full_file_name, thm_file_name, file_type, size_max))
         
     def task_results(self, source, condition):
         unique_id, preview_full_size, preview_small = self.task_results_conn.recv()
@@ -1312,10 +1364,10 @@ class SubfolderFileManager(SingleInstanceTaskManager):
     """
     Manages the daemon process that renames files and creates subfolders
     """
-    def __init__(self, results_callback, sequence_values, focal_length):
+    def __init__(self, results_callback, sequence_values):
         SingleInstanceTaskManager.__init__(self, results_callback)
         self._subfolder_file = subfolderfile.SubfolderFile(self.task_process_conn, 
-                                                sequence_values, focal_length)
+                                                sequence_values)
         self._subfolder_file.start()
         logger.debug("SubfolderFile PID: %s", self._subfolder_file.pid)
         
@@ -1440,7 +1492,6 @@ class PreviewImage:
     def update_preview_image(self, unique_id, pil_image):
         if unique_id == self.unique_id:
             self.set_preview_image(unique_id, pil_image)
-      
 
         
 class RapidApp(dbus.service.Object):
@@ -1525,6 +1576,7 @@ class RapidApp(dbus.service.Object):
         scan_termination_requested = self.scan_manager.request_termination()        
         thumbnails_termination_requested = self.thumbnails.thumbnail_manager.request_termination()
         backup_termination_requested = self.backup_manager.request_termination()
+        file_modify_termination_requested = self.file_modify_manager.request_termination()
         
         if terminate_file_copies:
             copy_files_termination_requested = self.copy_files_manager.request_termination()
@@ -1532,17 +1584,19 @@ class RapidApp(dbus.service.Object):
             copy_files_termination_requested = False
         
         if (scan_termination_requested or thumbnails_termination_requested or
-                                                backup_termination_requested):
+                backup_termination_requested or file_modify_termination_requested):
             time.sleep(1)
             if (self.scan_manager.get_no_active_processes() > 0 or 
                 self.thumbnails.thumbnail_manager.get_no_active_processes() > 0 or
-                self.backup_manager.get_no_active_processes() > 0):
+                self.backup_manager.get_no_active_processes() > 0 or
+                self.file_modify_manager.get_no_active_processes() > 0):
                 time.sleep(1)
                 # must try again, just in case a new scan has meanwhile started!
                 self.scan_manager.request_termination()
                 self.thumbnails.thumbnail_manager.terminate_forcefully()
                 self.scan_manager.terminate_forcefully()
                 self.backup_manager.terminate_forcefully()
+                self.file_modify_manager.terminate_forcefully()
                 
         if terminate_file_copies and copy_files_termination_requested:
             time.sleep(1)
@@ -1591,6 +1645,7 @@ class RapidApp(dbus.service.Object):
         self.on_rapidapp_destroy(widget=self.rapidapp, data=None)
         
     def on_refresh_action_activate(self, action):
+        self.thumbnails.clear_all()
         self.setup_devices(on_startup=False, on_preference_change=False,
                            block_auto_start=True)
                            
@@ -1602,7 +1657,7 @@ class RapidApp(dbus.service.Object):
         self.about.set_property("version", utilities.human_readable_version(
                                                                 __version__))
         self.about.run()
-        self.about.destroy() 
+        self.about.hide()
         
     def on_report_problem_action_activate(self, action):
         webbrowser.open("https://bugs.launchpad.net/rapid")
@@ -1675,6 +1730,34 @@ class RapidApp(dbus.service.Object):
                                           self.prefs.ignored_paths,
                                           self.prefs.use_re_ignored_paths])
         
+    def confirm_manual_location(self):
+        """
+        Queries the user to ask if they really want to download from locations 
+        that could take a very long time to scan. They can choose yes or no.
+        
+        Returns True if yes or there was no need to ask the user, False if the
+        user said no.
+        """
+        l = self.prefs.device_location
+        if l in ['/media', os.path.expanduser('~'), '/']:
+            logger.info("Prompting whether to download from %s", l)
+            if l == '/':
+                #this location is a human readable explanation for /, and is inserted into Downloading from %(location)s
+                l = _('the root of the file system')
+            c = preferencesdialog.QuestionDialog(parent_window=self.rapidapp,
+                    title=_('Rapid Photo Downloader'),
+                    #message in dialog box which asks the user if they really want to be downloading from this location
+                    question="<b>" + _("Downloading from %(location)s.") %  {'location': l} + "</b>\n\n" +
+                    _("Do you really want to download from here? On some systems, scanning this location can take a very long time."),
+                    default_to_yes=False,
+                    use_markup=True)        
+            response = c.run()
+            user_confirmed = response == gtk.RESPONSE_OK
+            c.destroy()
+            if not user_confirmed:
+                return False
+        return True
+    
     def setup_devices(self, on_startup, on_preference_change, block_auto_start):
         """
         
@@ -1697,10 +1780,12 @@ class RapidApp(dbus.service.Object):
         
         if self.using_volume_monitor():
             self.start_volume_monitor()
-        
 
         self.clear_non_running_downloads()
-        
+        if not self.prefs.device_autodetection:
+            if not self.confirm_manual_location():
+                return
+            
         mounts = []
         self.backup_devices = {}
         
@@ -2175,6 +2260,10 @@ class RapidApp(dbus.service.Object):
         
         # Track which downloads are running
         self.download_active_by_scan_pid = []
+        
+    def modify_files_during_download(self):
+        """ Returns True if there is a need to modify files during download"""
+        return self.prefs.auto_rotate_jpeg or (self.focal_length is not None)
 
     
     def start_download(self, scan_pid=None):
@@ -2286,11 +2375,20 @@ class RapidApp(dbus.service.Object):
         if self.auto_start_is_on and self.prefs.generate_thumbnails:
             for rpd_file in files:
                 rpd_file.generate_thumbnail = True
+
+        modify_files_during_download = self.modify_files_during_download()
+        if modify_files_during_download:
+            self.file_modify_manager.add_task((scan_pid, self.prefs.auto_rotate_jpeg, self.focal_length))
+            modify_pipe = self.file_modify_manager.get_modify_pipe(scan_pid)
+        else:
+            modify_pipe = None
+
             
         # Initiate copy files process
         self.copy_files_manager.add_task((photo_download_folder, 
                               video_download_folder, scan_pid,
-                              files))
+                              files, modify_files_during_download,
+                              modify_pipe))
                               
     def copy_files_results(self, source, condition):
         """
@@ -2315,33 +2413,7 @@ class RapidApp(dbus.service.Object):
                                             None, None)
                 self.time_remaining.update(scan_pid, bytes_downloaded=chunk_downloaded)
             elif msg_type == rpdmp.MSG_FILE:
-                download_succeeded, rpd_file, download_count, temp_full_file_name, thumbnail_icon, thumbnail = data
-                
-                if thumbnail is not None or thumbnail_icon is not None:
-                    self.thumbnails.update_thumbnail((rpd_file.unique_id, 
-                                                      thumbnail_icon, 
-                                                      thumbnail))
-                
-                self.download_tracker.set_download_count_for_file(
-                                            rpd_file.unique_id, download_count)
-                self.download_tracker.set_download_count(
-                                            rpd_file.scan_pid, download_count)
-                rpd_file.download_start_time = self.download_start_time
-                
-                if download_succeeded:
-                    # Insert preference values needed for name generation
-                    rpd_file = prefsrapid.insert_pref_lists(self.prefs, rpd_file)
-                    rpd_file.strip_characters = self.prefs.strip_characters
-                    rpd_file.download_folder = self.prefs.get_download_folder_for_file_type(rpd_file.file_type)
-                    rpd_file.download_conflict_resolution = self.prefs.download_conflict_resolution
-                    rpd_file.synchronize_raw_jpg = self.prefs.must_synchronize_raw_jpg()
-                    rpd_file.job_code = self.job_code 
-                
-                self.subfolder_file_manager.rename_file_and_move_to_subfolder(
-                        download_succeeded, 
-                        download_count, 
-                        rpd_file
-                        ) 
+                self.copy_file_results_single_file(data)
                 
             return True
         else:
@@ -2349,6 +2421,63 @@ class RapidApp(dbus.service.Object):
             connection.close()
             return False
             
+
+    def copy_file_results_single_file(self, data):
+        """
+        Handles results from one of two processes:
+        1. copy_files
+        2. file_modify
+        
+        Operates after a single file has been copied from the download device
+        to the local folder.
+        
+        Calls the process to rename files and create subfolders (subfolderfile)
+        """
+        
+        download_succeeded, rpd_file, download_count, temp_full_file_name, thumbnail_icon, thumbnail = data
+        
+        if thumbnail is not None or thumbnail_icon is not None:
+            self.thumbnails.update_thumbnail((rpd_file.unique_id, 
+                                              thumbnail_icon, 
+                                              thumbnail))
+        
+        self.download_tracker.set_download_count_for_file(
+                                    rpd_file.unique_id, download_count)
+        self.download_tracker.set_download_count(
+                                    rpd_file.scan_pid, download_count)
+        rpd_file.download_start_time = self.download_start_time
+        
+        if download_succeeded:
+            # Insert preference values needed for name generation
+            rpd_file = prefsrapid.insert_pref_lists(self.prefs, rpd_file)
+            rpd_file.strip_characters = self.prefs.strip_characters
+            rpd_file.download_folder = self.prefs.get_download_folder_for_file_type(rpd_file.file_type)
+            rpd_file.download_conflict_resolution = self.prefs.download_conflict_resolution
+            rpd_file.synchronize_raw_jpg = self.prefs.must_synchronize_raw_jpg()
+            rpd_file.job_code = self.job_code
+            
+            self.subfolder_file_manager.rename_file_and_move_to_subfolder(
+                    download_succeeded, 
+                    download_count, 
+                    rpd_file
+                    )         
+    def file_modify_results(self, source, condition):
+        """
+        'file modify' is a process that runs immediately after 'copy files', 
+        meaning there can be more than one at one time. 
+        
+        It runs before the renaming process.
+        """
+        connection = self.file_modify_manager.get_pipe(source)
+        
+        conn_type, data = connection.recv()
+        if conn_type == rpdmp.CONN_PARTIAL:
+            self.copy_file_results_single_file(data)
+            return True
+        else:
+            # Process is complete, i.e. conn_type == rpdmp.CONN_COMPLETE
+            connection.close()
+            return False            
 
     
     def download_is_occurring(self):
@@ -2840,8 +2969,10 @@ class RapidApp(dbus.service.Object):
                      'device_location', 'ignored_paths',
                      'use_re_ignored_paths', 'device_blacklist']:
             self.rerun_setup_available_image_and_video_media = True
+            self._set_from_toolbar_state()
             if not self.preferences_dialog_displayed:
                 self.post_preference_change()
+            
                 
         elif key in ['backup_images', 'backup_device_autodetection', 
                      'backup_location', 'backup_video_location', 
@@ -2868,6 +2999,7 @@ class RapidApp(dbus.service.Object):
             self._check_for_sequence_value_use()
             
         elif key in ['download_folder', 'video_download_folder']:
+            self._set_to_toolbar_values()
             self.display_free_space()
     
     def post_preference_change(self):
@@ -2945,9 +3077,14 @@ class RapidApp(dbus.service.Object):
         self.builder = builder
         builder.add_from_file(paths.share_dir("glade3/rapid.ui"))
         self.rapidapp = builder.get_object("rapidapp")
+        self.from_toolbar = builder.get_object("from_toolbar")
+        self.copy_toolbar = builder.get_object("copy_toolbar")
+        self.dest_toolbar = builder.get_object("dest_toolbar")
+        self.menu_toolbar = builder.get_object("menu_toolbar")
         self.main_vpaned = builder.get_object("main_vpaned")
         self.main_notebook = builder.get_object("main_notebook")
         self.download_action = builder.get_object("download_action")
+        self.download_button = builder.get_object("download_button")
         
         self.download_progressbar = builder.get_object("download_progressbar")
         self.rapid_statusbar = builder.get_object("rapid_statusbar")
@@ -2962,7 +3099,9 @@ class RapidApp(dbus.service.Object):
         
         # Only enable this action when actually displaying a preview
         self.next_image_action.set_sensitive(False)
-        self.prev_image_action.set_sensitive(False)        
+        self.prev_image_action.set_sensitive(False)
+        
+        self._init_toolbars()
         
         # About dialog
         builder.add_from_file(paths.share_dir("glade3/about.ui"))
@@ -3003,6 +3142,227 @@ class RapidApp(dbus.service.Object):
         self.time_remaining = downloadtracker.TimeRemaining()
         self.time_check = downloadtracker.TimeCheck()
         
+    def _init_toolbars(self):
+        """ Setup the 3 vertical toolbars on the main screen """
+        self._setup_from_toolbar()
+        self._setup_copy_move_toolbar()
+        self._setup_dest_toolbar()
+        
+        # size label widths so they are equal, or else the left border of the file chooser will not match
+        self.photo_dest_label.realize()
+        self._make_widget_widths_equal(self.photo_dest_label, self.video_dest_label)
+        self.photo_dest_label.set_alignment(xalign=0.0, yalign=0.5)
+        self.video_dest_label.set_alignment(xalign=0.0, yalign=0.5)
+        
+        # size copy / move buttons so they are equal in length, so arrows align
+        self._make_widget_widths_equal(self.copy_button, self.move_button)
+        
+    def _setup_from_toolbar(self):
+        self.from_toolbar.set_style(gtk.TOOLBAR_TEXT)
+        self.from_toolbar.set_border_width(5)
+        
+        from_label = gtk.Label()
+        from_label.set_markup("<i>" + _("From") + "</i>")
+        self.from_toolbar_label = gtk.ToolItem()
+        self.from_toolbar_label.add(from_label)
+        self.from_toolbar_label.set_is_important(True)
+        self.from_toolbar.insert(self.from_toolbar_label, 0)
+
+        self.auto_detect_button = gtk.ToggleToolButton()
+        self.auto_detect_button.set_is_important(True)
+        self.auto_detect_button.set_label(_("Auto Detect"))
+        self.from_toolbar.insert(self.auto_detect_button, 1)
+
+        self.from_filechooser_button = gtk.FileChooserButton(
+            _("Select a folder containing %(file_types)s") % {'file_types':file_types_to_download()})
+        self.from_filechooser_button.set_action(
+                            gtk.FILE_CHOOSER_ACTION_SELECT_FOLDER)
+        
+        self.from_filechooser = gtk.ToolItem()
+        self.from_filechooser.set_is_important(True)
+        self.from_filechooser.add(self.from_filechooser_button)
+        self.from_filechooser.set_expand(True)
+        self.from_toolbar.insert(self.from_filechooser, 2)
+        
+        self._set_from_toolbar_state()
+        
+        #set events after having initialized the values
+        self.auto_detect_button.connect("toggled", self.on_auto_detect_button_toggled_event)
+        self.from_filechooser_button.connect("selection-changed", 
+                            self.on_from_filechooser_button_selection_changed)
+                
+        self.from_toolbar.show_all()
+    
+    def _setup_copy_move_toolbar(self):
+        self.copy_toolbar.set_style(gtk.TOOLBAR_TEXT)
+        self.copy_toolbar.set_border_width(5)
+        
+        copy_move_label = gtk.Label(" ")
+        self.copy_move_toolbar_label = gtk.ToolItem()
+        self.copy_move_toolbar_label.add(copy_move_label)
+        self.copy_move_toolbar_label.set_is_important(True)
+        self.copy_toolbar.insert(self.copy_move_toolbar_label, 0)
+        
+        self.copy_hbox = gtk.HBox()
+        self.move_hbox = gtk.HBox()
+        self.forward_image = gtk.image_new_from_stock(gtk.STOCK_GO_FORWARD, gtk.ICON_SIZE_SMALL_TOOLBAR)
+        self.forward_image2 = gtk.image_new_from_stock(gtk.STOCK_GO_FORWARD, gtk.ICON_SIZE_SMALL_TOOLBAR)
+        self.forward_image3 = gtk.image_new_from_stock(gtk.STOCK_GO_FORWARD, gtk.ICON_SIZE_SMALL_TOOLBAR)
+        self.forward_image4 = gtk.image_new_from_stock(gtk.STOCK_GO_FORWARD, gtk.ICON_SIZE_SMALL_TOOLBAR)
+        self.forward_label = gtk.Label(" ")
+        self.forward_label2 = gtk.Label(" ")
+        self.forward_label3 = gtk.Label(" ")
+        self.forward_label4 = gtk.Label(" ")
+        
+        self.copy_button = gtk.RadioToolButton()
+        self.copy_button.set_label(_("Copy"))
+        self.copy_button.set_is_important(True)
+
+        self.copy_hbox.pack_start(self.forward_label)
+        self.copy_hbox.pack_start(self.forward_image)
+        self.copy_hbox.pack_start(self.copy_button, expand=False, fill=False)
+        self.copy_hbox.pack_start(self.forward_image2)
+        self.copy_hbox.pack_start(self.forward_label2)
+        copy_box = gtk.ToolItem()
+        copy_box.add(self.copy_hbox)
+        self.copy_toolbar.insert(copy_box, 1)
+            
+        self.move_button = gtk.RadioToolButton(self.copy_button)
+        self.move_button.set_label(_("Move"))
+        self.move_button.set_is_important(True)
+        self.move_hbox.pack_start(self.forward_label3)
+        self.move_hbox.pack_start(self.forward_image3)
+        self.move_hbox.pack_start(self.move_button, expand=False, fill=False)
+        self.move_hbox.pack_start(self.forward_image4)
+        self.move_hbox.pack_start(self.forward_label4)
+        move_box = gtk.ToolItem()
+        move_box.add(self.move_hbox)
+        self.copy_toolbar.insert(move_box, 2)
+        
+        self.move_button.set_active(self.prefs.auto_delete)
+        self.copy_button.connect("toggled", self.on_copy_button_toggle_event)        
+        
+        self.copy_toolbar.show_all()
+        self._set_copy_toolbar_active_arrows()    
+    
+    def _setup_dest_toolbar(self):
+        #Destination Toolbar
+        self.dest_toolbar.set_border_width(5)
+        
+        dest_label = gtk.Label()
+        dest_label.set_markup("<i>" + _("To") + "</i>")
+        self.dest_toolbar_label = gtk.ToolItem()
+        self.dest_toolbar_label.add(dest_label)
+        self.dest_toolbar_label.set_is_important(True)
+        self.dest_toolbar.insert(self.dest_toolbar_label, 0)
+        
+        photo_dest_hbox = gtk.HBox()
+        self.photo_dest_label = gtk.Label(_("Photos:"))
+        
+        self.to_photo_filechooser_button = gtk.FileChooserButton(
+                _("Select a folder to download photos to"))
+        self.to_photo_filechooser_button.set_action(
+                            gtk.FILE_CHOOSER_ACTION_SELECT_FOLDER)
+        photo_dest_hbox.pack_start(self.photo_dest_label, expand=False, fill=False, padding=6)
+        photo_dest_hbox.pack_start(self.to_photo_filechooser_button)
+        self.to_photo_filechooser = gtk.ToolItem()
+        self.to_photo_filechooser.set_is_important(True)
+        self.to_photo_filechooser.set_expand(True)
+        self.to_photo_filechooser.add(photo_dest_hbox)
+        self.dest_toolbar.insert(self.to_photo_filechooser, 1)
+
+        video_dest_hbox = gtk.HBox()
+        self.video_dest_label = gtk.Label(_("Videos:"))
+        self.to_video_filechooser_button = gtk.FileChooserButton(
+                _("Select a folder to download videos to"))
+        self.to_video_filechooser_button.set_action(
+                        gtk.FILE_CHOOSER_ACTION_SELECT_FOLDER)
+        video_dest_hbox.pack_start(self.video_dest_label, expand=False, fill=False, padding=6)
+        video_dest_hbox.pack_start(self.to_video_filechooser_button)
+        self.to_video_filechooser = gtk.ToolItem()
+        self.to_video_filechooser.set_is_important(True)
+        self.to_video_filechooser.set_expand(True)
+        self.to_video_filechooser.add(video_dest_hbox)
+        self.dest_toolbar.insert(self.to_video_filechooser, 2)
+        
+        self._set_to_toolbar_values()
+        self.to_photo_filechooser_button.connect("selection-changed", 
+                        self.on_to_photo_filechooser_button_selection_changed)
+        self.to_video_filechooser_button.connect("selection-changed",
+                        self.on_to_video_filechooser_button_selection_changed)
+        self.dest_toolbar.show_all()
+
+    def _make_widget_widths_equal(self, widget1, widget2):
+        """takes two widgets and sets a width for both equal to widest one"""
+        
+        x1, y1, w1, h1 = widget1.get_allocation()
+        x2, y2, w2, h2 = widget2.get_allocation()
+        w = max(w1, w2)
+        h = max(h1, h2)
+        widget1.set_size_request(w,h)
+        widget2.set_size_request(w,h)
+        
+    def _set_copy_toolbar_active_arrows(self):
+        if self.copy_button.get_active():
+            self.forward_image.set_visible(True)
+            self.forward_image2.set_visible(True)
+            self.forward_image3.set_visible(False)
+            self.forward_image4.set_visible(False)
+            self.forward_label.set_visible(False)
+            self.forward_label2.set_visible(False)
+            self.forward_label3.set_visible(True)
+            self.forward_label4.set_visible(True)
+        else:
+            self.forward_image.set_visible(False)
+            self.forward_image2.set_visible(False)
+            self.forward_image3.set_visible(True)
+            self.forward_image4.set_visible(True)
+            self.forward_label.set_visible(True)
+            self.forward_label2.set_visible(True)
+            self.forward_label3.set_visible(False)
+            self.forward_label4.set_visible(False)
+
+    def on_copy_button_toggle_event(self, radio_button):
+        self._set_copy_toolbar_active_arrows()
+        self.prefs.auto_delete = not self.copy_button.get_active()
+                    
+    def _set_from_toolbar_state(self):
+        logger.debug("_set_from_toolbar_state")
+        self.auto_detect_button.set_active(self.prefs.device_autodetection)
+        if self.prefs.device_autodetection:
+            self.from_filechooser_button.set_sensitive(False)
+        self.from_filechooser_button.set_current_folder(self.prefs.device_location)
+    
+    def on_auto_detect_button_toggled_event(self, button):
+        logger.debug("on_auto_detect_button_toggled_event")
+        self.from_filechooser_button.set_sensitive(not button.get_active())
+        if not self.rerun_setup_available_image_and_video_media:
+            self.prefs.device_autodetection = button.get_active()
+                
+    def on_from_filechooser_button_selection_changed(self, filechooserbutton):
+        logger.debug("on_from_filechooser_button_selection_changed")
+        path = filechooserbutton.get_current_folder()
+        if path and not self.rerun_setup_available_image_and_video_media:
+            self.prefs.device_location = path
+            
+    def on_to_photo_filechooser_button_selection_changed(self, filechooserbutton):
+        path = filechooserbutton.get_current_folder()
+        if path:
+            self.prefs.download_folder = path
+    
+    def on_to_video_filechooser_button_selection_changed(self, filechooserbutton):
+        path = filechooserbutton.get_current_folder()
+        if path:
+            self.prefs.video_download_folder = path
+            
+    def _set_to_toolbar_values(self):
+        self.to_photo_filechooser_button.set_current_folder(self.prefs.download_folder)
+        self.to_video_filechooser_button.set_current_folder(self.prefs.video_download_folder)
+
+    def toolbar_event(self, widget, toolbar):
+        pass
+
+
 
     def _set_window_size(self):
         """
@@ -3027,7 +3387,7 @@ class RapidApp(dbus.service.Object):
         Set the size of the device collection scrolled window widget
         """
         if self.device_collection.map_process_to_row:
-            height = self.device_collection_viewport.size_request()[1]
+            height = max(self.device_collection_viewport.size_request()[1], 24)
             self.device_collection_scrolledwindow.set_size_request(-1,  height)
             self.main_vpaned.set_position(height)
         else:
@@ -3407,7 +3767,7 @@ class RapidApp(dbus.service.Object):
         Set up process managers.
         
         A task such as scanning a device or copying files is handled in its
-        own process.        
+        own process.
         """
         
         self.batch_size = 10
@@ -3421,19 +3781,27 @@ class RapidApp(dbus.service.Object):
                            self.uses_stored_sequence_no_value,
                            self.uses_session_sequece_no_value,
                            self.uses_sequence_letter_value)
-                           
+        
+        # daemon process to rename files and create subfolders                   
         self.subfolder_file_manager = SubfolderFileManager(
                                         self.subfolder_file_results,
-                                        sequence_values,
-                                        self.focal_length)
-            
+                                        sequence_values)
         
+        # process to scan source devices / paths
         self.scan_manager = ScanManager(self.scan_results, self.batch_size, 
                                         self.device_collection.add_device)
+                                        
+        #process to copy files from source to destination
         self.copy_files_manager = CopyFilesManager(self.copy_files_results, 
                                                    self.batch_size_MB)
+                                                   
+        #process to back files up
         self.backup_manager = BackupFilesManager(self.backup_results,
                                                  self.batch_size_MB)
+                                                 
+        #process to enhance files after they've been copied and before they're
+        #renamed
+        self.file_modify_manager = FileModifyManager(self.file_modify_results)
         
         
     def scan_results(self, source, condition):
@@ -3468,6 +3836,7 @@ class RapidApp(dbus.service.Object):
                     self.start_download(scan_pid=scan_pid)
 
             self.set_thumbnail_sort()
+            self.download_button.grab_focus()
             
             # signal that no more data is coming, finishing io watch for this pipe
             return False
@@ -3481,7 +3850,6 @@ class RapidApp(dbus.service.Object):
         
         # must return True for this method to be called again
         return True
-        
         
 
     @dbus.service.method (config.DBUS_NAME,
@@ -3511,7 +3879,7 @@ def start():
     parser.add_option("-q", "--quiet",  action="store_false", dest="verbose",  help=_("only output errors to the command line"))
     # image file extensions are recognized RAW files plus TIFF and JPG
     parser.add_option("-e",  "--extensions", action="store_true", dest="extensions", help=_("list photo and video file extensions the program recognizes and exit"))
-    parser.add_option("--focal-length", type=int, dest="focal_length", help="If an aperture value of 0.0 is encountered, for file renaming purposes the metadata for that photo will temporarily have its focal length set to the number passed, and its aperture to f8")
+    parser.add_option("--focal-length", type=int, dest="focal_length", help="If an aperture value of 0.0 is encountered, the focal length metadata will be set to the number passed, and its aperture metadata to f8")
     parser.add_option("--reset-settings", action="store_true", dest="reset", help=_("reset all program settings and preferences and exit"))
     (options, args) = parser.parse_args()
     
@@ -3525,7 +3893,7 @@ def start():
     logger.setLevel(logging_level)
 
     if options.extensions:
-        extensions = ((rpdfile.RAW_FILE_EXTENSIONS + rpdfile.NON_RAW_IMAGE_FILE_EXTENSIONS, _("Photos:")), (rpdfile.VIDEO_FILE_EXTENSIONS, _("Videos:")))
+        extensions = ((rpdfile.PHOTO_EXTENSIONS, _("Photos:")), (rpdfile.VIDEO_EXTENSIONS, _("Videos:")))
         for exts, file_type in extensions:
             v = ''
             for e in exts[:-1]:
@@ -3549,14 +3917,16 @@ def start():
     logger.info("Rapid Photo Downloader %s", utilities.human_readable_version(config.version))
     logger.info("Using pyexiv2 %s", metadataphoto.pyexiv2_version_info())
     logger.info("Using exiv2 %s", metadataphoto.exiv2_version_info())
-    
+    if metadataexiftool.EXIFTOOL_VERSION is None:
+        logger.info("Exiftool not detected")
+    else:
+        logger.info("Using exiftool %s", metadataexiftool.EXIFTOOL_VERSION)
+    if metadatavideo.HAVE_HACHOIR:
+        logger.info("Using hachoir %s", metadatavideo.version_info())
+
+
     if focal_length:
         logger.info("Focal length of %s will be used when an aperture of 0.0 is encountered", focal_length)
-        
-    if DOWNLOAD_VIDEO:
-        logger.info("Using hachoir %s", metadatavideo.version_info())
-    else:
-        logger.info(_("Video downloading functionality disabled.\nTo download videos, please install the hachoir metadata and kaa metadata packages for python."))
 
     bus = dbus.SessionBus ()
     request = bus.request_name (config.DBUS_NAME, dbus.bus.NAME_FLAG_DO_NOT_QUEUE)

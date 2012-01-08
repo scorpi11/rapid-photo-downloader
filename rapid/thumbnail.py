@@ -1,5 +1,4 @@
 #!/usr/bin/python
-#!/usr/bin/python
 # -*- coding: latin1 -*-
 
 ### Copyright (C) 2011 Damon Lynch <damonlynch@gmail.com>
@@ -137,26 +136,6 @@ class PicklablePIL:
     def get_pixbuf(self):
         return image_to_pixbuf(self.get_image())
 
-def get_video_THM_file(fullFileName):
-    """
-    Checks to see if a thumbnail file (THM) is in the same directory as the 
-    file. Expects a full path to be part of the file name.
-    
-    Returns the filename, including path, if found, else returns None.
-    """
-    
-    f = None
-    name, ext = os.path.splitext(fullFileName)
-    for e in rpdfile.VIDEO_THUMBNAIL_EXTENSIONS:
-        if os.path.exists(name + '.' + e):
-            f = name + '.' + e
-            break
-        if os.path.exists(name + '.' + e.upper()):
-            f = name + '.' + e.upper()
-            break
-        
-    return f 
-
 class Thumbnail:
     
     # file types from which to remove letterboxing (black bands in the thumbnail
@@ -187,17 +166,24 @@ class Thumbnail:
         return (thumbnail.data, lowrez)
         
     def _process_thumbnail(self, image, size_reduced):
+        image_ok = True
         if image.mode <> "RGBA":
-            image = image.convert("RGBA")
+            try:
+                image = image.convert("RGBA")
+            except:
+                logger.error("Image thumbnail is corrupt")
+                image_ok = False
 
-        thumbnail = PicklablePIL(image)
-        if size_reduced is not None:
-            thumbnail_icon = image.copy()
-            downsize_pil(thumbnail_icon, size_reduced, fit=False)                
-            thumbnail_icon = PicklablePIL(thumbnail_icon)
+        if image_ok:
+            thumbnail = PicklablePIL(image)
+            if size_reduced is not None:
+                thumbnail_icon = image.copy()
+                downsize_pil(thumbnail_icon, size_reduced, fit=False)                
+                thumbnail_icon = PicklablePIL(thumbnail_icon)
+            else:
+                thumbnail_icon = None
         else:
-            thumbnail_icon = None
-            
+            thumbnail = thumbnail_icon = None
         return (thumbnail, thumbnail_icon)
     
     def _get_photo_thumbnail(self, full_file_name, size_max, size_reduced):
@@ -263,7 +249,7 @@ class Thumbnail:
         logger.debug("...got thumbnail for %s", full_file_name)
         return (thumbnail, thumbnail_icon)
         
-    def _get_video_thumbnail(self, full_file_name, size_max, size_reduced):
+    def _get_video_thumbnail(self, full_file_name, thm_full_name, size_max, size_reduced):
         thumbnail = None
         thumbnail_icon = None
         if size_max is None:
@@ -272,14 +258,16 @@ class Thumbnail:
             size = max(size_max[0], size_max[1])
         image = None
         if size > 0 and size <= 160:
-            thm = get_video_THM_file(full_file_name)
-            if thm:
+            if thm_full_name:
                 try:
-                    thumbnail = gtk.gdk.pixbuf_new_from_file(thm)
+                    thumbnail = gtk.gdk.pixbuf_new_from_file(thm_full_name)
                 except:
-                    logger.warning("Could not open THM file for %s", full_file_name)
-                thumbnail = add_filmstrip(thumbnail)
-                image = pixbuf_to_image(thumbnail)
+                    logger.error("Could not open THM file for %s", full_file_name)
+                    logger.error("Thumbnail file is %s", thm_full_name)
+                    image = None
+                else:
+                    thumbnail = add_filmstrip(thumbnail)
+                    image = pixbuf_to_image(thumbnail)
         
         if image is None:
             try:
@@ -299,13 +287,13 @@ class Thumbnail:
         logger.debug("...got thumbnail for %s", full_file_name)    
         return (thumbnail, thumbnail_icon)
     
-    def get_thumbnail(self, full_file_name, file_type, size_max=None, size_reduced=None):
+    def get_thumbnail(self, full_file_name, thm_full_name, file_type, size_max=None, size_reduced=None):
         logger.debug("Getting thumbnail for %s...", full_file_name)
         if file_type == rpdfile.FILE_TYPE_PHOTO:
             logger.debug("file type is photo")
             return self._get_photo_thumbnail(full_file_name, size_max, size_reduced)
         else:
-            return self._get_video_thumbnail(full_file_name, size_max, size_reduced)
+            return self._get_video_thumbnail(full_file_name, thm_full_name, size_max, size_reduced)
                 
                 
 class GetPreviewImage(multiprocessing.Process):
@@ -332,8 +320,8 @@ class GetPreviewImage(multiprocessing.Process):
         
     def run(self):
         while True:
-            unique_id, full_file_name, file_type, size_max = self.results_pipe.recv()
-            full_size_preview, reduced_size_preview = self.thumbnail_maker.get_thumbnail(full_file_name, file_type, size_max=size_max, size_reduced=(100,100))
+            unique_id, full_file_name, thm_full_name, file_type, size_max = self.results_pipe.recv()
+            full_size_preview, reduced_size_preview = self.thumbnail_maker.get_thumbnail(full_file_name, thm_full_name, file_type, size_max=size_max, size_reduced=(100,100))
             if full_size_preview is None:
                 full_size_preview = self.get_stock_image(file_type)
             self.results_pipe.send((unique_id, full_size_preview, reduced_size_preview))
@@ -369,9 +357,9 @@ class GenerateThumbnails(multiprocessing.Process):
                 logger.info("Terminating thumbnailing")
                 return None
             
-            
             thumbnail, thumbnail_icon = self.thumbnail_maker.get_thumbnail(
                                     f.full_file_name,
+                                    f.thm_full_name,
                                     f.file_type,
                                     (160, 120), (100,100))
             

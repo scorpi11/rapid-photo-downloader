@@ -20,10 +20,10 @@
 """
 Generates names for files and folders.
 
-Runs a daemon process.
+Runs as a daemon process.
 """
 
-import os, datetime, collections, fractions
+import os, datetime, collections
 
 import gio
 import multiprocessing
@@ -82,13 +82,17 @@ def time_subseconds_human_readable(date, subseconds):
              'second':date.strftime("%S"),
              'subsecond': subseconds}        
 
-def load_metadata(rpd_file):
+def load_metadata(rpd_file, temp_file=True):
     """
     Loads the metadata for the file. Returns True if operation succeeded, false
     otherwise
+    
+    If temp_file is true, the the metadata from the temporary file rather than
+    the original source file is used. This is important, because the metadata
+    can be modified by the filemodify process.
     """
     if rpd_file.metadata is None:        
-        if not rpd_file.load_metadata():
+        if not rpd_file.load_metadata(temp_file):
             # Error in reading metadata
             rpd_file.add_problem(None, pn.CANNOT_DOWNLOAD_BAD_METADATA, {'filetype': rpd_file.title_capitalized})
             return False
@@ -133,10 +137,10 @@ def generate_name(rpd_file):
         
     rpd_file.download_name = _generate_name(generator, rpd_file)
     return rpd_file
-        
+    
 
 class SubfolderFile(multiprocessing.Process):
-    def __init__(self, results_pipe, sequence_values, focal_length):
+    def __init__(self, results_pipe, sequence_values):
         multiprocessing.Process.__init__(self)
         self.daemon = True
         self.results_pipe = results_pipe
@@ -149,8 +153,6 @@ class SubfolderFile(multiprocessing.Process):
         self.uses_stored_sequence_no = sequence_values[5]
         self.uses_session_sequece_no = sequence_values[6]
         self.uses_sequence_letter = sequence_values[7]
-        
-        self.focal_length = focal_length
         
         logger.debug("Start of day is set to %s", self.day_start.value)
         
@@ -237,6 +239,7 @@ class SubfolderFile(multiprocessing.Process):
         """
         Get subfolder and name.
         Attempt to move the file from it's temporary directory.
+        Move video THM file if there is one.
         If successful, increment sequence values.
         Report any success or failure.
         """
@@ -265,10 +268,8 @@ class SubfolderFile(multiprocessing.Process):
         while True:
             logger.debug("Finished %s. Getting next task.", download_count)
 
-            task = self.results_pipe.recv()
-            
             # rename file and move to generated subfolder                    
-            download_succeeded, download_count, rpd_file = task
+            download_succeeded, download_count, rpd_file = self.results_pipe.recv()
             
             move_succeeded = False
             
@@ -311,22 +312,16 @@ class SubfolderFile(multiprocessing.Process):
                     # Generate subfolder name and new file name
                     generation_succeeded = True
                     
-                    # check to see if focal length and aperture data should be manipulated
-                    if self.focal_length is not None and rpd_file.file_type == rpdfile.FILE_TYPE_PHOTO:
-                        if load_metadata(rpd_file):
-                            a = rpd_file.metadata.aperture()
-                            if a == '0.0':
-                                fl = rpd_file.metadata["Exif.Photo.FocalLength"].value
-                                logger.info("Adjusting focal length and aperture for %s", rpd_file.full_file_name)
-                                #~ try:
-                                rpd_file.metadata["Exif.Photo.FocalLength"] = fractions.Fraction(self.focal_length,1)
-                                rpd_file.metadata["Exif.Photo.FNumber"] = fractions.Fraction(8,1)
-                                    #~ rpd_file.metadata.write(preserve_timestamps=True)
-                                #~ logger.info("...wrote new value")
-                                #~ except:
-                                    #~ logger.error("failed to write value!") 
-                            
-                        
+                    if rpd_file.file_type == rpdfile.FILE_TYPE_PHOTO:
+                        if hasattr(rpd_file, 'new_focal_length'):
+                            # A RAW file has had its focal length and aperture adjusted.
+                            # These have been written out to an XMP sidecar, but they won't
+                            # be picked up by pyexiv2. So temporarily change the values inplace here, 
+                            # without saving them.
+                            if load_metadata(rpd_file):
+                                rpd_file.metadata["Exif.Photo.FocalLength"] = rpd_file.new_focal_length
+                                rpd_file.metadata["Exif.Photo.FNumber"] = rpd_file.new_aperture
+                    
                     rpd_file = generate_subfolder(rpd_file)
                     if rpd_file.download_subfolder:
                         
@@ -374,6 +369,7 @@ class SubfolderFile(multiprocessing.Process):
                 if generation_succeeded:
                     rpd_file.download_path = os.path.join(rpd_file.download_folder, rpd_file.download_subfolder)
                     rpd_file.download_full_file_name = os.path.join(rpd_file.download_path, rpd_file.download_name)
+                    rpd_file.download_full_base_name = os.path.splitext(rpd_file.download_full_file_name)[0]
                     
                     subfolder = gio.File(path=rpd_file.download_path)
                     
@@ -468,6 +464,36 @@ class SubfolderFile(multiprocessing.Process):
                         self.downloads_today_tracker.increment_downloads_today()
                         self.downloads_today.value = self.downloads_today_tracker.get_raw_downloads_today()
                         self.downloads_today_date.value = self.downloads_today_tracker.get_raw_downloads_today_date()
+                        
+                    if rpd_file.temp_thm_full_name:
+                        # copy and rename THM video file
+                        source = gio.File(path=rpd_file.temp_thm_full_name)
+                        ext = None
+                        if hasattr(rpd_file, 'thm_extension'):
+                            if rpd_file.thm_extension:
+                                ext = rpd_file.thm_extension
+                        if ext is None:
+                            ext = '.THM'
+                        download_thm_full_name = rpd_file.download_full_base_name + ext
+                        dest = gio.File(path=download_thm_full_name)
+                        try:
+                            source.move(dest, self.progress_callback_no_update, cancellable=None)
+                            rpd_file.download_thm_full_name = download_thm_full_name
+                        except gio.Error, inst:
+                            logger.error("Failed to move video THM file %s", download_thm_full_name)
+                            
+                    if rpd_file.temp_xmp_full_name:
+                        # copy and rename XMP sidecar file
+                        source = gio.File(path=rpd_file.temp_xmp_full_name)
+                        # generate_name() has generated xmp extension with correct capitalization
+                        download_xmp_full_name = rpd_file.download_full_base_name + rpd_file.xmp_extension
+                        dest = gio.File(path=download_xmp_full_name)
+                        try:
+                            source.move(dest, self.progress_callback_no_update, cancellable=None)
+                            rpd_file.download_xmp_full_name = download_xmp_full_name
+                        except gio.Error, inst:
+                            logger.error("Failed to move XMP sidecar file %s", download_xmp_full_name)
+                            
                 
                 if not move_succeeded:
                     logger.error("%s: %s - %s", rpd_file.full_file_name, 

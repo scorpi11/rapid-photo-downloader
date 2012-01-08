@@ -36,6 +36,7 @@ import rpdfile
 import higdefaults as hd
 import metadataphoto
 import metadatavideo
+
 import tableplusminus as tpm
 
 import utilities
@@ -385,7 +386,8 @@ class VideoSubfolderPrefs(PhotoSubfolderPrefs):
             pref_list = pref_list)
 
 class QuestionDialog(gtk.Dialog):
-    def __init__(self, parent_window, title, question, post_choice_callback):
+    def __init__(self, parent_window, title, question, use_markup=False, 
+                default_to_yes=True, post_choice_callback=None):
         gtk.Dialog.__init__(self, title, None,
                    gtk.DIALOG_MODAL | gtk.DIALOG_DESTROY_WITH_PARENT,
                    (gtk.STOCK_NO, gtk.RESPONSE_CANCEL, 
@@ -404,6 +406,7 @@ class QuestionDialog(gtk.Dialog):
             prompt_hbox.pack_start(image, False, False, padding = 6)
             
         prompt_label = gtk.Label(question)
+        prompt_label.set_use_markup(use_markup)
         prompt_label.set_line_wrap(True)
         prompt_hbox.pack_start(prompt_label, False, False, padding=6)
                     
@@ -412,16 +415,18 @@ class QuestionDialog(gtk.Dialog):
         self.set_border_width(6)
         self.set_has_separator(False)   
         
-        self.set_default_response(gtk.RESPONSE_OK)
+        if default_to_yes: 
+            self.set_default_response(gtk.RESPONSE_OK)
+        else:
+            self.set_default_response(gtk.RESPONSE_CANCEL)
       
-       
         self.set_transient_for(parent_window)
         self.show_all()
 
-        
-        self.connect('response', self.on_response)
+        if post_choice_callback:
+            self.connect('response', self.on_response)
 
-    def on_response(self,  device_dialog, response):
+    def on_response(self, device_dialog, response):
         user_selected = response == gtk.RESPONSE_OK
         self.post_choice_callback(self, user_selected)
 
@@ -430,21 +435,21 @@ class RemoveAllJobCodeDialog(QuestionDialog):
         QuestionDialog.__init__(self, parent_window,
                                 _('Remove all Job Codes?'),
                                 _('Should all Job Codes be removed?'),
-                                post_choice_callback)
+                                post_choice_callback=post_choice_callback)
                                 
 class RemoveAllRemeberedDevicesDialog(QuestionDialog):
     def __init__(self, parent_window, post_choice_callback):
         QuestionDialog.__init__(self, parent_window,
                                 _('Remove all Remembered Paths?'),
                                 _('Should all remembered paths be removed?'),
-                                post_choice_callback)
+                                post_choice_callback=post_choice_callback)
     
 class RemoveAllIgnoredPathsDialog(QuestionDialog):
     def __init__(self, parent_window, post_choice_callback):
         QuestionDialog.__init__(self, parent_window,
                                 _('Remove all Ignored Paths?'),
                                 _('Should all ignored paths be removed?'),
-                                post_choice_callback)
+                                post_choice_callback=post_choice_callback)
                                 
 class PhotoRenameTable(tpm.TablePlusMinus):
 
@@ -467,8 +472,7 @@ class PhotoRenameTable(tpm.TablePlusMinus):
             self.connect("add",  self.size_adjustment)
             self.connect("remove",  self.size_adjustment)
 
-            # get scrollbar thickness from parent app scrollbar - very hackish, but what to do??
-            self.bump = 16# self.preferencesdialog.parentApp.image_scrolledwindow.get_hscrollbar().allocation.height
+            self.bump = 16
             self.have_vertical_scrollbar = False
 
 
@@ -887,10 +891,7 @@ class PreferencesDialog():
         
         self._setup_control_spacing()
         
-        if metadatavideo.DOWNLOAD_VIDEO:
-            self.file_types = _("photos and videos")
-        else:
-            self.file_types = _("photos")
+        self.file_types = metadatavideo.file_types_to_download()
 
         self._setup_sample_names()
         
@@ -1418,10 +1419,10 @@ class PreferencesDialog():
                         self.prefs.auto_exit)
         self.auto_exit_force_checkbutton.set_active(
                         self.prefs.auto_exit_force)
-        self.auto_delete_checkbutton.set_active(
-                        self.prefs.auto_delete)
         self.generate_thumbnails_checkbutton.set_active(
                         self.prefs.generate_thumbnails)
+        self.auto_rotate_checkbutton.set_active(
+                        self.prefs.auto_rotate_jpeg)
                         
         self.update_misc_controls()
 
@@ -1758,9 +1759,9 @@ class PreferencesDialog():
         
     def on_auto_unmount_checkbutton_toggled(self, checkbutton):
         self.prefs.auto_unmount = checkbutton.get_active()
-
-    def on_auto_delete_checkbutton_toggled(self, checkbutton):
-        self.prefs.auto_delete = checkbutton.get_active()
+        
+    def on_auto_rotate_checkbutton_toggled(self, checkbutton):
+        self.prefs.auto_rotate_jpeg = checkbutton.get_active()
 
     def on_auto_exit_checkbutton_toggled(self, checkbutton):
         active = checkbutton.get_active()
@@ -1918,7 +1919,6 @@ class PreferencesDialog():
 
     def on_backup_identifier_entry_changed(self, widget):
         self.update_backup_example()
-        #~ self.prefs.
     
     def on_video_backup_identifier_entry_changed(self, widget):
         self.update_backup_example()

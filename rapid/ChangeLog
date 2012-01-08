@@ -1,3 +1,74 @@
+Version 0.4.3
+-------------
+
+2012-01-07
+
+ExifTool is now a required dependency for Rapid Photo Downloader. ExifTool
+can be used to help download videos on Linux distributions that have not
+packaged hachoir-metadata, such as Fedora.
+
+Exiftran is another new dependency. It is used to automatically rotate 
+JPEG images. 
+
+Fixed bug #704482: Delete photos option should be easily accessible -
+
+Added a toolbar at the top of the main program window, which gives immediate
+access to the most commonly changed configuration options: where files will
+be transferred from, whether they will be copied or moved, and where they will
+be transferred to.
+
+Please when the move option is chosen, all files in the download from a device
+are first copied before any are deleted. In other words, only once all
+source files have been successfully copied from a device to their destination
+are the source files deleted from that device.
+
+Fixed bug #754531: extract Exif.CanonFi.FileNumber metadata -
+
+Added FileNumber metadata renaming option, which is a Canon-specific Exif value
+in the form xxx-yyyy, where xxx is the folder number and yyyy is the image
+number. Uses ExifTool. Thanks go to Etieene Charlier for researching the fix
+and contributing code to get it implemented.
+
+Fixed bug #695517: Added functionality to download MTS video files. There is
+currently no python based library to read metadata from MTS files, but ExifTool
+works. 
+
+Fixed bug #859998: Download THM video thumbnail files -
+
+Some video files have THM video thumbnail files associated with them. Rapid 
+Photo Downloader now downloads them and renames them to match the name of the
+video it is associated with.
+
+Fixed bug #594533: Lossless JPEG rotation based on EXIF data after picture 
+transfer -
+
+There is now an option to automatically rotate JPEG photos as they are
+downloaded. The program exiftran is used to do the rotation. The feature is
+turned on default. 
+
+Fixed bug #859012: Confirm if really want to download from /home, /media or / -
+
+It is possible for the program's preferences to be set to download from /home,
+/media or / (the root of the file system). This can result in the program 
+scanning a very large number of files, possibly causing the system to become
+unresponsive. The program now queries the user before commencing this scan to 
+confirm if this is really what they want to do.
+
+Fixed bug #792228: clear all thumbnails when refresh command issued.
+
+Fixed a bug where the device progress bar would occasionally disappear when 
+the download device was changed. 
+
+Fixed a bug where the file extensions the program downloads could not be
+displayed from the command line.
+
+Fixed a bug where the program would crash when trying to convert a malformed
+thumbnail from one image mode to another.
+
+Updated Czech, Danish, Dutch, French, German, Hungarian, Italian, Norwegian,
+Polish, Serbian, Slovak, Spanish and Swedish translations.
+
+
 Version 0.4.2
 -------------
 
