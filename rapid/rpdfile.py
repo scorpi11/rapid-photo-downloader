@@ -34,6 +34,7 @@ from gettext import gettext as _
 import config
 import metadataphoto
 import metadatavideo
+import metadataexiftool
 
 import problemnotification as pn
 
@@ -43,7 +44,9 @@ import thumbnail as tn
 RAW_EXTENSIONS = ['arw', 'dcr', 'cr2', 'crw',  'dng', 'mos', 'mef', 'mrw', 
                   'nef', 'orf', 'pef', 'raf', 'raw', 'rw2', 'sr2', 'srw']
                         
-NON_RAW_IMAGE_EXTENSIONS = ['jpg', 'jpe', 'jpeg', 'tif', 'tiff']
+JPEG_EXTENSIONS = ['jpg', 'jpe', 'jpeg']
+
+NON_RAW_IMAGE_EXTENSIONS = JPEG_EXTENSIONS + ['tif', 'tiff']
 
 PHOTO_EXTENSIONS = RAW_EXTENSIONS + NON_RAW_IMAGE_EXTENSIONS
 
@@ -52,7 +55,9 @@ if metadatavideo.DOWNLOAD_VIDEO:
     # needs to be able to download videos
     VIDEO_EXTENSIONS = ['3gp', 'avi', 'm2t', 'mov', 'mp4', 'mpeg','mpg', 'mod', 
                         'tod']
-    VIDEO_THUMBNAIL_EXTENSIONS = ['thm']                        
+    if metadataexiftool.EXIFTOOL_VERSION is not None:
+        VIDEO_EXTENSIONS += ['mts']
+    VIDEO_THUMBNAIL_EXTENSIONS = ['thm']
 else:
     VIDEO_EXTENSIONS = []
     VIDEO_THUMBNAIL_EXTENSIONS = []
@@ -75,18 +80,18 @@ def file_type(file_extension):
     return None
     
 def get_rpdfile(extension, name, display_name, path, size, 
-                file_system_modification_time, 
-                scan_pid, file_id):
+                file_system_modification_time, thm_full_name,
+                scan_pid, file_id, file_type):
                     
-    if extension in VIDEO_EXTENSIONS:
+    if file_type == FILE_TYPE_VIDEO:
         return Video(name, display_name, path, size,
-                     file_system_modification_time, 
+                     file_system_modification_time, thm_full_name,
                      scan_pid, file_id)
     else:
         # assume it's a photo - no check for performance reasons (this will be
         # called many times)
         return Photo(name, display_name, path, size,
-                     file_system_modification_time, 
+                     file_system_modification_time, thm_full_name,
                      scan_pid, file_id)
 
 class FileTypeCounter:
@@ -144,7 +149,7 @@ class RPDFile:
     """
 
     def __init__(self, name, display_name, path, size, 
-                 file_system_modification_time, 
+                 file_system_modification_time, thm_full_name,
                  scan_pid, file_id):
                      
         self.path = path
@@ -153,10 +158,14 @@ class RPDFile:
         self.display_name = display_name
 
         self.full_file_name = os.path.join(path, name)
+        self.extension = os.path.splitext(name)[1][1:].lower()
         
         self.size = size # type int
         
         self.modification_time = file_system_modification_time
+        
+        #full path and name of thumbnail file that is associated with some videos
+        self.thm_full_name = thm_full_name
         
         self.status = config.STATUS_NOT_DOWNLOADED
         self.problem = None # class Problem in problemnotifcation.py
@@ -177,12 +186,18 @@ class RPDFile:
         # generated values
         
         self.temp_full_file_name = ''
+        self.temp_thm_full_name = ''
+        self.temp_xmp_full_name = ''
+        
         self.download_start_time = None
         
         self.download_subfolder = ''
         self.download_path = ''
         self.download_name = ''
-        self.download_full_file_name = ''
+        self.download_full_file_name = '' #file name with path
+        self.download_full_base_name = '' #file name with path but no extension
+        self.download_thm_full_name = ''  #name of THM (thumbnail) file with path
+        self.download_xmp_full_name = ''  #name of XMP sidecar with path
         
         self.metadata = None
         
@@ -194,10 +209,23 @@ class RPDFile:
         #self.subfolder_pref_list = []
         #self.name_pref_list = []
         #strip_characters = False
+        #self.thm_extension = ''
+        #self.xmp_extension = ''
+        
+        #these values are set only if they were written to an xmp sidecar 
+        #in the filemodify process
+        #self.new_aperture = ''
+        #self.new_focal_length = ''
         
         
     def _assign_file_type(self):
         self.file_type = None
+        
+    def _load_file_for_metadata(self, temp_file):
+        if temp_file:
+            return self.temp_full_file_name
+        else:
+            return self.full_file_name        
         
     def initialize_problem(self):
         self.problem = pn.Problem()
@@ -218,32 +246,6 @@ class RPDFile:
     
     def add_extra_detail(self, extra_detail, *args):
         self.problem.add_extra_detail(extra_detail, *args)
-    
-
-        
-#~ exif_tags_needed = ('Exif.Photo.FNumber', 
-                    #~ 'Exif.Photo.ISOSpeedRatings',
-                    #~ 'Exif.Photo.ExposureTime',
-                    #~ 'Exif.Photo.FocalLength',
-                    #~ 'Exif.Image.Make',
-                    #~ 'Exif.Image.Model',
-                    #~ 'Exif.Canon.SerialNumber',
-                    #~ 'Exif.Nikon3.SerialNumber'
-                    #~ 'Exif.OlympusEq.SerialNumber',
-                    #~ 'Exif.Olympus.SerialNumber',
-                    #~ 'Exif.Olympus.SerialNumber2',
-                    #~ 'Exif.Panasonic.SerialNumber',
-                    #~ 'Exif.Fujifilm.SerialNumber',
-                    #~ 'Exif.Image.CameraSerialNumber',
-                    #~ 'Exif.Nikon3.ShutterCount',
-                    #~ 'Exif.Canon.FileNumber',
-                    #~ 'Exif.Canon.ImageNumber',
-                    #~ 'Exif.Canon.OwnerName',
-                    #~ 'Exif.Photo.DateTimeOriginal',
-                    #~ 'Exif.Image.DateTime',
-                    #~ 'Exif.Photo.SubSecTimeOriginal',
-                    #~ 'Exif.Image.Orientation'
-                   #~ )
                    
 class Photo(RPDFile):
     
@@ -253,9 +255,8 @@ class Photo(RPDFile):
     def _assign_file_type(self):
         self.file_type = FILE_TYPE_PHOTO
         
-    def load_metadata(self):
-        
-        self.metadata = metadataphoto.MetaData(self.full_file_name)
+    def load_metadata(self, temp_file=False):
+        self.metadata = metadataphoto.MetaData(self._load_file_for_metadata(temp_file))
         try:
             self.metadata.read()
         except:
@@ -273,8 +274,13 @@ class Video(RPDFile):
     def _assign_file_type(self):
         self.file_type = FILE_TYPE_VIDEO
         
-    def load_metadata(self):
-        self.metadata = metadatavideo.VideoMetaData(self.full_file_name)
+    def load_metadata(self, temp_file=False):
+        if self.extension == 'mts' or not metadatavideo.HAVE_HACHOIR:
+            if metadatavideo.HAVE_HACHOIR:
+                logger.debug("Using ExifTool parser")
+            self.metadata = metadataexiftool.ExifToolMetaData(self._load_file_for_metadata(temp_file))
+        else:
+            self.metadata = metadatavideo.VideoMetaData(self._load_file_for_metadata(temp_file))
         return True
         
 class SamplePhoto(Photo):
@@ -285,7 +291,8 @@ class SamplePhoto(Photo):
                        size=23516764, 
                        file_system_modification_time=time.time(), 
                        scan_pid=2033,
-                       file_id='9873afe')
+                       file_id='9873afe',
+                       thm_full_name=None)
         self.sequences = sequences
         self.metadata = metadataphoto.DummyMetaData()
         self.download_start_time = datetime.datetime.now()
@@ -298,7 +305,8 @@ class SampleVideo(Video):
                        size=823513764, 
                        file_system_modification_time=time.time(), 
                        scan_pid=2033,
-                       file_id='9873qrsfe')
+                       file_id='9873qrsfe',
+                       thm_full_name=None)
         self.sequences = sequences
         self.metadata = metadatavideo.DummyMetaData(filename=sample_name)
         self.download_start_time = datetime.datetime.now()

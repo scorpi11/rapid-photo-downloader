@@ -20,6 +20,8 @@
 import multiprocessing
 import tempfile
 import os
+import random
+import string
 
 import gio
 
@@ -37,7 +39,11 @@ from gettext import gettext as _
 
 
 class CopyFiles(multiprocessing.Process):
+    """
+    Copies files from source to temporary directory, giving them a random name
+    """
     def __init__(self, photo_download_folder, video_download_folder, files,
+                 modify_files_during_download, modify_pipe,
                  scan_pid, 
                  batch_size_MB, results_pipe, terminate_queue, 
                  run_event):
@@ -48,6 +54,8 @@ class CopyFiles(multiprocessing.Process):
         self.photo_download_folder = photo_download_folder
         self.video_download_folder = video_download_folder
         self.files = files
+        self.modify_files_during_download = modify_files_during_download
+        self.modify_pipe = modify_pipe
         self.scan_pid = scan_pid
         self.no_files= len(self.files)
         self.run_event = run_event
@@ -85,9 +93,16 @@ class CopyFiles(multiprocessing.Process):
     def progress_callback(self, amount_downloaded, total):
         self.update_progress(amount_downloaded, total)
         
+    def thm_progress_callback(self, amount_downloaded, total):
+        # we don't care about tracking download progress for tiny THM files!
+        pass
+        
 
     def run(self):
         """start the actual copying of files"""
+        
+        #characters used to generate temporary filenames
+        filename_characters = string.letters + string.digits
         
         self.bytes_downloaded = 0
         self.total_downloaded = 0
@@ -107,8 +122,8 @@ class CopyFiles(multiprocessing.Process):
         if self.photo_temp_dir or self.video_temp_dir:
             
             self.thumbnail_maker = tn.Thumbnail()
-                
-            for i in range(len(self.files)):
+            
+            for i in range(self.no_files):
                 rpd_file = self.files[i]
                 self.total_reached = False
                 
@@ -119,9 +134,13 @@ class CopyFiles(multiprocessing.Process):
                     return None
                 
                 source = gio.File(path=rpd_file.full_file_name)
+                
+                #generate temporary name 5 digits long, no extension
+                temp_name = ''.join(random.choice(filename_characters) for i in xrange(5))
+                
                 temp_full_file_name = os.path.join(
                                     self._get_dest_dir(rpd_file.file_type), 
-                                    rpd_file.name)
+                                    temp_name)
                 rpd_file.temp_full_file_name = temp_full_file_name
                 dest = gio.File(path=temp_full_file_name)
                 
@@ -152,9 +171,26 @@ class CopyFiles(multiprocessing.Process):
                 # succeeded or not. It's neccessary to keep the user informed.
                 self.total_downloaded += rpd_file.size
                 
+                # copy THM (video thumbnail file) if there is one
+                if copy_succeeded and rpd_file.thm_full_name:
+                    source = gio.File(path=rpd_file.thm_full_name)
+                    # reuse video's file name
+                    temp_thm_full_name = temp_full_file_name + '__rpd__thm'
+                    dest = gio.File(path=temp_thm_full_name)
+                    try:
+                        source.copy(dest, self.thm_progress_callback, cancellable=self.cancel_copy)
+                        rpd_file.temp_thm_full_name = temp_thm_full_name
+                        logger.debug("Copied video THM file %s", rpd_file.temp_thm_full_name)
+                    except gio.Error, inst:
+                        logger.error("Failed to download video THM file: %s", rpd_file.thm_full_name)
+                else:
+                    temp_thm_full_name = None
+                        
+                
                 if copy_succeeded and rpd_file.generate_thumbnail:
                     thumbnail, thumbnail_icon = self.thumbnail_maker.get_thumbnail(
                                     temp_full_file_name,
+                                    temp_thm_full_name,
                                     rpd_file.file_type,
                                     (160, 120), (100,100))
                 else:
@@ -163,10 +199,19 @@ class CopyFiles(multiprocessing.Process):
                 
                 if rpd_file.metadata is not None:
                     rpd_file.metadata = None
-                    
-                self.results_pipe.send((rpdmp.CONN_PARTIAL, (rpdmp.MSG_FILE, 
-                    (copy_succeeded, rpd_file, i + 1, temp_full_file_name, 
-                     thumbnail_icon, thumbnail))))
+                
+                
+                download_count = i + 1
+                if self.modify_files_during_download and copy_succeeded:
+                    copy_finished = download_count == self.no_files
+                        
+                    self.modify_pipe.send((rpd_file, download_count, temp_full_file_name, 
+                        thumbnail_icon, thumbnail, copy_finished))
+                else:
+                    self.results_pipe.send((rpdmp.CONN_PARTIAL, (rpdmp.MSG_FILE, 
+                        (copy_succeeded, rpd_file, download_count,
+                         temp_full_file_name, 
+                         thumbnail_icon, thumbnail))))
                     
             
         self.results_pipe.send((rpdmp.CONN_COMPLETE, None))
