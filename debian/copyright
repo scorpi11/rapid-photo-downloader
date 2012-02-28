@@ -1,4 +1,4 @@
-Format: http://anonscm.debian.org/viewvc/dep/web/deps/dep5.mdwn?revision=174
+Format: http://www.debian.org/doc/packaging-manuals/copyright-format/1.0/
 Upstream-Name: Rapid Photo Downloader
 Upstream-Contact: Damon Lynch <damonlynch@gmail.com>
 Source: https://launchpad.net/rapid
@@ -59,3 +59,4 @@ License: GPL-2+
  .
  On Debian systems, the complete text of the GNU General Public
  License can be found in the file `/usr/share/common-licenses/GPL-2'.
+
