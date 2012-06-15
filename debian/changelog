@@ -1,8 +1,9 @@
-rapid-photo-downloader (0.4.3-2) unstable; urgency=low
+rapid-photo-downloader (0.4.4-1) unstable; urgency=low
 
+  * New upstream release (Closes: #677539)
   * Update DEP-5 URI to the final location 
 
- -- Julien Valroff <julien@debian.org>  Tue, 28 Feb 2012 18:46:41 +0100
+ -- Julien Valroff <julien@debian.org>  Fri, 15 Jun 2012 07:44:06 +0200
 
 rapid-photo-downloader (0.4.3-1) unstable; urgency=low
 
