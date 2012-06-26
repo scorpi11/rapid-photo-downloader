@@ -1,3 +1,9 @@
+rapid-photo-downloader (0.4.5-1) UNRELEASED; urgency=low
+
+  * New upstream release
+
+ -- Julien Valroff <julien@debian.org>  Tue, 26 Jun 2012 20:47:29 +0200
+
 rapid-photo-downloader (0.4.4-1) unstable; urgency=low
 
   * New upstream release (Closes: #677539)
