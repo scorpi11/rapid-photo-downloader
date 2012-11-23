@@ -15,6 +15,7 @@ Package: rapid-photo-downloader
 Architecture: all
 Depends: ${python:Depends},
          ${misc:Depends}, 
+         python-dbus,
          python-gtk2 (>= 2.12),
          python-glade2 (>= 2.17),
          python-gconf (>= 2.28),

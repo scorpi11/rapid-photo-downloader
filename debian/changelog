@@ -1,3 +1,9 @@
+rapid-photo-downloader (0.4.5-2) unstable; urgency=low
+
+  * Depends on python-dbus (Closes: #693753) 
+
+ -- Julien Valroff <julien@debian.org>  Fri, 23 Nov 2012 06:36:06 +0100
+
 rapid-photo-downloader (0.4.5-1) unstable; urgency=low
 
   * New upstream release
