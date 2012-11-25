@@ -26,6 +26,7 @@ Depends: ${python:Depends},
          librsvg2-common (>= 2.26),
          gnome-icon-theme,
          libimage-exiftool-perl,
+         exiv2,
          exiftran
 Recommends: python-kaa-metadata,
             python-hachoir-metadata,

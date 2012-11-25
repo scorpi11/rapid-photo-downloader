@@ -1,3 +1,9 @@
+rapid-photo-downloader (0.4.5-3) unstable; urgency=low
+
+  * Add dependency on exiv2 (thanks to Damon Lynch for spotting this) 
+
+ -- Julien Valroff <julien@debian.org>  Sun, 25 Nov 2012 09:37:56 +0100
+
 rapid-photo-downloader (0.4.5-2) unstable; urgency=low
 
   * Depends on python-dbus (Closes: #693753) 
