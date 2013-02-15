@@ -1,3 +1,38 @@
+Version 0.4.6
+-------------
+
+2013-01-22
+
+Fixed bug #1083756: Application shows duplicate sources.
+Fixed bug #1093330: Photo rename ignores SubSeconds when 00.
+
+Added extra debugging output to help trace program execution progress.
+
+Updated German and Spanish translations.
+
+Version 0.4.6 Beta 1
+-------------
+
+2012-11-26
+
+Fixed bug #1023586: Added RAW file support for Nikon NRW files. Rapid Photo
+Downloader uses the exiv2 program to read a photo's metadata. Although the NRW
+format is not officially supported by exiv2, it appears to work. If you have
+NRW files and Rapid Photo Downloader crashes while reading this files, please 
+file a bug report.
+
+Preliminary and tentative fix for bug #1025908: Application freezes under
+Ubuntu 12.10. This fix should not be considered final, and needs further 
+testing.
+
+Added Arabic translation. Updated Czech, Danish, French, Italian, Norwegian, 
+Russian, Serbian, Spanish and Swedish translations.
+
+Fixed missing dependencies on python-dbus and exiv2 in Debian/control file.
+
+Added extra debugging output to help trace program execution progress.
+
+
 Version 0.4.5
 -------------
 
@@ -112,6 +147,8 @@ unresponsive. The program now queries the user before commencing this scan to
 confirm if this is really what they want to do.
 
 Fixed bug #792228: clear all thumbnails when refresh command issued.
+
+Fixed bug #890949: Panasonic MOD format and duplicate filename issue
 
 Fixed a bug where the device progress bar would occasionally disappear when 
 the download device was changed. 
