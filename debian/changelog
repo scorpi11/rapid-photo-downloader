@@ -1,3 +1,9 @@
+rapid-photo-downloader (0.4.6-1) UNRELEASED; urgency=low
+
+  * New upstream release
+
+ -- Julien Valroff <julien@debian.org>  Fri, 15 Feb 2013 18:54:40 +0100
+
 rapid-photo-downloader (0.4.5-3) unstable; urgency=low
 
   * Add dependency on exiv2 (thanks to Damon Lynch for spotting this) 
