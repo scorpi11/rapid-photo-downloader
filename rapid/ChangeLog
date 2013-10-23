@@ -1,3 +1,30 @@
+Version 0.4.7
+-------------
+
+2013-10-19
+
+Added feature to download audio files that are associated with photos such as
+those created by the Canon 1D series of cameras.
+
+Fixed bug #1242119: Choosing a new folder does not work in Ubuntu 13.10. In
+Ubuntu 13.10, choosing a destination or source folder from its bookmark does not
+work. The correct value is displayed in the file chooser button, but this value
+is not used by Rapid Photo Downloader.
+
+Fixed bug #1206853: Crashes when system message notifications not functioning
+properly.
+
+Fixed bug #909405: Allow selections by row (and not GTK default by square) when
+user is dragging the mouse or using the keyboard to select. Thank you to
+user 'Salukibob' for the patch.
+
+Added a KDE Solid action. Solid is KDE4's hardware-related framework. It detects
+when the user connects a new device and display a list of related actions.
+Thanks to dju` for the patch.
+
+Added Belarusian translation -- thanks go to Ilya Tsimokhin. Updated Swedish and 
+Ukrainian translations.
+
 Version 0.4.6
 -------------
 
@@ -11,7 +38,7 @@ Added extra debugging output to help trace program execution progress.
 Updated German and Spanish translations.
 
 Version 0.4.6 Beta 1
--------------
+--------------------
 
 2012-11-26
 
