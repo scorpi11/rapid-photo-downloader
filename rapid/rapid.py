@@ -54,6 +54,8 @@ logger = log_to_stderr()
 
 import rpdfile
 
+from misc import get_folder_selection
+
 import problemnotification as pn
 import thumbnail as tn
 import rpdmultiprocessing as rpdmp
@@ -343,7 +345,10 @@ class DeviceCollection(gtk.TreeView):
 
                 n = pynotify.Notification(title, message)
                 n.set_icon_from_pixbuf(self.parent_app.application_icon)
-                n.show()
+                try:
+                    n.show()
+                except:
+                    logger.error("Unable to display message using notification system")
 
 
 def create_cairo_image_surface(pil_image, image_width, image_height):
@@ -627,6 +632,20 @@ class ThumbnailDisplay(gtk.IconView):
         self.liststore.set_sort_column_id(self.TIMESTAMP_COL, gtk.SORT_ASCENDING)
 
     def on_selection_changed(self, iconview):
+        """
+        Allow selections by row (and not GTK default by square) when user is
+        dragging the mouse or using the keyboard to select
+        """
+        selections = self.get_selected_items()
+        if len(selections) > 1:
+            previous_sel = selections[0][0] + 1
+            # seleted items list always starts with the highest selected item
+            for selection in selections:
+                current_sel = selection[0]
+                if current_sel <> (previous_sel-1):
+                    for i in range(previous_sel-1, current_sel, -1):
+                        self.select_path(i)
+                previous_sel = current_sel
         self._selected_items = self.get_selected_items()
 
     def on_checkbutton_toggled(self, cellrenderertoggle, path):
@@ -1838,7 +1857,7 @@ class RapidApp(dbus.service.Object):
                     if path:
                         if (path in self.prefs.device_blacklist and
                                     self.search_for_PSD()):
-                            logger.info("%s ignored", mount.get_name())
+                            logger.info("blacklisted device %s ignored", mount.get_name())
                         else:
                             logger.info("Detected %s", mount.get_name())
                             is_backup_mount, backup_file_type = self.check_if_backup_mount(path)
@@ -2807,7 +2826,10 @@ class RapidApp(dbus.service.Object):
             n = pynotify.Notification(notification_name, message)
             n.set_icon_from_pixbuf(icon)
 
-            n.show()
+            try:
+                n.show()
+            except:
+                logger.error("Unable to display message using notification system")
 
     def notify_download_complete(self):
         if self.display_summary_notification:
@@ -2859,7 +2881,10 @@ class RapidApp(dbus.service.Object):
             if use_pynotify:
                 n = pynotify.Notification(PROGRAM_NAME, message)
                 n.set_icon_from_pixbuf(self.application_icon)
-                n.show()
+                try:
+                    n.show()
+                except:
+                    logger.error("Unable to display message using notification system")
             self.display_summary_notification = False # don't show it again unless needed
 
 
@@ -3373,6 +3398,10 @@ class RapidApp(dbus.service.Object):
         self._set_to_toolbar_values()
         self.to_photo_filechooser_button.connect("selection-changed",
                         self.on_to_photo_filechooser_button_selection_changed)
+        #~ self.to_photo_filechooser_button.connect("file-set",
+                        #~ self.on_to_photo_filechooser_button_file_set)
+        #~ self.to_photo_filechooser_button.connect("current-folder-changed",
+                        #~ self.on_to_photo_filechooser_button_current_folder_changed)
         self.to_video_filechooser_button.connect("selection-changed",
                         self.on_to_video_filechooser_button_selection_changed)
         self.dest_toolbar.show_all()
@@ -3426,17 +3455,28 @@ class RapidApp(dbus.service.Object):
 
     def on_from_filechooser_button_selection_changed(self, filechooserbutton):
         logger.debug("on_from_filechooser_button_selection_changed")
-        path = filechooserbutton.get_current_folder()
+        path = get_folder_selection(filechooserbutton)
         if path and not self.rerun_setup_available_image_and_video_media:
             self.prefs.device_location = path
 
+    def on_from_filechooser_button_file_set(self, button):
+        logger.debug("on_from_filechooser_button_file_set")
+
+    def on_to_photo_filechooser_button_file_set(self, filechooserbutton):
+        logger.debug("on_to_filechooser_button_file_set")
+
     def on_to_photo_filechooser_button_selection_changed(self, filechooserbutton):
-        path = filechooserbutton.get_current_folder()
+        logger.debug("on_to_filechooser_button_selection_changed")
+        path = get_folder_selection(filechooserbutton)
+        #~ logger.debug("Path: %s", path)
         if path:
             self.prefs.download_folder = path
 
+    def on_to_photo_filechooser_button_current_folder_changed(self, filechooserbutton):
+        logger.debug("on_to_photo_filechooser_button_current_folder_changed")
+
     def on_to_video_filechooser_button_selection_changed(self, filechooserbutton):
-        path = filechooserbutton.get_current_folder()
+        path = get_folder_selection(filechooserbutton)
         if path:
             self.prefs.video_download_folder = path
 

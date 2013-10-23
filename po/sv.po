@@ -8,14 +8,14 @@ msgstr ""
 "Project-Id-Version: rapid\n"
 "Report-Msgid-Bugs-To: FULL NAME <EMAIL@ADDRESS>\n"
 "POT-Creation-Date: 2012-06-23 04:00-0500\n"
-"PO-Revision-Date: 2012-11-09 01:10+0000\n"
-"Last-Translator: Mikael Hiort af Ornäs <lakritslemmel@hotmail.com>\n"
+"PO-Revision-Date: 2013-05-27 23:14+0000\n"
+"Last-Translator: Joachim Johansson <Unknown>\n"
 "Language-Team: Swedish <sv@li.org>\n"
 "MIME-Version: 1.0\n"
 "Content-Type: text/plain; charset=UTF-8\n"
 "Content-Transfer-Encoding: 8bit\n"
-"X-Launchpad-Export-Date: 2012-11-26 19:04+0000\n"
-"X-Generator: Launchpad (build 16309)\n"
+"X-Launchpad-Export-Date: 2013-08-26 05:21+0000\n"
+"X-Generator: Launchpad (build 16738)\n"
 
 #. Translators: if neccessary, for guidance in how to translate this program, you may see http://damonlynch.net/translate.html
 #: rapid/rapid.py:112 rapid/rapid.py:1784 rapid/glade3/rapid.ui.h:1
@@ -79,19 +79,19 @@ msgstr "filsystemets rotmapp"
 #: rapid/rapid.py:1786
 #, python-format
 msgid "Downloading from %(location)s."
-msgstr "Laddar ner från %(location)s."
+msgstr "För över från %(location)s."
 
 #: rapid/rapid.py:1787
 msgid ""
 "Do you really want to download from here? On some systems, scanning this "
 "location can take a very long time."
 msgstr ""
-"Vill du verkligen ladda ner härifrån? På vissa filsystem kan det ta väldigt "
-"lång tid att scanna den här platsen."
+"Vill du verkligen föra över härifrån? På vissa filsystem kan det ta väldigt "
+"lång tid att söka av den här platsen."
 
 #: rapid/rapid.py:2209
 msgid "Download"
-msgstr "Hämta"
+msgstr "Starta överföringen"
 
 #: rapid/rapid.py:2212
 msgid "Pause"
@@ -114,7 +114,7 @@ msgid ""
 "This download folder is invalid:\n"
 "%s"
 msgstr ""
-"Denna mapp är ogiltig:\n"
+"Denna nedladdningsmapp är ogiltig:\n"
 "%s"
 
 #: rapid/rapid.py:2321
@@ -123,16 +123,16 @@ msgstr "Kan inte fortsätta överföringen"
 
 #: rapid/rapid.py:2700
 msgid "About 1 second remaining"
-msgstr "Cirka en sekund återstår"
+msgstr "Ungefär en sekund återstår"
 
 #: rapid/rapid.py:2702
 #, python-format
 msgid "About %i seconds remaining"
-msgstr "Cirka %i sekunder återstår"
+msgstr "Ungefär %i sekunder återstår"
 
 #: rapid/rapid.py:2704
 msgid "About 1 minute remaining"
-msgstr "Cirka en minut återstår"
+msgstr "Ungefär en minut återstår"
 
 #. Translators: in the text '%(minutes)i:%(seconds)02i', only the : should be translated, if needed.
 #. '%(minutes)i' and '%(seconds)02i' should not be modified or left out. They are used to format and display the amount
@@ -152,12 +152,12 @@ msgstr "bilder eller filmer"
 
 #: rapid/rapid.py:2736 rapid/rapid.py:3558 rapid/rpdfile.py:128
 msgid "videos"
-msgstr "video"
+msgstr "filmer"
 
 #: rapid/rapid.py:2738 rapid/preferencesdialog.py:1620 rapid/rpdfile.py:130
 #: rapid/rpdfile.py:291
 msgid "video"
-msgstr "video"
+msgstr "film"
 
 #: rapid/rapid.py:2741 rapid/rapid.py:3556 rapid/rpdfile.py:133
 msgid "photos"
@@ -185,7 +185,7 @@ msgstr "varningar"
 
 #: rapid/rapid.py:2786
 msgid "All downloads complete"
-msgstr "Alla överföringar klara"
+msgstr "Alla överföringar är färdiga"
 
 #: rapid/rapid.py:2792 rapid/rapid.py:2801 rapid/rapid.py:2810
 #: rapid/rapid.py:2819 rapid/rapid.py:2827
@@ -196,12 +196,12 @@ msgstr "%(number)s %(numberdownloaded)s"
 #: rapid/rapid.py:2794 rapid/rapid.py:2812
 #, python-format
 msgid "%(filetype)s downloaded"
-msgstr "%(filetype)s hämtade"
+msgstr "%(filetype)s överfördes"
 
 #: rapid/rapid.py:2803 rapid/rapid.py:2821
 #, python-format
 msgid "%(filetype)s failed to download"
-msgstr "%(filetype)s gick inte att hämta"
+msgstr "%(filetype)s gick inte att föra över"
 
 #. e.g.: 3 of 205 photos and videos (202 remaining)
 #: rapid/rapid.py:2860
@@ -226,7 +226,7 @@ msgstr "Upptäck automatiskt"
 #: rapid/rapid.py:3234 rapid/preferencesdialog.py:1327
 #, python-format
 msgid "Select a folder containing %(file_types)s"
-msgstr "Välj en katalog innehållande %(file_types)s"
+msgstr "Välj en mapp innehållande %(file_types)s"
 
 #: rapid/rapid.py:3275
 msgid "Copy"
@@ -246,7 +246,7 @@ msgstr "Bilder:"
 
 #: rapid/rapid.py:3320 rapid/preferencesdialog.py:1164
 msgid "Select a folder to download photos to"
-msgstr "Välj en katalog att överföra bilder till"
+msgstr "Välj en mapp att överföra bilder till"
 
 #: rapid/rapid.py:3332 rapid/rapid.py:3986
 msgid "Videos:"
@@ -270,7 +270,7 @@ msgstr "Använder enhet för säkerhetskopiering"
 
 #: rapid/rapid.py:3535
 msgid "No backup devices detected"
-msgstr "Inga enheter för säkerhetskopiering hittades"
+msgstr "Hittade inga enheter för säkerhetskopiering"
 
 #: rapid/rapid.py:3562
 msgid "Free space:"
@@ -329,7 +329,7 @@ msgstr "Säkerhetskopierar till %(path)s"
 #: rapid/rapid.py:3608
 #, python-format
 msgid "Backing up photos to %(path)s and videos to %(path2)s"
-msgstr "Säkerhetskopierar bolder till %(path)s och videor till %(path2)s"
+msgstr "Säkerhetskopierar bilder till %(path)s och filmer till %(path2)s"
 
 #: rapid/rapid.py:3615
 #, python-format
@@ -370,7 +370,7 @@ msgstr "%(file_type)s nedladdningsmapp är inte skrivbar"
 
 #: rapid/rapid.py:3894
 msgid "Thumbnails"
-msgstr "Miniatyrer"
+msgstr "Miniatyrbilder"
 
 #. Translators: this text is displayed to the user when they request information on the command line options.
 #. The text %default should not be modified or left out.
@@ -380,29 +380,29 @@ msgid ""
 "display program information on the command line as the program runs "
 "(default: %default)"
 msgstr ""
-"visa programinformation på kommandoraden när programmet körs (standardvärde: "
+"visa programinformation i kommandoraden när programmet körs (default: "
 "%default)"
 
 #: rapid/rapid.py:3950
 msgid "display debugging information when run from the command line"
-msgstr "visa debuginformation när programmet körs från kommandorad"
+msgstr "visa debug-information när programmet körs från kommandoraden"
 
 #: rapid/rapid.py:3951
 msgid "only output errors to the command line"
-msgstr "Visa fel endast på kommandoraden"
+msgstr "visa fel endast på kommandoraden"
 
 #. image file extensions are recognized RAW files plus TIFF and JPG
 #: rapid/rapid.py:3953
 msgid "list photo and video file extensions the program recognizes and exit"
-msgstr "lista filändelser som programmet stödjer och avsluta"
+msgstr "visa de filändelser som programmet stödjer och avsluta"
 
 #: rapid/rapid.py:3955
 msgid ""
 "automatically detect devices from which to download, overwriting existing "
 "program preferences"
 msgstr ""
-"identifiera automatiskt enheter att hämta objekt från och ersätt därmed "
-"befintliga programinställningar"
+"upptäck automatiskt enheter att hämta objekt från och ersätt de nuvarande "
+"programinställningarna"
 
 #: rapid/rapid.py:3956
 msgid ""
@@ -410,7 +410,7 @@ msgid ""
 "existing program preferences"
 msgstr ""
 "ange SÖKVÄGEN manuellt till den enhet från vilken du önskar hämta objekt och "
-"ersätt därmed befintliga programinställningar"
+"ersätt de nuvarande programinställningarna"
 
 #: rapid/rapid.py:3957
 msgid "reset all program settings and preferences and exit"
@@ -421,8 +421,8 @@ msgid ""
 "Error: specify device auto-detection or manually specify a device's path "
 "from which to download, but do not do both."
 msgstr ""
-"Fel: Aktivera antingen automatisk identifiering av enheter eller ange en "
-"enhetssökväg manuellt. Du kan inte välja båda."
+"Fel: Aktivera antingen automatisk upptäckt av enheter eller ange en sökvägen "
+"manuellt. Du kan inte välja båda."
 
 #: rapid/rapid.py:3991
 #, python-format
@@ -440,7 +440,7 @@ msgstr "Fel vid säkerhetskopiering"
 #: rapid/backupfile.py:159
 #, python-format
 msgid "Destination directory could not be created: %(directory)s\n"
-msgstr "Målplatsen kunde inte skapas: %(directory)s\n"
+msgstr "Målmappen kunde inte skapas: %(directory)s\n"
 
 #: rapid/backupfile.py:161 rapid/backupfile.py:182 rapid/subfolderfile.py:199
 #, python-format
@@ -474,7 +474,7 @@ msgstr "Enhet hittad"
 #: rapid/device.py:89
 msgid ""
 "Should this device or partition be used to download photos or videos from?"
-msgstr "Skall denna enhet användas för bild- eller filmöverföring?"
+msgstr "Skall denna enhet användas för bild- och filmöverföring?"
 
 #. Translators: for an explanation of what this means, see http://damonlynch.net/rapid/documentation/index.html#usedeviceprompt
 #: rapid/device.py:108
@@ -529,7 +529,7 @@ msgstr "Igår"
 #. Translators: Download time is the time and date that the download started (when the user clicked the Download button)
 #: rapid/generatenameconfig.py:163
 msgid "Download time"
-msgstr "Nedladdningstid"
+msgstr "Nedladdningsögonblick"
 
 #. Translators: for an explanation of what this means, see http://damonlynch.net/rapid/documentation/index.html#renamefilename
 #: rapid/generatenameconfig.py:165
@@ -568,7 +568,7 @@ msgstr "ISO"
 #. Translators: for an explanation of what this means, see http://damonlynch.net/rapid/documentation/index.html#renamemetadata
 #: rapid/generatenameconfig.py:178
 msgid "Exposure time"
-msgstr "Bländartid"
+msgstr "Exponeringstid"
 
 #. Translators: for an explanation of what this means, see http://damonlynch.net/rapid/documentation/index.html#renamemetadata
 #: rapid/generatenameconfig.py:180
@@ -627,7 +627,7 @@ msgstr "Ägarens namn"
 
 #: rapid/generatenameconfig.py:201
 msgid "Codec"
-msgstr "Kodek"
+msgstr "Avkodare"
 
 #: rapid/generatenameconfig.py:202
 msgid "Width"
@@ -749,7 +749,7 @@ msgstr "Sju siffror"
 #. Translators: for an explanation of what this means, see http://damonlynch.net/rapid/documentation/index.html#renamedateandtime
 #: rapid/generatenameconfig.py:242
 msgid "Subseconds"
-msgstr "Sekunder"
+msgstr "Sekunddelar"
 
 #. Translators: for an explanation of what this means, see http://damonlynch.net/rapid/documentation/index.html#renamedateandtime
 #: rapid/generatenameconfig.py:244
@@ -864,17 +864,17 @@ msgstr "SS"
 #: rapid/preferencesdialog.py:374
 #, python-format
 msgid "Subfolder preferences should not start with a %s"
-msgstr "Inställningen för underkataloger skall inte börja med %s"
+msgstr "Inställningen för undermappar ska inte börja med %s"
 
 #: rapid/preferencesdialog.py:376
 #, python-format
 msgid "Subfolder preferences should not end with a %s"
-msgstr "Inställning för underkatalog skall inte börja med %s"
+msgstr "Inställningen för undermappen ska inte börja med %s"
 
 #: rapid/preferencesdialog.py:380
 #, python-format
 msgid "Subfolder preferences should not contain two %s one after the other"
-msgstr "Inställning för underkatalog skall inte innehålla två %s i rad"
+msgstr "Inställningen för undermappen ska inte innehålla två %s i rad"
 
 #: rapid/preferencesdialog.py:439 rapid/preferencesdialog.py:700
 msgid "Remove all Job Codes?"
@@ -924,12 +924,12 @@ msgstr "Ange fototillfälle"
 #. Translators: for an explanation of what this means, see http://damonlynch.net/rapid/documentation/index.html#jobcode
 #: rapid/preferencesdialog.py:758
 msgid "Enter a new Job Code, or select a previous one"
-msgstr "Skriv ett nytt jobbnummer, eller välj ett föregående"
+msgstr "Ange ett nytt fototillfälle, eller välj något av de tidigare"
 
 #. Translators: for an explanation of what this means, see http://damonlynch.net/rapid/documentation/index.html#jobcode
 #: rapid/preferencesdialog.py:761
 msgid "Enter a new Job Code"
-msgstr "Ange nytt jobbnamn"
+msgstr "Ange ett nytt fototillfälle"
 
 #: rapid/preferencesdialog.py:766
 msgid "Job Code:"
@@ -950,15 +950,15 @@ msgstr "Sökväg:"
 
 #: rapid/preferencesdialog.py:1082
 msgid "Job Code"
-msgstr "Jobbnamn"
+msgstr "Fototillfälle"
 
 #: rapid/preferencesdialog.py:1353
 msgid "Select a folder in which to backup photos"
-msgstr "Välj en plats för att säkerhetskopiera bilder"
+msgstr "Välj den mapp där du vill säkerhetskopiera bilderna"
 
 #: rapid/preferencesdialog.py:1366
 msgid "Select a folder in which to backup videos"
-msgstr "Välj en plats för att säkerhetskopiera videor"
+msgstr "Välj den mapp där du vill säkerhetskopiera filmerna"
 
 #. Translators: please do not modify or leave out html formatting tags like <i> and <b>. These are used to format the text the users sees
 #: rapid/preferencesdialog.py:1461
@@ -966,16 +966,16 @@ msgid ""
 "<i><b>Warning:</b> There is insufficient metadata to fully generate the "
 "name. Please use other renaming options.</i>"
 msgstr ""
-"<i><b>Varning:</b> Det saknas metadata för att namnge. Var god välj andra "
-"inställningar för namngivning.</i>"
+"<i><b>Varning:</b> Metadata saknas för att namnge filerna. Ändra "
+"namngivningsinställningarna.</i>"
 
 #: rapid/preferencesdialog.py:1512
 msgid ""
 "<i><b>Warning:</b> There is insufficient metadata to fully generate "
 "subfolders. Please use other subfolder naming options.</i>"
 msgstr ""
-"<i><b>Varning:</b> Det finns inte tillräckligt med metadata för att skapa "
-"underkataloger. Välj andra inställningar för att namnge underkataloger.</i>"
+"<i><b>Varning:</b>Metadata saknas för att namnge undermappar. Ändra "
+"namngivningsinställningarna.</i>"
 
 #. Translators: you should not modify or leave out the %s. This is a code used by the programming language python to insert a value that thes user will see
 #: rapid/preferencesdialog.py:1515
@@ -991,7 +991,7 @@ msgid ""
 "used.\n"
 "They will be reset to their default values."
 msgstr ""
-"Underkatalog för %(filetype)s har felaktiga inställningar som inte kan "
+"Undermappen för %(filetype)s har felaktiga inställningar som inte kan "
 "användas.\n"
 "Återställer till standardvärden."
 
@@ -1002,7 +1002,7 @@ msgid ""
 "you correct them:\n"
 " %s"
 msgstr ""
-"Följande reguljära uttryck är ogiltiga, och kommer att tas bort om du inte "
+"Följande reguljära uttryck är ogiltiga och kommer att tas bort om du inte "
 "ändrar dem:\n"
 " %s"
 
@@ -1013,7 +1013,7 @@ msgid ""
 "it:\n"
 " %s"
 msgstr ""
-"Detta reguljära uttryck är ogiltigt, och kommer att tas bort om du inte "
+"Detta reguljära uttryck är ogiltigt och kommer att tas bort om du inte "
 "ändrar det:\n"
 " %s"
 
@@ -1093,7 +1093,7 @@ msgstr "Warszawa"
 
 #: rapid/prefsrapid.py:131
 msgid "Jakarta"
-msgstr "Djakarta"
+msgstr "Jakarta"
 
 #: rapid/prefsrapid.py:131
 msgid "Madrid"
@@ -1106,16 +1106,16 @@ msgstr "Stockholm"
 #. components
 #: rapid/problemnotification.py:27 rapid/subfolderfile.py:358
 msgid "subfolder"
-msgstr "Underkatalog"
+msgstr "Undermapp"
 
 #: rapid/problemnotification.py:28 rapid/subfolderfile.py:356
 msgid "filename"
-msgstr "Filnamn"
+msgstr "filnamn"
 
 #: rapid/problemnotification.py:81
 #, python-format
 msgid "Date time value %s appears invalid."
-msgstr "Datum/tid-värde %s verkar ogiltigt."
+msgstr "Datum/tid-värdet %s verkar vara ogiltigt."
 
 #: rapid/problemnotification.py:82
 msgid "Filename does not have an extension."
@@ -1135,7 +1135,7 @@ msgstr "Ett fel uppstod när nummer %s skulle skapas."
 #: rapid/problemnotification.py:87
 #, python-format
 msgid "%(filetype)s metadata cannot be read"
-msgstr "Metadata i %(filetype)s kan inte läsas."
+msgstr "Metadata i %(filetype)s kan inte avläsas."
 
 #: rapid/problemnotification.py:89
 #, python-format
@@ -1167,7 +1167,7 @@ msgid ""
 "%(image1)s was taken on %(image1_date)s at %(image1_time)s, and %(image2)s "
 "on %(image2_date)s at %(image2_time)s."
 msgstr ""
-"%(image1)s togs den %(image1_date)s kl %(image1_time)s, och %(image2)s den "
+"%(image1)s togs den %(image1_date)s kl %(image1_time)s och %(image2)s den "
 "%(image2_date)s kl %(image2_time)s."
 
 #: rapid/problemnotification.py:104
@@ -1202,13 +1202,13 @@ msgstr "Fel: %(errorno)s %(strerror)s"
 
 #: rapid/problemnotification.py:202
 msgid "The metadata might be corrupt."
-msgstr "Metadatan kan vara korrupt."
+msgstr "Metadatan kan vara skadad."
 
 #: rapid/problemnotification.py:205
 msgid ""
 "The filename, extension and Exif information indicate it has already been "
 "downloaded."
-msgstr "Filnamnet, filändelsen och Exif-informationen har redan överförts."
+msgstr "Filnamnet, filändelsen och exif-informationen har redan överförts."
 
 #: rapid/problemnotification.py:224
 #, python-format
@@ -1237,24 +1237,21 @@ msgid ""
 "Photos detected with the same filenames, but taken at different times: "
 "%(details)s"
 msgstr ""
-"Hittade bilder med samma filnamn, fast tagna vid olika tillfällen: "
-"%(details)s"
+"Hittade bilder med samma filnamn tagna vid olika tillfällen: %(details)s"
 
 #: rapid/problemnotification.py:258
 #, python-format
 msgid "An error occurred when backing up on %(volume)s: %(inst)s."
-msgstr ""
-"Ett fel uppstod när säkerhetskopia skulle tas till %(volume)s: %(inst)s."
+msgstr "Ett fel uppstod vid säkerhetskopiering till %(volume)s: %(inst)s."
 
 #: rapid/problemnotification.py:260
 #, python-format
 msgid "An error occurred when backing up on %(volume)s."
-msgstr "Ett fel uppstod när säkerhetskopia skulle tas till %(volume)s."
+msgstr "Ett fel uppstod vid säkerhetskopiering till %(volume)s."
 
 #: rapid/problemnotification.py:262
 msgid "Errors occurred when backing up on the following backup devices: "
-msgstr ""
-"Ett fel uppstod när säkerhetskopia skulle tas till följande enheter: "
+msgstr "Ett fel uppstod vid säkerhetskopiering till följande enheter: "
 
 #: rapid/problemnotification.py:266 rapid/problemnotification.py:314
 #, python-format
@@ -1279,45 +1276,45 @@ msgstr "%(volumes)s och %(volume)s."
 #: rapid/problemnotification.py:285
 #, python-format
 msgid "Backup already exists on %(volume)s."
-msgstr "Säkerhetskopia finns redan på %(volume)s."
+msgstr "En säkerhetskopia finns redan på %(volume)s."
 
 #: rapid/problemnotification.py:287
 msgid "Backups already exist in these locations: "
-msgstr "Säkerhetskopia finns redan i: "
+msgstr "En säkerhetskopia finns redan i: "
 
 #: rapid/problemnotification.py:297
 #, python-format
 msgid "Backup overwritten on %(volume)s."
-msgstr "Säkerhetskopia skrevs över på %(volume)s."
+msgstr "Den befintliga säkerhetskopian skrevs över på %(volume)s."
 
 #: rapid/problemnotification.py:299
 msgid "Backups overwritten on these devices: "
-msgstr "Säkerhetskopia skrevs över i: "
+msgstr "Den befintliga säkerhetskopian skrevs över på: "
 
 #: rapid/problemnotification.py:310
 #, python-format
 msgid "An error occurred when creating directories on %(volume)s: %(inst)s."
-msgstr "Ett fel uppstod när kataloger skulle skapas på %(volume)s: %(inst)s."
+msgstr "Ett fel uppstod när mappar skulle skapas på %(volume)s: %(inst)s."
 
 #: rapid/problemnotification.py:312
 msgid ""
 "Errors occurred when creating directories on the following backup devices: "
-msgstr "Ett fel uppstod när kataloger skulle skapas på följande enheter: "
+msgstr "Ett fel uppstod när mappar skulle skapas på följande enheter: "
 
 #: rapid/problemnotification.py:323
 #, python-format
 msgid "%(previousproblem)s Additionally, %(newproblem)s"
-msgstr "%(previousproblem)s Mer problem därtill, %(newproblem)s"
+msgstr "%(previousproblem)s Dessutom, %(newproblem)s"
 
 #: rapid/problemnotification.py:331
 #, python-format
 msgid " Furthermore, there were %(problems)s."
-msgstr " Problem hittades %(problems)s."
+msgstr " Dessutom uppstod %(problems)s."
 
 #: rapid/problemnotification.py:333
 #, python-format
 msgid " Furthermore, there was a %(problem)s."
-msgstr " Ett problem hittades %(problem)s."
+msgstr " Dessutom uppstod %(problem)s."
 
 #: rapid/problemnotification.py:342
 #, python-format
@@ -1332,25 +1329,25 @@ msgstr "Följande metadata saknas: "
 #, python-format
 msgid "%(missing_metadata_elements)s and %(final_missing_metadata_element)s."
 msgstr ""
-"%(missing_metadata_elements)s oct %(final_missing_metadata_element)s."
+"%(missing_metadata_elements)s och %(final_missing_metadata_element)s."
 
 #: rapid/problemnotification.py:364
 msgid "Problems in subfolder and filename generation"
-msgstr "Problem med skapande av undermappar och filnamn"
+msgstr "Problem vid namngivning av undermappar och filnamn"
 
 #: rapid/problemnotification.py:366
 msgid "Problem in subfolder and filename generation"
-msgstr "Problem med skapande av undermappar och filnamn"
+msgstr "Problem vid namngivning av undermappar och filnamn"
 
 #: rapid/problemnotification.py:369
 #, python-format
 msgid "Problems in %s generation"
-msgstr "Problem med skapande av %s"
+msgstr "Problem vid namngivning av %s"
 
 #: rapid/problemnotification.py:371
 #, python-format
 msgid "Problem in %s generation"
-msgstr "Problem med skapande av %s"
+msgstr "Problem vid namngivning av %s"
 
 #: rapid/problemnotification.py:380
 #, python-format
@@ -1365,33 +1362,33 @@ msgstr ""
 
 #: rapid/problemnotification.py:402
 msgid "Multiple problems were encountered"
-msgstr "Flera fel hittades"
+msgstr "Flera fel uppstod"
 
 #: rapid/problemnotification.py:404 rapid/subfolderfile.py:233
 msgid "Photos detected with the same filenames, but taken at different times"
-msgstr "Bilder med samma filnamn hittades, fast tagna vid olika tillfällen"
+msgstr "Bilder med samma filnamn, tagna vid olika tillfällen, hittades"
 
 #: rapid/problemnotification.py:410
 msgid "there were errors backing up"
-msgstr "det uppstod fel vid säkerhetskopiering"
+msgstr "det uppstod fel vid säkerhetskopieringen"
 
 #: rapid/problemnotification.py:411
 msgid "There were errors backing up"
-msgstr "Det uppstod fel vid säkerhetskopiering"
+msgstr "Det uppstod fel vid säkerhetskopieringen"
 
 #: rapid/problemnotification.py:413
 msgid "there was an error backing up"
-msgstr "det uppstod ett fel vid säkerhetskopiering"
+msgstr "det uppstod ett fel vid säkerhetskopieringen"
 
 #: rapid/problemnotification.py:414
 msgid "There was an error backing up"
-msgstr "Det uppstod ett fel vid säkerhetskopiering"
+msgstr "Det uppstod ett fel vid säkerhetskopieringen"
 
 #. e.g.
 #: rapid/problemnotification.py:417
 #, python-format
 msgid "%(previousproblem)s, and %(backinguperror)s"
-msgstr "%(previousproblem)s, och %(backinguperror)s"
+msgstr "%(previousproblem)s och %(backinguperror)s"
 
 #: rapid/rpdfile.py:153
 #, python-format
@@ -1401,7 +1398,7 @@ msgstr "%(number)s %(filetypes)s"
 #: rapid/rpdfile.py:163
 #, python-format
 msgid "scanning (found %(photos)s photos and %(videos)s videos)..."
-msgstr "söker igenom (har hittat %(photos)s bilder och %(videos)s videor)…"
+msgstr "söker igenom (har hittat %(photos)s bilder och %(videos)s filmer)…"
 
 #: rapid/subfolderfile.py:80
 #, python-format
@@ -1423,7 +1420,7 @@ msgstr "undermapp och filnamn"
 
 #: rapid/subfolderfile.py:393
 msgid "Failed to create download subfolder"
-msgstr "Misslyckades med att skapa mapp för nedladdning"
+msgstr "Misslyckades med att skapa nedladdningmappen"
 
 #: rapid/subfolderfile.py:394
 #, python-format
@@ -1436,7 +1433,7 @@ msgstr "_Arkiv"
 
 #: rapid/glade3/rapid.ui.h:3
 msgid "Download / Pause"
-msgstr "Överföring / Paus"
+msgstr "Överför / Pausa"
 
 #: rapid/glade3/rapid.ui.h:4
 msgid "_Select"
@@ -1448,7 +1445,7 @@ msgstr "Markera alla som sakna_r fototillfälle"
 
 #: rapid/glade3/rapid.ui.h:6
 msgid "Select All Wit_h Job Code"
-msgstr "Markera alla vid ett fototillf_älle"
+msgstr "Markera alla med ett fototillf_älle"
 
 #: rapid/glade3/rapid.ui.h:7
 msgid "_View"
@@ -1504,8 +1501,7 @@ msgstr "Inställningar: Rapid Photo Downloader"
 
 #: rapid/glade3/prefs.ui.h:2
 msgid "<span weight=\"bold\" size=\"x-large\">Photo Download Folders</span>"
-msgstr ""
-"<span weight=\"bold\" size=\"x-large\">Bildöverföringskataloger</span>"
+msgstr "<span weight=\"bold\" size=\"x-large\">Bildöverföringsmapp</span>"
 
 #: rapid/glade3/prefs.ui.h:3
 msgid "<i>Example: /home/user/Pictures</i>"
@@ -1513,35 +1509,36 @@ msgstr "<i>Exempel: /home/user/Bilder</i>"
 
 #: rapid/glade3/prefs.ui.h:4
 msgid "<b>Download Subfolders</b>"
-msgstr "<b>Underkataloger till överföring</b>"
+msgstr "<b>Inkludera undermappar i överföringen</b>"
 
 #: rapid/glade3/prefs.ui.h:5
 msgid "Download folder:"
-msgstr "Katalog för överföring:"
+msgstr "Överföringsmapp:"
 
 #: rapid/glade3/prefs.ui.h:6
 msgid ""
 "Choose the download folder. Subfolders for the downloaded photos will be "
 "automatically created in this folder using the structure specified below."
 msgstr ""
-"Ange en katalog för överföring. Underkataloger kommer att skapas automatiskt "
-"enligt strukturen nedan."
+"Ange en överföringsmapp. Undermappar kommer att skapas automatiskt enligt "
+"strukturen nedan."
 
 #: rapid/glade3/prefs.ui.h:7
 msgid "<b>Download Folder</b>"
-msgstr "<b>Överföringskatalog</b>"
+msgstr "<b>Överföringsmapp</b>"
 
 #: rapid/glade3/prefs.ui.h:8
 msgid "Photo Folders"
-msgstr "Bildkataloger"
+msgstr "Bildmapp"
 
 #: rapid/glade3/prefs.ui.h:9
 msgid "<span weight=\"bold\" size=\"x-large\">Photo Rename</span>\t"
-msgstr "<span weight=\"bold\" size=\"x-large\">Bildnamngivning</span>\t"
+msgstr ""
+"<span weight=\"bold\" size=\"x-large\">Namngivning av bilder</span>\t"
 
 #: rapid/glade3/prefs.ui.h:10
 msgid "<b>Photo Rename</b>"
-msgstr "<b>Bildnamngivning</b>"
+msgstr "<b>Namngivning av bilder</b>"
 
 #: rapid/glade3/prefs.ui.h:11
 msgid " "
@@ -1561,7 +1558,7 @@ msgstr "<b>Exempel</b>"
 
 #: rapid/glade3/prefs.ui.h:15
 msgid "Photo Rename"
-msgstr "Bildnamngivning"
+msgstr "Namngivning av bilder"
 
 #: rapid/glade3/prefs.ui.h:16
 msgid "<span weight=\"bold\" size=\"x-large\">Video Download Folders</span>"
@@ -1573,34 +1570,35 @@ msgid ""
 "install either the <i>hachoir metadata</i> and <i>kaa metadata</i> packages "
 "for python, or <i>exiftool</i>."
 msgstr ""
-"Ledsen, men videohämtningsfunktionen har inaktiverats. För att hämta videor, "
-"installera antingen paketen <i>hachoir metadata</i> och <i>kaa metadata</i> "
-"för python, eller <i>exiftool</i>."
+"Ledsen, men filmhämtningsfunktionen har inaktiverats. För att föra över "
+"filmer, installera antingen paketen <i>hachoir metadata</i> och <i>kaa "
+"metadata</i> för python, eller <i>exiftool</i>."
 
 #: rapid/glade3/prefs.ui.h:18
 msgid ""
 "Choose the download folder. Subfolders for the downloaded videos will be "
 "automatically created in this folder using the structure specified below."
 msgstr ""
-"Välj katalog för överföring. Underkataloger kommer att skapas automatiskt "
-"enligt inställningarna nedan."
+"Välj överföringsmapp. Undermappar kommer att skapas automatiskt enligt "
+"strukturen nedan."
 
 #: rapid/glade3/prefs.ui.h:19
 msgid "Video Folders"
-msgstr "Filmkataloger"
+msgstr "Filmmapp"
 
 #: rapid/glade3/prefs.ui.h:20
 msgid "<span weight=\"bold\" size=\"x-large\">Video Rename</span>\t"
-msgstr "<span weight=\"bold\" size=\"x-large\">Filmnamngivning</span>\t"
+msgstr ""
+"<span weight=\"bold\" size=\"x-large\">Namngivning av filmer</span>\t"
 
 #: rapid/glade3/prefs.ui.h:21
 msgid "Video Rename"
-msgstr "Filmnamngivning"
+msgstr "Namngivning av filmer"
 
 #: rapid/glade3/prefs.ui.h:22
 msgid "<span weight=\"bold\" size=\"x-large\">Rename Options</span>"
 msgstr ""
-"<span weight=\"bold\" size=\"x-large\">Alternativ för namnbyte</span>"
+"<span weight=\"bold\" size=\"x-large\">Alternativ för namngivning</span>"
 
 #: rapid/glade3/prefs.ui.h:23
 msgid "<b>Sequence Numbers</b>"
@@ -1611,16 +1609,16 @@ msgid ""
 "Specify the time in 24 hour format at which the <i>Downloads today</i> "
 "sequence number should be reset."
 msgstr ""
-"Ange tiden i 24-timmarsformat då <i>Antal överföringar idag</i> ska "
+"Ange tiden i 24-timmarsformat då <i>Antalet överföringar idag</i> ska "
 "nollställas."
 
 #: rapid/glade3/prefs.ui.h:25
 msgid "Day start:"
-msgstr "Början på dagen:"
+msgstr "Dagen börjar:"
 
 #: rapid/glade3/prefs.ui.h:26
 msgid "Downloads today:"
-msgstr "Antal överföringar idag:"
+msgstr "Antalet överföringar idag:"
 
 #: rapid/glade3/prefs.ui.h:27
 msgid "Stored number:"
@@ -1636,7 +1634,7 @@ msgstr " hh:mm"
 
 #: rapid/glade3/prefs.ui.h:30
 msgid "Synchronize RAW + JPEG sequence numbers"
-msgstr "Synkronisera RAW och JPEG-sekvensnummer"
+msgstr "Använd samma sekvensnummer för både RAW- och JPEG-filer"
 
 #: rapid/glade3/prefs.ui.h:31
 msgid "<b>Compatibility with Other Operating Systems</b>"
@@ -1647,8 +1645,8 @@ msgid ""
 "Specify whether photo, video and folder names should have any characters "
 "removed that are not allowed by other operating systems."
 msgstr ""
-"Ange om specialtecken som inte stöds av operativsystemet ska tas bort från "
-"filnamn."
+"Ange om specialtecken som inte tillåts i andra operativsystem ska tas bort "
+"från fil- och mappnamn."
 
 #: rapid/glade3/prefs.ui.h:33
 msgid "Strip incompatible characters"
@@ -1656,7 +1654,7 @@ msgstr "Avlägsna inkompatibla tecken"
 
 #: rapid/glade3/prefs.ui.h:34
 msgid "Rename Options"
-msgstr "Inställningar för namnbyte"
+msgstr "Inställningar för namngivning"
 
 #: rapid/glade3/prefs.ui.h:35
 msgid "<span weight=\"bold\" size=\"x-large\">Job Codes</span>"
@@ -1699,13 +1697,13 @@ msgid ""
 "setting it to PTP mode. If that is not possible, a card reader must be "
 "used.</i>"
 msgstr ""
-"Du kan överföra bilder och videor från kameror, minneskort eller externa "
+"Du kan överföra bilder och filmer från kameror, minneskort eller externa "
 "enheter som t.ex hårddiskar.\n"
 "\n"
 "Du kan överföra från flera enheter samtidigt, eller ange en plats på din "
 "hårddisk.\n"
 "\n"
-"<i>Överföring direkt från kameror är en experimentell funktion. Om det "
+"<i>Överföring direkt från kameran är en experimentell funktion. Om det "
 "fungerar dåligt eller inte alls, prova att aktivera PTP läge på din kamera. "
 "Om det ändå inte fungerar måste du använda en kortläsare.</i>"
 
@@ -1728,8 +1726,8 @@ msgstr ""
 "Om du aktiverar sökning av externa enheter så kommer hela enheten att "
 "avsökas. På stora enheter kan det ta en stund.\n"
 "\n"
-"När denna inställning är påslagen och en potentiell enhet hittas, så kommer "
-"du att frågas om den ska avsökas eller ej."
+"När denna inställning är påslagen och en möjlig enhet hittas, så kommer du "
+"att tillfrågas om den ska avsökas eller ej."
 
 #: rapid/glade3/prefs.ui.h:53
 msgid "Location:"
@@ -1740,7 +1738,8 @@ msgid ""
 "If you disable automatic detection, choose the exact location of the photos "
 "and videos."
 msgstr ""
-"Om du inaktiverar automatisk sökning, ange exakt plats för bilder och videor."
+"Om du inaktiverar automatisk sökning, måste du ange exakt plats för bilder "
+"och filmer."
 
 #: rapid/glade3/prefs.ui.h:55
 msgid "<span weight=\"bold\" size=\"x-large\">Device Options</span>"
@@ -1776,7 +1775,7 @@ msgstr "Ta bo_rt alla"
 
 #: rapid/glade3/prefs.ui.h:62
 msgid "Use _python-style regular expressions"
-msgstr "Använd Python-kompatibla reguljära uttryck"
+msgstr "Använd _Python-kompatibla reguljära uttryck"
 
 #: rapid/glade3/prefs.ui.h:63
 msgid "Device Options"
@@ -1794,7 +1793,8 @@ msgstr "<b>Säkerhetskopia</b>"
 msgid ""
 "If you disable automatic detection, choose the exact backup locations."
 msgstr ""
-"Om du inaktiverar automatisk sökning, ange exakt plats för säkerhetskopior."
+"Om du inaktiverar automatisk sökning, måste du ange exakta platser för "
+"säkerhetskopiorna."
 
 #: rapid/glade3/prefs.ui.h:67
 msgid "Automatically detect backup devices"
@@ -1810,7 +1810,7 @@ msgstr ""
 
 #: rapid/glade3/prefs.ui.h:69
 msgid "Backup photos and videos when downloading"
-msgstr "Säkerhetskopiera bilder och filmer vid överföring"
+msgstr "Säkerhetskopiera bilder och filmer under överföringen"
 
 #: rapid/glade3/prefs.ui.h:70
 msgid ""
@@ -1820,9 +1820,9 @@ msgid ""
 "used for backups. For each device you wish to use for backing up to, create "
 "a folder in it with one of these names.</i>"
 msgstr ""
-"Välj i vilken katalog på enheten som används till säkerhetskopior.\n"
+"Välj i vilken mapp på enheten som används till säkerhetskopior.\n"
 "\n"
-"<i>Observera att katalogen kommer användas för att avgöra om enheten används "
+"<i>Observera att mappen kommer användas för att avgöra om enheten används "
 "till säkerhetskopior. För varje enhet du vill använda till säkerhetskopior "
 "kan du skapa en mapp med ett av dessa namn.</i>"
 
@@ -1832,7 +1832,7 @@ msgstr "Plats för säkerhetskopiering av bilder:"
 
 #: rapid/glade3/prefs.ui.h:74
 msgid "Photo backup folder name:"
-msgstr "Plats för säkerhetskopiering av bilder:"
+msgstr "Säkerhetskopieringsmapp för bilder:"
 
 #: rapid/glade3/prefs.ui.h:75
 msgid "<i>Example:</i>"
@@ -1840,11 +1840,11 @@ msgstr "<i>Exempel:</i>"
 
 #: rapid/glade3/prefs.ui.h:76
 msgid "<i>/media/externaldrive/Photos</i>"
-msgstr "<i>/media/extern_enhet/Photos</i>"
+msgstr "<i>/media/extern_enhet/Bilder</i>"
 
 #: rapid/glade3/prefs.ui.h:77
 msgid "Video backup folder name:"
-msgstr "Katalog för säkerhetskopiering av film:"
+msgstr "Säkerhetskopieringsmapp för filmer:"
 
 #: rapid/glade3/prefs.ui.h:78
 msgid "Video backup location:"
@@ -1852,7 +1852,7 @@ msgstr "Plats för säkerhetskopiering av videor:"
 
 #: rapid/glade3/prefs.ui.h:79
 msgid "Backup"
-msgstr "Säkerhetskopiering"
+msgstr "Säkerhetskopia"
 
 #: rapid/glade3/prefs.ui.h:80
 msgid "<span weight=\"bold\" size=\"x-large\">Miscellaneous</span>"
@@ -1860,23 +1860,23 @@ msgstr "<span weight=\"bold\" size=\"x-large\">Diverse</span>"
 
 #: rapid/glade3/prefs.ui.h:81
 msgid "<b>Program Automation</b>"
-msgstr "<b>Automatisering av programmet</b>"
+msgstr "<b>Automatisera programmet</b>"
 
 #: rapid/glade3/prefs.ui.h:82
 msgid "Unmount (\"eject\") device upon download completion"
-msgstr "Mata ut och avmontera enheter när överföring är klar"
+msgstr "Avmontera och mata ut enheter när överföringen är färdig"
 
 #: rapid/glade3/prefs.ui.h:83
 msgid "Start downloading at program startup"
-msgstr "Börja överföring vid programstart"
+msgstr "Påbörja överföringen när programmet startar"
 
 #: rapid/glade3/prefs.ui.h:84
 msgid "Start downloading upon device insertion"
-msgstr "Påbörja överföring när enhet sätts i"
+msgstr "Påbörja överföring när en enhet sätts i"
 
 #: rapid/glade3/prefs.ui.h:85
 msgid "Exit program when download completes"
-msgstr "Avsluta programmet när överföring är klar"
+msgstr "Avsluta programmet när överföringen är färdig"
 
 #: rapid/glade3/prefs.ui.h:86
 msgid "Exit program even if download had warnings or errors"
@@ -1892,7 +1892,7 @@ msgstr "Prestanda"
 
 #: rapid/glade3/prefs.ui.h:89
 msgid "Generate thumbnails (slower)"
-msgstr "Skapa miniatyrer (långsammare)"
+msgstr "Skapa miniatyrbilder (långsammare)"
 
 #: rapid/glade3/prefs.ui.h:90
 msgid "Miscellaneous"
@@ -1919,20 +1919,20 @@ msgid ""
 "When a photo or video of the same name has already been downloaded, choose "
 "whether to skip downloading the file, or to add a unique indentifier."
 msgstr ""
-"När en bild eller video med samma namn redan har överförts, välj om den ska "
-"skippas eller tilldelas ett unikt nummer."
+"Ange om en bild eller film med ett namn som redan finns, ska hoppas över "
+"eller tilldelas ett unikt nummer."
 
 #: rapid/glade3/prefs.ui.h:96
 msgid ""
 "When backing up, choose whether to overwrite a file on the backup device "
 "that has the same name, or skip backing it up."
 msgstr ""
-"Ange om filer som redan finns på enheten för säkerhetskopiering skall "
-"skrivas över, eller inte säkerhetskopieras."
+"Ange om en bild eller film med ett namn som redan finns på säkerhetskopian, "
+"ska hoppas över eller skrivas över."
 
 #: rapid/glade3/prefs.ui.h:97
 msgid "Overwrite"
-msgstr "Ersätt"
+msgstr "Skriv över"
 
 #: rapid/glade3/prefs.ui.h:98
 msgid "Skip"
