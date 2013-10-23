@@ -1,6 +1,7 @@
 rapid-photo-downloader (0.4.7-1) unstable; urgency=low
 
   * New upstream release
+  * Bump standard version to 3.9.4 (no changes needed) 
 
  -- Julien Valroff <julien@debian.org>  Wed, 23 Oct 2013 11:48:47 +0200
 
