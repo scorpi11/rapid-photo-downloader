@@ -9,7 +9,7 @@
     <property name="icon">rapid-photo-downloader.svg</property>
     <property name="type_hint">dialog</property>
     <property name="program_name">Rapid Photo Downloader</property>
-    <property name="copyright">Copyright Damon Lynch 2007-12</property>
+    <property name="copyright">Copyright Damon Lynch 2007-14</property>
     <property name="comments" translatable="yes">Import your photos and videos efficiently and reliably</property>
     <property name="website">http://www.damonlynch.net/rapid</property>
     <property name="license">Rapid Photo Downloader is free software; you can redistribute it and/or modify it under the terms of the GNU General Public License as published by the Free Software Foundation; either version 2 of the License, or (at your option) any later version.
@@ -21,6 +21,7 @@ You should have received a copy of the GNU General Public License along with Rap
     <property name="translator_credits">Anton Alyab'ev &lt;subeditor@dolgopa.org&gt;
 Lőrincz András &lt;level.andrasnak@gmail.com&gt;
 Michel Ange &lt;michelange@wanadoo.fr&gt;
+Adolfo Jayme Barrientos &lt;fitoschido@gmail.com&gt;
 Alain J. Baudrez &lt;a.baudrez@gmail.com&gt;
 Kevin Brubeck Unhammer &lt;unhammer@fsfe.org&gt;
 Bert &lt;crinbert@yahoo.com&gt;
@@ -31,6 +32,7 @@ Tauno Erik &lt;tauno.erik@gmail.com&gt;
 Sergiy Gavrylov &lt;sergiovana@bigmir.net&gt;
 Emanuele Grande &lt;caccolangrifata@gmail.com&gt;
 Torben Gundtofte-Bruun &lt;torben@g-b.dk&gt;
+Joachim Johansson &lt;joachim.j@gmail.com&gt;
 Miroslav Matejaš &lt;silverspace@ubuntu-hr.org&gt;
 Nicolás M. Zahlut &lt;nzahlut@live.com&gt;
 Erik M

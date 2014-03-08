@@ -1,3 +1,81 @@
+Version 0.4.10
+--------------
+
+2014-02-23
+
+Updated Catalan and Portuguese translations.
+
+Fixed bug in translations for term "Back up".
+
+
+Version 0.4.9
+-------------
+
+2014-01-21
+
+Updated Catalan and Spanish translations.
+
+Fixed occasional incorrect use of term "backup".
+
+
+Version 0.4.9 Beta 3
+--------------------
+
+2014-01-20
+
+Fixed packaging bug.
+
+
+Version 0.4.9 Beta 2
+--------------------
+
+2014-01-20
+
+Added file verification of downloaded and backed up files.
+
+Updated Dutch, Hungarian, Italian, Polish, Serbian, Spanish and Swedish 
+translations. Added Catalan translation.
+
+
+Version 0.4.9 Beta 1
+--------------------
+
+2014-01-16
+
+Fixed bugs #1025908 and #1186955: Finalize fix for severe performance problems 
+and crashes that arose from the combination of Gnome's GIO file functionality 
+and python's multiprocessing. The solution was to remove GIO and replace it with
+regular python file processing. A nice side effect is that the program now runs
+faster than ever before.
+
+Fixed bug #1268291: Handle cases where filesystem metadata (e.g. file 
+permissions) could not be copied when writing to certain file systems such as
+NTFS. The program will now consider a file is copied succesfully even if the
+filesystem metadata could not be updated.
+
+Fixed bug #1269032: When Sync RAW + JPEG sequence numbers is enabled, the 
+program fails to properly deal with photos with corrupt EXIF metadata.
+
+Fixed bug #1269079: Download failure when folder exists for only one of photo or
+video on auto detected back devices. 
+
+Updated Norwegian and Serbian translations.
+
+
+Version 0.4.8
+-------------
+
+2013-12-31
+
+Fixed bug #1263237: Added support for MPO files (3D images). Thanks to Jan 
+Kaluza for reporting it.
+
+Fixed bug #1263483: Some terms in the user interface are not being translated.
+Thanks to Jose Luis Tirado for alerting me to the problem, which has probably 
+existed for some time.
+
+Updated Dutch, French Italian, Polish and Spanish translations.
+
 Version 0.4.7
 -------------
 
@@ -205,10 +283,10 @@ You can now specify paths never to scan for photos or videos. By default, any
 path ending in .Trash or .thumbnails is ignored.  Advanced users can specify
 paths to never scan using python-style regular expressions.
 
-Fixed bug #774488: added manual backup path for videos, in addition to photos -
+Fixed bug #774488: added manual back up path for videos, in addition to photos -
 
-You can now manually specify a path specifically in which to backup videos. This
-can be the same as or different than the path in which to backup photos.
+You can now manually specify a path specifically in which to back up videos. This
+can be the same as or different than the path in which to back up photos.
 
 Fixed bug #838722: wrong file types may be backed up to external devices - 
 
@@ -217,12 +295,12 @@ type might be backed up. For instance, if the backup device is only meant to
 store videos, and the download contains photos, photos would incorrectly be
 backed up to the device in addition to videos.
 
-Fixed bug #815727: Backup errors and warnings incorrectly displayed in log 
+Fixed bug #815727: Back up errors and warnings incorrectly displayed in log 
 window -
 
 Fixed a bug that occurred when backing up errors are encountered, the log window
 did not display them correctly, although they were correctly outputted to the 
-terminal window. This only occurred when more than one backup device was being
+terminal window. This only occurred when more than one back up device was being
 used during a download.
 
 Fixed bug #859242: Crash when displaying a preview of file without an extracted

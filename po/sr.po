@@ -6,23 +6,23 @@ msgid ""
 msgstr ""
 "Project-Id-Version: rapid\n"
 "Report-Msgid-Bugs-To: FULL NAME <EMAIL@ADDRESS>\n"
-"POT-Creation-Date: 2012-06-23 04:00-0500\n"
-"PO-Revision-Date: 2012-10-30 08:48+0000\n"
+"POT-Creation-Date: 2014-01-21 21:34+0600\n"
+"PO-Revision-Date: 2014-01-21 23:47+0000\n"
 "Last-Translator: Мирослав Николић <miroslavnikolic@rocketmail.com>\n"
 "Language-Team: Serbian translators\n"
 "MIME-Version: 1.0\n"
 "Content-Type: text/plain; charset=UTF-8\n"
 "Content-Transfer-Encoding: 8bit\n"
-"X-Launchpad-Export-Date: 2012-11-26 19:04+0000\n"
-"X-Generator: Launchpad (build 16309)\n"
+"X-Launchpad-Export-Date: 2014-01-23 13:56+0000\n"
+"X-Generator: Launchpad (build 16901)\n"
 "Language: sr\n"
 
 #. Translators: if neccessary, for guidance in how to translate this program, you may see http://damonlynch.net/translate.html
-#: rapid/rapid.py:112 rapid/rapid.py:1784 rapid/glade3/rapid.ui.h:1
+#: rapid/rapid.py:117 rapid/rapid.py:1820 rapid/glade3/rapid.ui.h:15
 msgid "Rapid Photo Downloader"
 msgstr "Брзи преносилац фотографија"
 
-#: rapid/rapid.py:117
+#: rapid/rapid.py:122
 #, python-format
 msgid ""
 "%(date)s\n"
@@ -31,33 +31,33 @@ msgstr ""
 "%(date)s\n"
 "%(time)s"
 
-#: rapid/rapid.py:119
+#: rapid/rapid.py:124
 #, python-format
 msgid "%(date)s %(time)s"
 msgstr "%(date)s %(time)s"
 
-#: rapid/rapid.py:122
+#: rapid/rapid.py:127
 #, python-format
 msgid "%(date)s %(hour)s:%(minute)s:%(second)s:%(subsecond)s"
 msgstr "%(date)s %(hour)s:%(minute)s:%(second)s:%(subsecond)s"
 
 #. Device refers to a thing like a camera, memory card in its reader,
 #. external hard drive, Portable Storage Device, etc.
-#: rapid/rapid.py:157
+#: rapid/rapid.py:162
 msgid "Device"
 msgstr "Уређај"
 
 #. Size refers to the total size of images on the device, typically in
 #. MB or GB
-#: rapid/rapid.py:175
+#: rapid/rapid.py:180
 msgid "Size"
 msgstr "Величина"
 
-#: rapid/rapid.py:178
+#: rapid/rapid.py:183
 msgid "Download Progress"
 msgstr "Напредак преузимања"
 
-#: rapid/rapid.py:336
+#: rapid/rapid.py:343
 #, python-format
 msgid "%(device)s did not unmount"
 msgstr "%(device)s није демонтиран"
@@ -66,22 +66,22 @@ msgstr "%(device)s није демонтиран"
 #. looking for photos or videos. It is visible initially in the progress bar for each device
 #. (which normally holds "x photos and videos").
 #. It maybe displayed only briefly if the contents of the device being scanned is small.
-#: rapid/rapid.py:1216
+#: rapid/rapid.py:1241
 msgid "scanning..."
 msgstr "претражујем уређај..."
 
 #. this location is a human readable explanation for /, and is inserted into Downloading from %(location)s
-#: rapid/rapid.py:1782
+#: rapid/rapid.py:1818
 msgid "the root of the file system"
 msgstr "почетни директоријум система датотека"
 
 #. message in dialog box which asks the user if they really want to be downloading from this location
-#: rapid/rapid.py:1786
+#: rapid/rapid.py:1822
 #, python-format
 msgid "Downloading from %(location)s."
 msgstr "Преузми са %(location)s."
 
-#: rapid/rapid.py:1787
+#: rapid/rapid.py:1823
 msgid ""
 "Do you really want to download from here? On some systems, scanning this "
 "location can take a very long time."
@@ -89,15 +89,15 @@ msgstr ""
 "Да ли заиста желите да преузмете слике одавде? На неким системима "
 "претраживање те путање може да потраје."
 
-#: rapid/rapid.py:2209
+#: rapid/rapid.py:2267 rapid/glade3/rapid.ui.h:6
 msgid "Download"
 msgstr "Преузми"
 
-#: rapid/rapid.py:2212
+#: rapid/rapid.py:2270
 msgid "Pause"
 msgstr "Паузирај"
 
-#: rapid/rapid.py:2317
+#: rapid/rapid.py:2376
 #, python-format
 msgid ""
 "These download folders are invalid:\n"
@@ -108,7 +108,7 @@ msgstr ""
 "%(folder1)s\n"
 "%(folder2)s"
 
-#: rapid/rapid.py:2320
+#: rapid/rapid.py:2379
 #, python-format
 msgid ""
 "This download folder is invalid:\n"
@@ -117,176 +117,189 @@ msgstr ""
 "Следећа фасцикла за преузимање је неисправна:\n"
 "%s"
 
-#: rapid/rapid.py:2321
+#: rapid/rapid.py:2380
 msgid "Download cannot proceed"
 msgstr "Не могу да наставим преузимање"
 
-#: rapid/rapid.py:2700
+#: rapid/rapid.py:2388 rapid/rapid.py:2391
+#, python-format
+msgid "No backup device contains a valid folder for backing up %(filetype)s"
+msgstr ""
+"Ниједан уређај резерве не садржи исправну фасциклу за стварање резерве "
+"„%(filetype)s“"
+
+#: rapid/rapid.py:2388 rapid/rapid.py:2843 rapid/rapid.py:3680
+#: rapid/rpdfile.py:139
+msgid "photos"
+msgstr "фотографије"
+
+#: rapid/rapid.py:2391 rapid/rapid.py:2838 rapid/rapid.py:3682
+#: rapid/rpdfile.py:134
+msgid "videos"
+msgstr "видео"
+
+#: rapid/rapid.py:2393
+msgid "Backup problem"
+msgstr "Проблем са резервом"
+
+#: rapid/rapid.py:2802
 msgid "About 1 second remaining"
 msgstr "Преостала је 1 секунда"
 
-#: rapid/rapid.py:2702
+#: rapid/rapid.py:2804
 #, python-format
 msgid "About %i seconds remaining"
 msgstr "Преостало је %i секунди"
 
-#: rapid/rapid.py:2704
+#: rapid/rapid.py:2806
 msgid "About 1 minute remaining"
 msgstr "Преостао је 1 минут"
 
 #. Translators: in the text '%(minutes)i:%(seconds)02i', only the : should be translated, if needed.
 #. '%(minutes)i' and '%(seconds)02i' should not be modified or left out. They are used to format and display the amount
 #. of time the download has remainging, e.g. 'About 5:36 minutes remaining'
-#: rapid/rapid.py:2709
+#: rapid/rapid.py:2811
 #, python-format
 msgid "About %(minutes)i:%(seconds)02i minutes remaining"
 msgstr "Преостало је %(minutes)i:%(seconds)02i"
 
-#: rapid/rapid.py:2731 rapid/rpdfile.py:123
+#: rapid/rapid.py:2833 rapid/rpdfile.py:129
 msgid "photos and videos"
 msgstr "фотографије и видео"
 
-#: rapid/rapid.py:2733 rapid/rpdfile.py:125
+#: rapid/rapid.py:2835 rapid/rpdfile.py:131
 msgid "photos or videos"
 msgstr "фотографије или видео"
 
-#: rapid/rapid.py:2736 rapid/rapid.py:3558 rapid/rpdfile.py:128
-msgid "videos"
-msgstr "видео"
-
-#: rapid/rapid.py:2738 rapid/preferencesdialog.py:1620 rapid/rpdfile.py:130
-#: rapid/rpdfile.py:291
+#: rapid/rapid.py:2840 rapid/preferencesdialog.py:1632 rapid/rpdfile.py:136
+#: rapid/rpdfile.py:305
 msgid "video"
 msgstr "видео"
 
-#: rapid/rapid.py:2741 rapid/rapid.py:3556 rapid/rpdfile.py:133
-msgid "photos"
-msgstr "фотографије"
-
 #. check subfolder preferences for bad values
-#: rapid/rapid.py:2743 rapid/preferencesdialog.py:1619 rapid/rpdfile.py:135
-#: rapid/rpdfile.py:272
+#: rapid/rapid.py:2845 rapid/preferencesdialog.py:1631 rapid/rpdfile.py:141
+#: rapid/rpdfile.py:286
 msgid "photo"
 msgstr "фотографија"
 
-#: rapid/rapid.py:2770
+#: rapid/rapid.py:2872
 #, python-format
 msgid "%(noFiles)s %(filetypes)s downloaded"
 msgstr "%(noFiles)s %(filetypes)s преузето"
 
-#: rapid/rapid.py:2774
+#: rapid/rapid.py:2876
 #, python-format
 msgid "%(noFiles)s %(filetypes)s failed to download"
 msgstr "%(noFiles)s %(filetypes)s није преузето"
 
-#: rapid/rapid.py:2777 rapid/rapid.py:2829
+#: rapid/rapid.py:2879 rapid/rapid.py:2935
 msgid "warnings"
 msgstr "упозорења"
 
-#: rapid/rapid.py:2786
+#: rapid/rapid.py:2892
 msgid "All downloads complete"
 msgstr "Сва преузимања су завршена"
 
-#: rapid/rapid.py:2792 rapid/rapid.py:2801 rapid/rapid.py:2810
-#: rapid/rapid.py:2819 rapid/rapid.py:2827
+#: rapid/rapid.py:2898 rapid/rapid.py:2907 rapid/rapid.py:2916
+#: rapid/rapid.py:2925 rapid/rapid.py:2933
 #, python-format
 msgid "%(number)s %(numberdownloaded)s"
 msgstr "%(number)s %(numberdownloaded)s"
 
-#: rapid/rapid.py:2794 rapid/rapid.py:2812
+#: rapid/rapid.py:2900 rapid/rapid.py:2918
 #, python-format
 msgid "%(filetype)s downloaded"
 msgstr "%(filetype)s преузето"
 
-#: rapid/rapid.py:2803 rapid/rapid.py:2821
+#: rapid/rapid.py:2909 rapid/rapid.py:2927
 #, python-format
 msgid "%(filetype)s failed to download"
 msgstr "%(filetype)s није преузето"
 
 #. e.g.: 3 of 205 photos and videos (202 remaining)
-#: rapid/rapid.py:2860
+#: rapid/rapid.py:2970
 #, python-format
 msgid "%(number)s of %(total)s %(filetypes)s (%(remaining)s remaining)"
 msgstr "%(number)s од %(total)s %(filetypes)s (преостаје %(remaining)s)"
 
 #. e.g.: 205 of 205 photos and videos
-#: rapid/rapid.py:2867
+#: rapid/rapid.py:2977
 #, python-format
 msgid "%(number)s of %(total)s %(filetypes)s"
 msgstr "%(number)s од %(total)s %(filetypes)s"
 
-#: rapid/rapid.py:3222
+#: rapid/rapid.py:3331
 msgid "From"
 msgstr "Од"
 
-#: rapid/rapid.py:3230
+#: rapid/rapid.py:3339
 msgid "Auto Detect"
 msgstr "Сам одреди"
 
-#: rapid/rapid.py:3234 rapid/preferencesdialog.py:1327
+#: rapid/rapid.py:3343 rapid/preferencesdialog.py:1337
 #, python-format
 msgid "Select a folder containing %(file_types)s"
 msgstr "Изаберите фасциклу која садржи %(file_types)s"
 
-#: rapid/rapid.py:3275
+#: rapid/rapid.py:3384
 msgid "Copy"
 msgstr "Умножи"
 
-#: rapid/rapid.py:3288
+#: rapid/rapid.py:3397
 msgid "Move"
 msgstr "Премести"
 
-#: rapid/rapid.py:3310
+#: rapid/rapid.py:3419
 msgid "To"
 msgstr "У"
 
-#: rapid/rapid.py:3317 rapid/rapid.py:3986
+#: rapid/rapid.py:3426 rapid/rapid.py:4128
 msgid "Photos:"
 msgstr "Фотографије:"
 
-#: rapid/rapid.py:3320 rapid/preferencesdialog.py:1164
+#: rapid/rapid.py:3429 rapid/preferencesdialog.py:1174
 msgid "Select a folder to download photos to"
 msgstr "Изаберите фасциклу за чување фотографија"
 
-#: rapid/rapid.py:3332 rapid/rapid.py:3986
+#: rapid/rapid.py:3441 rapid/rapid.py:4128
 msgid "Videos:"
 msgstr "Видео:"
 
-#: rapid/rapid.py:3334 rapid/preferencesdialog.py:1182
+#: rapid/rapid.py:3443 rapid/preferencesdialog.py:1192
 msgid "Select a folder to download videos to"
 msgstr "Изаберите фасциклу за смештање преузетог видеа"
 
-#: rapid/rapid.py:3526
+#: rapid/rapid.py:3650
 msgid "and"
 msgstr "и"
 
-#: rapid/rapid.py:3531
+#: rapid/rapid.py:3655
 msgid "Using backup devices"
 msgstr "Употреба резервних уређаја"
 
-#: rapid/rapid.py:3533
+#: rapid/rapid.py:3657
 msgid "Using backup device"
 msgstr "Употреба резервног уређаја"
 
-#: rapid/rapid.py:3535
+#: rapid/rapid.py:3659
 msgid "No backup devices detected"
 msgstr "Нису изабрани резервни уређаји"
 
-#: rapid/rapid.py:3562
+#: rapid/rapid.py:3686
 msgid "Free space:"
 msgstr "Слободан простор:"
 
 #. (videos) or (photos) will be appended to the free space message displayed to the
 #. user in the status bar.
 #. you should only translate this if your language does not use parantheses
-#: rapid/rapid.py:3574
+#: rapid/rapid.py:3698
 #, python-format
 msgid "(%(file_type)s)"
 msgstr "(%(file_type)s)"
 
 #. Freespace available on the filesystem for downloading to
 #. Displayed in status bar message on main window
-#: rapid/rapid.py:3578
+#: rapid/rapid.py:3702
 #, python-format
 msgid "%(free)s %(file_type)s"
 msgstr "%(free)s %(file_type)s"
@@ -294,87 +307,87 @@ msgstr "%(free)s %(file_type)s"
 #. Inserted in the middle of the statusbar message concerning the amount of freespace
 #. Used to differentiate between two different file systems
 #. e.g. Free space: 21.3GB (photos); 14.7GB (videos).
-#: rapid/rapid.py:3583
+#: rapid/rapid.py:3707
 msgid "; "
 msgstr "; "
 
 #. Inserted at the end of the statusbar message concerning the amount of freespace
 #. Used to differentiate between two different file systems
 #. e.g. Free space: 21.3GB (photos); 14.7GB (videos).
-#: rapid/rapid.py:3588
+#: rapid/rapid.py:3712
 msgid "."
 msgstr "."
 
 #. Freespace available on the filesystem for downloading to
 #. Displayed in status bar message on main window
 #. e.g. 14.7GB available
-#: rapid/rapid.py:3594
+#: rapid/rapid.py:3718
 #, python-format
 msgid "%(free)s free"
 msgstr "%(free)s слободно"
 
 #. user manually specified the same location for photos and video backups
-#: rapid/rapid.py:3602
+#: rapid/rapid.py:3726
 #, python-format
 msgid "Backing up photos and videos to %(path)s"
 msgstr "Направи резерву слика и видеа у %(path)s"
 
 #. user manually specified backup location
-#: rapid/rapid.py:3605
+#: rapid/rapid.py:3729
 #, python-format
 msgid "Backing up to %(path)s"
 msgstr "Правим резерву у %(path)s"
 
 #. user manually specified different locations for photo and video backups
-#: rapid/rapid.py:3608
+#: rapid/rapid.py:3732
 #, python-format
 msgid "Backing up photos to %(path)s and videos to %(path2)s"
 msgstr "Правим резерву слика у %(path)s и видеа у %(path2)s"
 
-#: rapid/rapid.py:3615
+#: rapid/rapid.py:3739
 #, python-format
 msgid "%(freespace)s. %(backuppaths)s."
 msgstr "%(freespace)s. у %(backuppaths)s."
 
-#: rapid/rapid.py:3644
+#: rapid/rapid.py:3768
 msgid "Program preferences are invalid"
 msgstr "Подешавања програма су неисправна"
 
-#: rapid/rapid.py:3770 rapid/rpdfile.py:273
+#: rapid/rapid.py:3910 rapid/rpdfile.py:287
 msgid "Photo"
 msgstr "Фотографија"
 
-#: rapid/rapid.py:3772 rapid/rpdfile.py:292
+#: rapid/rapid.py:3912 rapid/rpdfile.py:306
 msgid "Video"
 msgstr "Видео"
 
-#: rapid/rapid.py:3781
+#: rapid/rapid.py:3921
 #, python-format
 msgid "%(file_type)s download folder does not exist"
 msgstr "Фасцикла за преузимање %(file_type)s датотека не постоји"
 
-#: rapid/rapid.py:3783 rapid/rapid.py:3797 rapid/rapid.py:3810
+#: rapid/rapid.py:3923 rapid/rapid.py:3937 rapid/rapid.py:3950
 #, python-format
 msgid "Folder: %s"
 msgstr "Фасцикла: %s"
 
-#: rapid/rapid.py:3795
+#: rapid/rapid.py:3935
 #, python-format
 msgid "%(file_type)s download folder is invalid"
 msgstr "Фасцикла за преузимање %(file_type)s датотека је неисправна"
 
-#: rapid/rapid.py:3808
+#: rapid/rapid.py:3948
 #, python-format
 msgid "%(file_type)s download folder is not writable"
 msgstr "Фасцикла за преузимање %(file_type)s датотека је неуписива"
 
-#: rapid/rapid.py:3894
+#: rapid/rapid.py:4034
 msgid "Thumbnails"
 msgstr "Умањени прикази"
 
 #. Translators: this text is displayed to the user when they request information on the command line options.
 #. The text %default should not be modified or left out.
-#: rapid/rapid.py:3949
+#: rapid/rapid.py:4089
 #, python-format
 msgid ""
 "display program information on the command line as the program runs "
@@ -383,22 +396,22 @@ msgstr ""
 "исписује податке о програму у командној линији док је покренут програм "
 "(подразумевано: %default)"
 
-#: rapid/rapid.py:3950
+#: rapid/rapid.py:4090
 msgid "display debugging information when run from the command line"
 msgstr ""
 "приказује податке за тражење грешака у програму при покретању из командне "
 "линије"
 
-#: rapid/rapid.py:3951
+#: rapid/rapid.py:4091
 msgid "only output errors to the command line"
 msgstr "исписује грешке само у командној линији"
 
 #. image file extensions are recognized RAW files plus TIFF and JPG
-#: rapid/rapid.py:3953
+#: rapid/rapid.py:4093
 msgid "list photo and video file extensions the program recognizes and exit"
 msgstr "исписује проширења подржаних слика и видеа и напушта програм"
 
-#: rapid/rapid.py:3955
+#: rapid/rapid.py:4095
 msgid ""
 "automatically detect devices from which to download, overwriting existing "
 "program preferences"
@@ -406,7 +419,7 @@ msgstr ""
 "сам открива уређаје са којих ће да преузима, преписујући постојеће поставке "
 "програма"
 
-#: rapid/rapid.py:3956
+#: rapid/rapid.py:4096
 msgid ""
 "manually specify the PATH of the device from which to download, overwriting "
 "existing program preferences"
@@ -414,11 +427,11 @@ msgstr ""
 "ручно наводи ПУТАЊУ уређаја са којих ће да преузима, преписујући постојеће "
 "поставке програма"
 
-#: rapid/rapid.py:3957
+#: rapid/rapid.py:4097
 msgid "reset all program settings and preferences and exit"
 msgstr "враћа све поставке на подразумевано и напушта програм"
 
-#: rapid/rapid.py:3970
+#: rapid/rapid.py:4110
 msgid ""
 "Error: specify device auto-detection or manually specify a device's path "
 "from which to download, but do not do both."
@@ -426,25 +439,26 @@ msgstr ""
 "Грешка: наведите самооткривање уређаја или ручно наведите путању уређаја са "
 "којих вршити преузимање, али немојте оба истовремено."
 
-#: rapid/rapid.py:3991
+#: rapid/rapid.py:4133
 #, python-format
 msgid "and %s"
 msgstr "и %s"
 
-#: rapid/rapid.py:3999
+#: rapid/rapid.py:4141
 msgid "All settings and preferences have been reset"
 msgstr "Сва подешавања су враћена на подразумеване вредности"
 
-#: rapid/backupfile.py:157 rapid/backupfile.py:180
+#: rapid/backupfile.py:149 rapid/backupfile.py:221
 msgid "Backing up error"
 msgstr "Грешка прављења резерве"
 
-#: rapid/backupfile.py:159
+#: rapid/backupfile.py:151
 #, python-format
 msgid "Destination directory could not be created: %(directory)s\n"
 msgstr "Не могу да направим циљни директоријум: %(directory)s\n"
 
-#: rapid/backupfile.py:161 rapid/backupfile.py:182 rapid/subfolderfile.py:199
+#: rapid/backupfile.py:153 rapid/backupfile.py:170 rapid/backupfile.py:223
+#: rapid/subfolderfile.py:202
 #, python-format
 msgid ""
 "Source: %(source)s\n"
@@ -453,13 +467,29 @@ msgstr ""
 "Извор: %(source)s\n"
 "Циљ: %(destination)s"
 
-#: rapid/backupfile.py:164 rapid/backupfile.py:184
+#: rapid/backupfile.py:156 rapid/backupfile.py:225
 #, python-format
 msgid "Error: %(inst)s"
 msgstr "Грешка: %(inst)s"
 
-#: rapid/copyfiles.py:163 rapid/subfolderfile.py:214
-#: rapid/subfolderfile.py:347 rapid/subfolderfile.py:365
+#: rapid/backupfile.py:163
+#, python-format
+msgid "Backup %(file_type)s overwritten"
+msgstr "Резерва „%(file_type)s“ је преписана"
+
+#: rapid/backupfile.py:166
+#, python-format
+msgid "%(file_type)s not backed up"
+msgstr "није направљена резерва за „%(file_type)s“"
+
+#: rapid/backupfile.py:168
+#, python-format
+msgid "Backup of %(file_type)s already exists"
+msgstr "Резерва за „%(file_type)s“ већ постоји"
+
+#: rapid/backupfile.py:209 rapid/copyfiles.py:201 rapid/copyfiles.py:219
+#: rapid/subfolderfile.py:217 rapid/subfolderfile.py:335
+#: rapid/subfolderfile.py:456
 #, python-format
 msgid ""
 "%(problem)s\n"
@@ -467,6 +497,10 @@ msgid ""
 msgstr ""
 "%(problem)s\n"
 "Датотека: %(file)s"
+
+#: rapid/copyfiles.py:214
+msgid "An unknown error occurred"
+msgstr "Дошло је до непознате грешке"
 
 #: rapid/device.py:80
 msgid "Device Detected"
@@ -949,20 +983,20 @@ msgstr "Одредите путање са којих никада не жели
 msgid "Path:"
 msgstr "Путања:"
 
-#: rapid/preferencesdialog.py:1082
+#: rapid/preferencesdialog.py:1092
 msgid "Job Code"
 msgstr "Код задатка"
 
-#: rapid/preferencesdialog.py:1353
+#: rapid/preferencesdialog.py:1363
 msgid "Select a folder in which to backup photos"
 msgstr "Изаберите фасциклу за резерве фотографија"
 
-#: rapid/preferencesdialog.py:1366
+#: rapid/preferencesdialog.py:1376
 msgid "Select a folder in which to backup videos"
 msgstr "Изаберите фасциклу за резерву видеа"
 
 #. Translators: please do not modify or leave out html formatting tags like <i> and <b>. These are used to format the text the users sees
-#: rapid/preferencesdialog.py:1461
+#: rapid/preferencesdialog.py:1473
 msgid ""
 "<i><b>Warning:</b> There is insufficient metadata to fully generate the "
 "name. Please use other renaming options.</i>"
@@ -970,7 +1004,7 @@ msgstr ""
 "<i><b>Упозорење:</b> Нема довољно метаподатака за образовање пуног имена. "
 "Искористите друге опције за преименовање.</i>"
 
-#: rapid/preferencesdialog.py:1512
+#: rapid/preferencesdialog.py:1524
 msgid ""
 "<i><b>Warning:</b> There is insufficient metadata to fully generate "
 "subfolders. Please use other subfolder naming options.</i>"
@@ -979,13 +1013,13 @@ msgstr ""
 "Искористите другу опцију за именовање фасцикли.</i>"
 
 #. Translators: you should not modify or leave out the %s. This is a code used by the programming language python to insert a value that thes user will see
-#: rapid/preferencesdialog.py:1515
+#: rapid/preferencesdialog.py:1527
 #, python-format
 msgid "<i>Example: %s</i>"
 msgstr "<i>Пример: %s</i>"
 
 #. Preferences list is now empty
-#: rapid/preferencesdialog.py:1605
+#: rapid/preferencesdialog.py:1617
 #, python-format
 msgid ""
 "The %(filetype)s subfolder preferences entered are invalid and cannot be "
@@ -996,7 +1030,7 @@ msgstr ""
 "коришћене.\n"
 "Враћам поставке на подразумеване вредности."
 
-#: rapid/preferencesdialog.py:1750
+#: rapid/preferencesdialog.py:1762
 #, python-format
 msgid ""
 "The following regular expressions are invalid, and will be removed unless "
@@ -1006,7 +1040,7 @@ msgstr ""
 "Следећи изрази су неисправни и биће уклоњени уколико их не поправите:\n"
 " %s"
 
-#: rapid/preferencesdialog.py:1752
+#: rapid/preferencesdialog.py:1764
 #, python-format
 msgid ""
 "This regular expression is invalid, and will be removed unless you correct "
@@ -1016,17 +1050,17 @@ msgstr ""
 "Следећи израз је неисправан и биће уклоњен уколико га не поправите:\n"
 " %s"
 
-#: rapid/preferencesdialog.py:1753
+#: rapid/preferencesdialog.py:1765
 msgid "Invalid regular expression"
 msgstr "Неисправан регуларни израз"
 
 #. Translators: this value is used as an example device when automatic backup device detection is enabled. You should translate this.
-#: rapid/preferencesdialog.py:1934
+#: rapid/preferencesdialog.py:1949
 msgid "externaldrive1"
 msgstr "СпољниУређај1"
 
 #. Translators: this value is used as an example device when automatic backup device detection is enabled. You should translate this.
-#: rapid/preferencesdialog.py:1936
+#: rapid/preferencesdialog.py:1951
 msgid "externaldrive2"
 msgstr "СпољниУређај2"
 
@@ -1103,55 +1137,60 @@ msgid "Stockholm"
 msgstr "Истамбул"
 
 #. components
-#: rapid/problemnotification.py:27 rapid/subfolderfile.py:358
+#: rapid/problemnotification.py:27 rapid/subfolderfile.py:329
 msgid "subfolder"
 msgstr "подфасцикла"
 
-#: rapid/problemnotification.py:28 rapid/subfolderfile.py:356
+#: rapid/problemnotification.py:28 rapid/subfolderfile.py:327
 msgid "filename"
 msgstr "назив датотеке"
 
-#: rapid/problemnotification.py:81
+#: rapid/problemnotification.py:85
 #, python-format
 msgid "Date time value %s appears invalid."
 msgstr "Вредности за датум и време %s су неисправне."
 
-#: rapid/problemnotification.py:82
+#: rapid/problemnotification.py:86
 msgid "Filename does not have an extension."
 msgstr "Назив датотеке не садржи проширење."
 
 #. a number component is something like the 8346 in IMG_8346.JPG
-#: rapid/problemnotification.py:84
+#: rapid/problemnotification.py:88
 msgid "Filename does not have a number component."
 msgstr "Назив датотеке нема секвенцу бројева."
 
-#: rapid/problemnotification.py:85
+#: rapid/problemnotification.py:89
 #, python-format
 msgid "Error generating component %s."
 msgstr "Не могу да образујем део имена за %s."
 
 #. a generic problem
-#: rapid/problemnotification.py:87
+#: rapid/problemnotification.py:91
 #, python-format
 msgid "%(filetype)s metadata cannot be read"
 msgstr "Не могу да читам %(filetype)s метаподатке"
 
-#: rapid/problemnotification.py:89
+#: rapid/problemnotification.py:93
 #, python-format
 msgid "%(filetype)s %(area)s could not be generated"
 msgstr "Не могу да образујем %(filetype)s %(area)s"
 
-#: rapid/problemnotification.py:91 rapid/problemnotification.py:92
+#: rapid/problemnotification.py:95 rapid/problemnotification.py:96
 #, python-format
 msgid "An error occurred when copying the %(filetype)s"
 msgstr "Грешка приликом умножавања %(filetype)s"
 
-#: rapid/problemnotification.py:94 rapid/problemnotification.py:95
+#: rapid/problemnotification.py:98
+#, python-format
+msgid "The %(filetype)s did not download correctly"
+msgstr "„%(filetype)s“ није исправно преузета"
+
+#: rapid/problemnotification.py:101 rapid/problemnotification.py:102
 #, python-format
 msgid "%(filetype)s already exists"
 msgstr "Већ постоји %(filetype)s"
 
-#: rapid/problemnotification.py:98
+#: rapid/problemnotification.py:105
 #, python-format
 msgid ""
 "%(filetype)s could not be backed up because no suitable backup locations "
@@ -1160,7 +1199,7 @@ msgstr ""
 "Не могу да направим резерву %(filetype)s датотека јер није нађена "
 "одговарајућа локација."
 
-#: rapid/problemnotification.py:103
+#: rapid/problemnotification.py:110
 #, python-format
 msgid ""
 "%(image1)s was taken on %(image1_date)s at %(image1_time)s, and %(image2)s "
@@ -1169,12 +1208,12 @@ msgstr ""
 "%(image1)s је сликана %(image1_date)s у %(image1_time)s, а %(image2)s "
 "%(image2_date)s у %(image2_time)s."
 
-#: rapid/problemnotification.py:104
+#: rapid/problemnotification.py:111
 #, python-format
 msgid "%(filetype)s was already downloaded"
 msgstr "%(filetype)s је већ преузет"
 
-#: rapid/problemnotification.py:108
+#: rapid/problemnotification.py:115
 #, python-format
 msgid ""
 "The existing %(filetype)s was last modified on %(date)s at %(time)s. Unique "
@@ -1183,54 +1222,61 @@ msgstr ""
 "Постојећи %(filetype)s је измењен %(date)s у %(time)s. Додата је јединствена "
 "реч „%(identifier)s“."
 
-#: rapid/problemnotification.py:109
+#: rapid/problemnotification.py:116
 #, python-format
 msgid "The existing %(filetype)s was last modified on %(date)s at %(time)s."
 msgstr "Постојећи %(filetype)s је измењен %(date)s у %(time)s."
 
-#: rapid/problemnotification.py:110
+#: rapid/problemnotification.py:117
 #, python-format
 msgid "There is no data with which to name the %(filetype)s."
 msgstr "Не постоје подаци за именовање %(filetype)s."
 
-#: rapid/problemnotification.py:112
+#: rapid/problemnotification.py:119
 #, python-format
 msgid "Error: %(errorno)s %(strerror)s"
 msgstr "Грешка: %(errorno)s %(strerror)s"
 
-#: rapid/problemnotification.py:202
+#: rapid/problemnotification.py:210
+msgid ""
+"File verification failed. The downloaded version is different from the "
+"original."
+msgstr ""
+"Провера датотеке није успела. Преузето издање се разликује од изворног."
+
+#: rapid/problemnotification.py:213
 msgid "The metadata might be corrupt."
 msgstr "Метаподаци су можда неисправни."
 
-#: rapid/problemnotification.py:205
+#: rapid/problemnotification.py:216
 msgid ""
 "The filename, extension and Exif information indicate it has already been "
 "downloaded."
 msgstr ""
 "Назив датотеке, проширење и Ексиф подаци указују да је датотека већ преузета."
 
-#: rapid/problemnotification.py:224
+#: rapid/problemnotification.py:235
 #, python-format
 msgid " It was backed up to %(volume)s"
 msgstr " Резерва је смештена на %(volume)s"
 
-#: rapid/problemnotification.py:226
+#: rapid/problemnotification.py:237
 msgid " It was backed up to these devices: "
 msgstr " Резерва је смештена на следеће уређаје: "
 
-#: rapid/problemnotification.py:228 rapid/problemnotification.py:289
-#: rapid/problemnotification.py:301
+#: rapid/problemnotification.py:239 rapid/problemnotification.py:300
+#: rapid/problemnotification.py:312 rapid/problemnotification.py:339
 #, python-format
 msgid "%s, "
 msgstr "%s, "
 
-#: rapid/problemnotification.py:229 rapid/problemnotification.py:290
-#: rapid/problemnotification.py:302
+#: rapid/problemnotification.py:240 rapid/problemnotification.py:301
+#: rapid/problemnotification.py:313 rapid/problemnotification.py:340
 #, python-format
 msgid "%(volumes)s and %(final_volume)s."
 msgstr "%(volumes)s и %(final_volume)s."
 
-#: rapid/problemnotification.py:241
+#: rapid/problemnotification.py:252
 #, python-format
 msgid ""
 "Photos detected with the same filenames, but taken at different times: "
@@ -1239,260 +1285,313 @@ msgstr ""
 "Нађене су фотографије са истим називом датотека, али сликане у различито "
 "време: %(details)s"
 
-#: rapid/problemnotification.py:258
+#: rapid/problemnotification.py:269
 #, python-format
 msgid "An error occurred when backing up on %(volume)s: %(inst)s."
 msgstr "Грешка приликом прављења резерве на %(volume)s: %(inst)s."
 
-#: rapid/problemnotification.py:260
+#: rapid/problemnotification.py:271
 #, python-format
 msgid "An error occurred when backing up on %(volume)s."
 msgstr "Грешка приликом прављења резерве на %(volume)s."
 
-#: rapid/problemnotification.py:262
+#: rapid/problemnotification.py:273
 msgid "Errors occurred when backing up on the following backup devices: "
 msgstr "Грешка приликом прављења резерве на следећим уређајима: "
 
-#: rapid/problemnotification.py:266 rapid/problemnotification.py:314
+#: rapid/problemnotification.py:277 rapid/problemnotification.py:325
 #, python-format
 msgid "%(volume)s (%(inst)s), "
 msgstr "%(volume)s (%(inst)s), "
 
-#: rapid/problemnotification.py:268
+#: rapid/problemnotification.py:279
 #, python-format
 msgid "%(volume)s, "
 msgstr "%(volume)s, "
 
-#: rapid/problemnotification.py:272 rapid/problemnotification.py:316
+#: rapid/problemnotification.py:283 rapid/problemnotification.py:327
 #, python-format
 msgid "%(volumes)s and %(volume)s (%(inst)s)."
 msgstr "%(volumes)s и %(volume)s (%(inst)s)."
 
-#: rapid/problemnotification.py:277
+#: rapid/problemnotification.py:288
 #, python-format
 msgid "%(volumes)s and %(volume)s."
 msgstr "%(volumes)s и %(volume)s."
 
-#: rapid/problemnotification.py:285
+#: rapid/problemnotification.py:296
 #, python-format
 msgid "Backup already exists on %(volume)s."
 msgstr "Већ постоји резерва на %(volume)s."
 
-#: rapid/problemnotification.py:287
+#: rapid/problemnotification.py:298
 msgid "Backups already exist in these locations: "
 msgstr "Већ постоји резерва на овим местима: "
 
-#: rapid/problemnotification.py:297
+#: rapid/problemnotification.py:308
 #, python-format
 msgid "Backup overwritten on %(volume)s."
 msgstr "Резерва је преписана на %(volume)s."
 
-#: rapid/problemnotification.py:299
+#: rapid/problemnotification.py:310
 msgid "Backups overwritten on these devices: "
 msgstr "Резерва је преписана на овим уређајима: "
 
-#: rapid/problemnotification.py:310
+#: rapid/problemnotification.py:321
 #, python-format
 msgid "An error occurred when creating directories on %(volume)s: %(inst)s."
 msgstr "Грешка при образовању директоријума на %(volume)s: %(inst)s."
 
-#: rapid/problemnotification.py:312
+#: rapid/problemnotification.py:323
 msgid ""
 "Errors occurred when creating directories on the following backup devices: "
 msgstr "Грешка при образовању директоријума на следећим уређајима: "
 
-#: rapid/problemnotification.py:323
+#: rapid/problemnotification.py:335
+#, python-format
+msgid ""
+"File verification failed on %(volume)s. The backed up version is different "
+"from the downloaded version."
+msgstr ""
+"Провера датотеке на „%(volume)s“ није успела. Издање резерве се разликује од "
+"преузетог издања."
+
+#: rapid/problemnotification.py:337
+msgid "File verification failed on these devices: "
+msgstr "Провера датотеке није успела на овим уређајима: "
+
+#: rapid/problemnotification.py:347
 #, python-format
 msgid "%(previousproblem)s Additionally, %(newproblem)s"
 msgstr "%(previousproblem)s Додатно, %(newproblem)s"
 
-#: rapid/problemnotification.py:331
+#: rapid/problemnotification.py:355
 #, python-format
 msgid " Furthermore, there were %(problems)s."
 msgstr " Такође, дошло је и до %(problems)s."
 
-#: rapid/problemnotification.py:333
+#: rapid/problemnotification.py:357
 #, python-format
 msgid " Furthermore, there was a %(problem)s."
 msgstr " Такође, дошло је и до %(problem)s."
 
-#: rapid/problemnotification.py:342
+#: rapid/problemnotification.py:366
 #, python-format
 msgid "The %(type)s metadata is missing."
 msgstr "Недостају %(type)s метаподаци."
 
-#: rapid/problemnotification.py:344
+#: rapid/problemnotification.py:368
 msgid "The following metadata is missing: "
 msgstr "Недостају следећи метаподаци: "
 
-#: rapid/problemnotification.py:347
+#: rapid/problemnotification.py:371
 #, python-format
 msgid "%(missing_metadata_elements)s and %(final_missing_metadata_element)s."
 msgstr "%(missing_metadata_elements)s и %(final_missing_metadata_element)s."
 
-#: rapid/problemnotification.py:364
+#: rapid/problemnotification.py:388
 msgid "Problems in subfolder and filename generation"
 msgstr "Проблеми при образовању подфасцикли и назива датотека"
 
-#: rapid/problemnotification.py:366
+#: rapid/problemnotification.py:390
 msgid "Problem in subfolder and filename generation"
 msgstr "Проблем при образовању подфасцикли и назива датотека"
 
-#: rapid/problemnotification.py:369
+#: rapid/problemnotification.py:393
 #, python-format
 msgid "Problems in %s generation"
 msgstr "Проблеми при образовању %s"
 
-#: rapid/problemnotification.py:371
+#: rapid/problemnotification.py:395
 #, python-format
 msgid "Problem in %s generation"
 msgstr "Проблем при образовању %s"
 
-#: rapid/problemnotification.py:380
+#: rapid/problemnotification.py:404
 #, python-format
 msgid "%(filetype)s already exists, but it was backed up"
 msgstr "Већ постоји %(filetype)s, али је направљена резерва"
 
-#: rapid/problemnotification.py:382
+#: rapid/problemnotification.py:406
 #, python-format
 msgid "An error occurred when copying the %(filetype)s, but it was backed up"
 msgstr ""
 "Дошло је до грешке приликом умножавања %(filetype)s, али је направљена "
 "резерва"
 
-#: rapid/problemnotification.py:402
+#: rapid/problemnotification.py:428
 msgid "Multiple problems were encountered"
 msgstr "Дошло је до више грешака"
 
-#: rapid/problemnotification.py:404 rapid/subfolderfile.py:233
+#: rapid/problemnotification.py:430 rapid/subfolderfile.py:261
 msgid "Photos detected with the same filenames, but taken at different times"
 msgstr ""
 "Нађене су фотографије са истим именом, које су сликане у различито време"
 
-#: rapid/problemnotification.py:410
+#: rapid/problemnotification.py:436
 msgid "there were errors backing up"
 msgstr "дошло је до грешака при прављењу резерве"
 
-#: rapid/problemnotification.py:411
+#: rapid/problemnotification.py:437
 msgid "There were errors backing up"
 msgstr "Дошло је до грешака при прављењу резерве"
 
-#: rapid/problemnotification.py:413
+#: rapid/problemnotification.py:439
 msgid "there was an error backing up"
 msgstr "дошло је до грешке при прављењу резерве"
 
-#: rapid/problemnotification.py:414
+#: rapid/problemnotification.py:440
 msgid "There was an error backing up"
 msgstr "Дошло је до грешке при прављењу резерве"
 
 #. e.g.
-#: rapid/problemnotification.py:417
+#: rapid/problemnotification.py:443
 #, python-format
 msgid "%(previousproblem)s, and %(backinguperror)s"
 msgstr "%(previousproblem)s, и %(backinguperror)s"
 
-#: rapid/rpdfile.py:153
+#: rapid/rpdfile.py:159
 #, python-format
 msgid "%(number)s %(filetypes)s"
 msgstr "%(number)s %(filetypes)s"
 
-#: rapid/rpdfile.py:163
+#: rapid/rpdfile.py:169
 #, python-format
 msgid "scanning (found %(photos)s photos and %(videos)s videos)..."
 msgstr "прегледам (нађох %(photos)s фотографија и %(videos)s видеа)..."
 
-#: rapid/subfolderfile.py:80
+#: rapid/subfolderfile.py:81
 #, python-format
 msgid "%(hour)s:%(minute)s:%(second)s:%(subsecond)s"
 msgstr "%(hour)s:%(minute)s:%(second)s:%(subsecond)s"
 
-#: rapid/subfolderfile.py:301
+#: rapid/subfolderfile.py:325
+msgid "subfolder and filename"
+msgstr "подфасцикла и назив датотеке"
+
+#: rapid/subfolderfile.py:406
 msgid "Photo has already been downloaded"
 msgstr "Фотографије су већ преузете"
 
-#: rapid/subfolderfile.py:302
+#: rapid/subfolderfile.py:407
 #, python-format
 msgid "Source: %(source)s"
 msgstr "Извор: %(source)s"
 
-#: rapid/subfolderfile.py:354
-msgid "subfolder and filename"
-msgstr "подфасцикла и назив датотеке"
-
-#: rapid/subfolderfile.py:393
+#: rapid/subfolderfile.py:485
 msgid "Failed to create download subfolder"
 msgstr "Не могу да направим подфасциклу за преузимање"
 
-#: rapid/subfolderfile.py:394
+#: rapid/subfolderfile.py:486
 #, python-format
 msgid "Path: %s"
 msgstr "Путања: %s"
 
+#: rapid/glade3/rapid.ui.h:1
+msgid "About..."
+msgstr "О програму..."
+
 #: rapid/glade3/rapid.ui.h:2
-msgid "_File"
-msgstr "_Датотека"
-
-#: rapid/glade3/rapid.ui.h:3
-msgid "Download / Pause"
-msgstr "Преузми / Паузирај"
-
-#: rapid/glade3/rapid.ui.h:4
-msgid "_Select"
-msgstr "_Изабери"
-
-#: rapid/glade3/rapid.ui.h:5
-msgid "Select All Without _Job Code"
-msgstr "Изабери све без к_ода задатка"
-
-#: rapid/glade3/rapid.ui.h:6
-msgid "Select All Wit_h Job Code"
-msgstr "Изабери све са _кодом задатка"
-
-#: rapid/glade3/rapid.ui.h:7
-msgid "_View"
-msgstr "П_реглед"
-
-#: rapid/glade3/rapid.ui.h:8
-msgid "_Error Log"
-msgstr "Списак са _грешкама"
-
-#: rapid/glade3/rapid.ui.h:9
-msgid "_Clear Completed Downloads"
-msgstr "_Очисти завршена преузимања"
-
-#: rapid/glade3/rapid.ui.h:10
-msgid "Previous File"
-msgstr "Претходна датотека"
-
-#: rapid/glade3/rapid.ui.h:11
-msgid "Next File"
-msgstr "Следећа датотека"
-
-#: rapid/glade3/rapid.ui.h:12
-msgid "_Help"
-msgstr "_Помоћ"
-
-#: rapid/glade3/rapid.ui.h:13
-msgid "_Make a Donation..."
-msgstr "_Приложите неки динар..."
-
-#: rapid/glade3/rapid.ui.h:14
-msgid "_Translate this Application..."
-msgstr "_Преведите овај програм..."
-
-#: rapid/glade3/rapid.ui.h:15
 msgid "_Check All"
 msgstr "Изабери _све"
 
-#: rapid/glade3/rapid.ui.h:16
+#: rapid/glade3/rapid.ui.h:3
+msgid "Check All Photos"
+msgstr "Изабери све фотографије"
+
+#: rapid/glade3/rapid.ui.h:4
+msgid "Check All Videos"
+msgstr "Изабери све снимке"
+
+#: rapid/glade3/rapid.ui.h:5
+msgid "_Make a Donation..."
+msgstr "_Приложите неки динар..."
+
+#: rapid/glade3/rapid.ui.h:7
+msgid "_Get Help Online..."
+msgstr "Помоћ на _мрежи"
+
+#: rapid/glade3/rapid.ui.h:8
+msgid "Help"
+msgstr "Помоћ"
+
+#: rapid/glade3/rapid.ui.h:9
+msgid "Preferences"
+msgstr "Поставке"
+
+#: rapid/glade3/rapid.ui.h:10
+msgid "Quit"
+msgstr "Изађи"
+
+#: rapid/glade3/rapid.ui.h:11
+msgid "Refresh"
+msgstr "Освежи"
+
+#: rapid/glade3/rapid.ui.h:12
+msgid "_Report a Problem..."
+msgstr "_Пријављивање грешака"
+
+#: rapid/glade3/rapid.ui.h:13
+msgid "Translate this Application..."
+msgstr "Преведите овај програм..."
+
+#: rapid/glade3/rapid.ui.h:14
 msgid "_Uncheck All"
 msgstr "_Поништи сав избор"
 
+#: rapid/glade3/rapid.ui.h:16
+msgid "_File"
+msgstr "_Датотека"
+
 #: rapid/glade3/rapid.ui.h:17
+msgid "Download / Pause"
+msgstr "Преузми / Паузирај"
+
+#: rapid/glade3/rapid.ui.h:18
+msgid "_Select"
+msgstr "_Изабери"
+
+#: rapid/glade3/rapid.ui.h:19
+msgid "Select All Without _Job Code"
+msgstr "Изабери све без к_ода задатка"
+
+#: rapid/glade3/rapid.ui.h:20
+msgid "Select All Wit_h Job Code"
+msgstr "Изабери све са _кодом задатка"
+
+#: rapid/glade3/rapid.ui.h:21
+msgid "_View"
+msgstr "П_реглед"
+
+#: rapid/glade3/rapid.ui.h:22
+msgid "_Error Log"
+msgstr "Списак са _грешкама"
+
+#: rapid/glade3/rapid.ui.h:23
+msgid "_Clear Completed Downloads"
+msgstr "_Очисти завршена преузимања"
+
+#: rapid/glade3/rapid.ui.h:24
+msgid "Previous File"
+msgstr "Претходна датотека"
+
+#: rapid/glade3/rapid.ui.h:25
+msgid "Next File"
+msgstr "Следећа датотека"
+
+#: rapid/glade3/rapid.ui.h:26
+msgid "_Help"
+msgstr "_Помоћ"
+
+#: rapid/glade3/rapid.ui.h:27
+msgid "_Translate this Application..."
+msgstr "_Преведите овај програм..."
+
+#: rapid/glade3/rapid.ui.h:28
 msgid "_Include in download"
 msgstr "_Укључи у преузето"
 
-#: rapid/glade3/rapid.ui.h:18
+#: rapid/glade3/rapid.ui.h:29
 msgid "_Download"
 msgstr "_Преузми"
 
@@ -1809,7 +1908,7 @@ msgstr ""
 "нпр. на спољним дисковима."
 
 #: rapid/glade3/prefs.ui.h:69
-msgid "Backup photos and videos when downloading"
+msgid "Back up photos and videos when downloading"
 msgstr "Направи резерву слика и видеа при преузимању"
 
 #: rapid/glade3/prefs.ui.h:70
@@ -1851,8 +1950,8 @@ msgid "Video backup location:"
 msgstr "Путања до резервног видеа:"
 
 #: rapid/glade3/prefs.ui.h:79
-msgid "Backup"
-msgstr "Резерва"
+msgid "Back up"
+msgstr ""
 
 #: rapid/glade3/prefs.ui.h:80
 msgid "<span weight=\"bold\" size=\"x-large\">Miscellaneous</span>"
@@ -1886,35 +1985,39 @@ msgstr "Изађи из програма чак и када постоје гр�
 msgid "Automatically rotate JPEG images"
 msgstr "Сам окрени слике"
 
-#: rapid/glade3/prefs.ui.h:88
+#: rapid/glade3/prefs.ui.h:89
+msgid "Verify files as they are downloaded"
+msgstr "Проверава датотеке након преузимања"
+
+#: rapid/glade3/prefs.ui.h:90
 msgid "Performance"
 msgstr "Учинак"
 
-#: rapid/glade3/prefs.ui.h:89
+#: rapid/glade3/prefs.ui.h:91
 msgid "Generate thumbnails (slower)"
 msgstr "Изгради умањене приказе (спорије)"
 
-#: rapid/glade3/prefs.ui.h:90
+#: rapid/glade3/prefs.ui.h:92
 msgid "Miscellaneous"
 msgstr "Остало"
 
-#: rapid/glade3/prefs.ui.h:91
+#: rapid/glade3/prefs.ui.h:93
 msgid "<span weight=\"bold\" size=\"x-large\">Error Handling</span>"
 msgstr "<span weight=\"bold\" size=\"x-large\">Превазилажење грешака</span>"
 
-#: rapid/glade3/prefs.ui.h:92
+#: rapid/glade3/prefs.ui.h:94
 msgid "<b>Photo and Video Name Conflicts</b>"
 msgstr "<b>Сукоби назива видеа и слика</b>"
 
-#: rapid/glade3/prefs.ui.h:93
+#: rapid/glade3/prefs.ui.h:95
 msgid "Add unique identifier"
 msgstr "Додај јединствену реч"
 
-#: rapid/glade3/prefs.ui.h:94
+#: rapid/glade3/prefs.ui.h:96
 msgid "Skip download"
 msgstr "Прескочи преузимање"
 
-#: rapid/glade3/prefs.ui.h:95
+#: rapid/glade3/prefs.ui.h:97
 msgid ""
 "When a photo or video of the same name has already been downloaded, choose "
 "whether to skip downloading the file, or to add a unique indentifier."
@@ -1922,7 +2025,7 @@ msgstr ""
 "Када је већ преузета фотографија или видео са истим називом, изаберите или "
 "да је прескочите или да јој додате јединствену ознаку."
 
-#: rapid/glade3/prefs.ui.h:96
+#: rapid/glade3/prefs.ui.h:98
 msgid ""
 "When backing up, choose whether to overwrite a file on the backup device "
 "that has the same name, or skip backing it up."
@@ -1930,15 +2033,15 @@ msgstr ""
 "Да ли да препишем датотеку са истим називом на резервном уређају или да је "
 "прескочим приликом прављења резерве."
 
-#: rapid/glade3/prefs.ui.h:97
+#: rapid/glade3/prefs.ui.h:99
 msgid "Overwrite"
 msgstr "Препиши"
 
-#: rapid/glade3/prefs.ui.h:98
+#: rapid/glade3/prefs.ui.h:100
 msgid "Skip"
 msgstr "Прескочи"
 
-#: rapid/glade3/prefs.ui.h:99
+#: rapid/glade3/prefs.ui.h:101
 msgid "Error Handling"
 msgstr "Руковање грешкама"
 
@@ -2377,9 +2480,6 @@ msgstr "Увезите ваше фотографије и видео брзо и
 #~ "Можете направити резервне копије фотографија на више места приликом "
 #~ "преузимања, нпр. на спољним дисковима."
 
-#~ msgid "_Get Help Online..."
-#~ msgstr "Помоћ на _мрежи"
-
 #~ msgid ""
 #~ "Specify the folder in which backups are stored on the device.  \n"
 #~ "\n"
@@ -2533,9 +2633,6 @@ msgstr "Увезите ваше фотографије и видео брзо и
 #~ msgid "_Photos"
 #~ msgstr "_Фотографија"
 
-#~ msgid "_Report a Problem..."
-#~ msgstr "_Пријављивање грешака"
-
 #~ msgid "Download Folder"
 #~ msgstr "Фасциклe"
 
@@ -2580,3 +2677,6 @@ msgstr "Увезите ваше фотографије и видео брзо и
 
 #~ msgid "<b>Image Rename</b>"
 #~ msgstr "<b>Преименовање фотографија</b>"
+
+#~ msgid "Backup"
+#~ msgstr "Резерва"

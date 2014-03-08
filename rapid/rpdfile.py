@@ -1,7 +1,7 @@
 #!/usr/bin/python
 # -*- coding: latin1 -*-
 
-### Copyright (C) 2011-2012 Damon Lynch <damonlynch@gmail.com>
+### Copyright (C) 2011-2014 Damon Lynch <damonlynch@gmail.com>
 
 ### This program is free software; you can redistribute it and/or modify
 ### it under the terms of the GNU General Public License as published by
@@ -48,7 +48,7 @@ RAW_EXTENSIONS = ['arw', 'dcr', 'cr2', 'crw',  'dng', 'mos', 'mef', 'mrw',
 
 JPEG_EXTENSIONS = ['jpg', 'jpe', 'jpeg']
 
-NON_RAW_IMAGE_EXTENSIONS = JPEG_EXTENSIONS + ['tif', 'tiff']
+NON_RAW_IMAGE_EXTENSIONS = JPEG_EXTENSIONS + ['tif', 'tiff', 'mpo']
 
 PHOTO_EXTENSIONS = RAW_EXTENSIONS + NON_RAW_IMAGE_EXTENSIONS
 

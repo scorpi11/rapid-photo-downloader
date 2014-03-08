@@ -1,7 +1,7 @@
 #!/usr/bin/python
 # -*- coding: latin1 -*-
 
-### Copyright (C) 2011-2012 Damon Lynch <damonlynch@gmail.com>
+### Copyright (C) 2011-2014 Damon Lynch <damonlynch@gmail.com>
 
 ### This program is free software; you can redistribute it and/or modify
 ### it under the terms of the GNU General Public License as published by
@@ -743,39 +743,40 @@ class ThumbnailDisplay(gtk.IconView):
             self.previews_being_fetched.add(unique_id)
 
     def show_preview(self, unique_id=None, iter=None):
-        if unique_id is not None:
-            iter = self.get_iter_from_unique_id(unique_id)
-        elif iter is not None:
-            unique_id = self.get_unique_id_from_iter(iter)
-        else:
-            # neither an iter or a unique_id were passed
-            # use iter from first selected file
-            # if none is selected, choose the first file
-            selected = self.get_selected_items()
-            if selected:
-                path = selected[0]
+        if len(self.liststore):
+            if unique_id is not None:
+                iter = self.get_iter_from_unique_id(unique_id)
+            elif iter is not None:
+                unique_id = self.get_unique_id_from_iter(iter)
             else:
-                path = 0
-            iter = self.liststore.get_iter(path)
-            unique_id = self.get_unique_id_from_iter(iter)
+                # neither an iter or a unique_id were passed
+                # use iter from first selected file
+                # if none is selected, choose the first file
+                selected = self.get_selected_items()
+                if selected:
+                    path = selected[0]
+                else:
+                    path = 0
+                iter = self.liststore.get_iter(path)
+                unique_id = self.get_unique_id_from_iter(iter)
 
 
-        rpd_file = self.rpd_files[unique_id]
+            rpd_file = self.rpd_files[unique_id]
 
-        if unique_id in self.previews:
-            preview_image = self.previews[unique_id]
-        else:
-            # request daemon process to get a full size thumbnail
-            self._get_preview(unique_id, rpd_file)
-            if unique_id in self.thumbnails:
-                preview_image = self.thumbnails[unique_id]
+            if unique_id in self.previews:
+                preview_image = self.previews[unique_id]
             else:
-                preview_image = self.get_stock_icon(rpd_file.file_type)
+                # request daemon process to get a full size thumbnail
+                self._get_preview(unique_id, rpd_file)
+                if unique_id in self.thumbnails:
+                    preview_image = self.thumbnails[unique_id]
+                else:
+                    preview_image = self.get_stock_icon(rpd_file.file_type)
 
-        checked = self.liststore.get_value(iter, self.SELECTED_COL)
-        include_checkbutton_visible = rpd_file.status == STATUS_NOT_DOWNLOADED
-        self.rapid_app.show_preview_image(unique_id, preview_image,
-                                            include_checkbutton_visible, checked)
+            checked = self.liststore.get_value(iter, self.SELECTED_COL)
+            include_checkbutton_visible = rpd_file.status == STATUS_NOT_DOWNLOADED
+            self.rapid_app.show_preview_image(unique_id, preview_image,
+                                                include_checkbutton_visible, checked)
 
     def _get_next_iter(self, iter):
         iter = self.liststore.iter_next(iter)
@@ -1249,12 +1250,14 @@ class CopyFilesManager(TaskManager):
         video_download_folder = task[1]
         scan_pid = task[2]
         files = task[3]
-        modify_files_during_download = task[4]
-        modify_pipe = task[5]
+        verify_files = task[4]
+        modify_files_during_download = task[5]
+        modify_pipe = task[6]
 
         copy_files = copyfiles.CopyFiles(photo_download_folder,
                                 video_download_folder,
                                 files,
+                                verify_files,
                                 modify_files_during_download,
                                 modify_pipe,
                                 scan_pid, self.batch_size,
@@ -1276,7 +1279,7 @@ class ThumbnailManager(TaskManager):
         return generator.pid
 
 class FileModifyManager(TaskManager):
-    """Handles the modification of downloaded files before they are renamed
+    """Handles the modification or verification of of downloaded files before they are renamed
     Duplex, multiprocess, similar to BackupFilesManager
     """
     def __init__(self, results_callback):
@@ -1289,8 +1292,11 @@ class FileModifyManager(TaskManager):
         scan_pid = task[0]
         auto_rotate_jpeg = task[1]
         focal_length = task[2]
+        verify_file = task[3]
+        refresh_md5_on_file_change = task[4]
 
         file_modify = filemodify.FileModify(auto_rotate_jpeg, focal_length,
+                                        verify_file, refresh_md5_on_file_change,
                                         task_process_conn, terminate_queue,
                                         run_event)
         file_modify.start()
@@ -1329,7 +1335,7 @@ class BackupFilesManager(TaskManager):
 
     def _send_termination_msg(self, p):
         p[1].put(None)
-        p[3].send((None, None, None, None, None))
+        p[3].send((None, None, None, None, None, None, None))
 
     def _initiate_task(self, task, task_results_conn, task_process_conn,
                        terminate_queue, run_event):
@@ -1350,6 +1356,7 @@ class BackupFilesManager(TaskManager):
 
     def backup_file(self, move_succeeded, rpd_file, path_suffix,
                                                 backup_duplicate_overwrite,
+                                                verify_file,
                                                 download_count):
 
         if rpd_file.file_type == rpdfile.FILE_TYPE_PHOTO:
@@ -1359,15 +1366,21 @@ class BackupFilesManager(TaskManager):
 
         for path in self.backup_devices_by_path:
             backup_type = self.backup_devices_by_path[path][2]
-            if ((backup_type == PHOTO_VIDEO_BACKUP) or
+            do_backup = ((backup_type == PHOTO_VIDEO_BACKUP) or
                     (rpd_file.file_type == rpdfile.FILE_TYPE_PHOTO and backup_type == PHOTO_BACKUP) or
-                    (rpd_file.file_type == rpdfile.FILE_TYPE_VIDEO and backup_type == VIDEO_BACKUP)):
+                    (rpd_file.file_type == rpdfile.FILE_TYPE_VIDEO and backup_type == VIDEO_BACKUP))
+            if do_backup:
                 logger.debug("Backing up to %s", path)
-                task_results_conn = self.backup_devices_by_path[path][0]
-                task_results_conn.send((move_succeeded, rpd_file, path_suffix,
-                                    backup_duplicate_overwrite, download_count))
             else:
                 logger.debug("Not backing up to %s", path)
+            # Even if not going to backup to this device, need to send it anyway so
+            # progress bar can be updated. Not this most efficient but the
+            # code is much more simple
+            task_results_conn = self.backup_devices_by_path[path][0]
+            task_results_conn.send((move_succeeded, do_backup, rpd_file,
+                                path_suffix,
+                                backup_duplicate_overwrite,
+                                verify_file, download_count))
 
     def add_device(self, path, name, backup_type):
         """
@@ -2343,8 +2356,8 @@ class RapidApp(dbus.service.Object):
         self.download_active_by_scan_pid = []
 
     def modify_files_during_download(self):
-        """ Returns True if there is a need to modify files during download"""
-        return self.prefs.auto_rotate_jpeg or (self.focal_length is not None)
+        """ Returns True if there is a need to modify or verify files during download"""
+        return self.prefs.auto_rotate_jpeg or (self.focal_length is not None) or self.prefs.verify_file
 
 
     def start_download(self, scan_pid=None):
@@ -2355,6 +2368,7 @@ class RapidApp(dbus.service.Object):
         """
 
         files_by_scan_pid = self.thumbnails.get_files_checked_for_download(scan_pid)
+        self.check_file_types_to_be_downloaded(files_by_scan_pid)
         folders_valid, invalid_dirs = self.check_download_folder_validity(files_by_scan_pid)
 
         if not folders_valid:
@@ -2366,6 +2380,18 @@ class RapidApp(dbus.service.Object):
             self.log_error(config.CRITICAL_ERROR, _("Download cannot proceed"),
                 msg)
         else:
+            missing_destinations = self.backup_destinations_missing()
+            if missing_destinations is not None:
+                # Warn user that they have specified that they want to backup a file type, but no such folder exists on backup devices
+                if not missing_destinations[0]:
+                    logger.warning("No backup device contains a valid folder for backing up photos")
+                    msg = _("No backup device contains a valid folder for backing up %(filetype)s") % {'filetype': _('photos')}
+                else:
+                    logger.warning("No backup device contains a valid folder for backing up videos")
+                    msg = _("No backup device contains a valid folder for backing up %(filetype)s") % {'filetype': _('videos')}
+
+                self.log_error(config.WARNING, _("Backup problem"), msg)
+
             # set time download is starting if it is not already set
             # it is unset when all downloads are completed
             if self.download_start_time is None:
@@ -2457,9 +2483,17 @@ class RapidApp(dbus.service.Object):
             for rpd_file in files:
                 rpd_file.generate_thumbnail = True
 
+        verify_file = self.prefs.verify_file
+        if verify_file:
+            # since a file might be modified in the file modify process,
+            # if it will be backed up, need to refresh the md5 once it has
+            # been modified
+            refresh_md5_on_file_change = self.prefs.backup_images
+        else:
+            refresh_md5_on_file_change = False
         modify_files_during_download = self.modify_files_during_download()
         if modify_files_during_download:
-            self.file_modify_manager.add_task((scan_pid, self.prefs.auto_rotate_jpeg, self.focal_length))
+            self.file_modify_manager.add_task((scan_pid, self.prefs.auto_rotate_jpeg, self.focal_length, verify_file, refresh_md5_on_file_change))
             modify_pipe = self.file_modify_manager.get_modify_pipe(scan_pid)
         else:
             modify_pipe = None
@@ -2468,7 +2502,8 @@ class RapidApp(dbus.service.Object):
         # Initiate copy files process
         self.copy_files_manager.add_task((photo_download_folder,
                               video_download_folder, scan_pid,
-                              files, modify_files_during_download,
+                              files, verify_file,
+                              modify_files_during_download,
                               modify_pipe))
 
     def copy_files_results(self, source, condition):
@@ -2549,11 +2584,13 @@ class RapidApp(dbus.service.Object):
             rpd_file.synchronize_raw_jpg = self.prefs.must_synchronize_raw_jpg()
             rpd_file.job_code = self.job_code
 
-            self.subfolder_file_manager.rename_file_and_move_to_subfolder(
-                    download_succeeded,
-                    download_count,
-                    rpd_file
-                    )
+        # Call this even if download did not succeed e.g. file verification error
+        self.subfolder_file_manager.rename_file_and_move_to_subfolder(
+                download_succeeded,
+                download_count,
+                rpd_file
+                )
+
     def file_modify_results(self, source, condition):
         """
         'file modify' is a process that runs immediately after 'copy files',
@@ -2595,21 +2632,38 @@ class RapidApp(dbus.service.Object):
             self.log_error(config.WARNING, rpd_file.error_title,
                            rpd_file.error_msg, rpd_file.error_extra_detail)
 
-        if self.prefs.backup_images and len(self.backup_devices):
-            if self.prefs.backup_device_autodetection:
-                if rpd_file.file_type == rpdfile.FILE_TYPE_PHOTO:
-                    path_suffix = self.prefs.backup_identifier
+        if self.prefs.backup_images:
+            if self.backup_possible(rpd_file.file_type):
+                if self.prefs.backup_device_autodetection:
+                    if rpd_file.file_type == rpdfile.FILE_TYPE_PHOTO:
+                        path_suffix = self.prefs.backup_identifier
+                    else:
+                        path_suffix = self.prefs.video_backup_identifier
                 else:
-                    path_suffix = self.prefs.video_backup_identifier
-            else:
-                path_suffix = None
+                    path_suffix = None
 
-            self.backup_manager.backup_file(move_succeeded, rpd_file,
-                                    path_suffix,
-                                    self.prefs.backup_duplicate_overwrite,
-                                    download_count)
+                self.backup_manager.backup_file(move_succeeded, rpd_file,
+                                        path_suffix,
+                                        self.prefs.backup_duplicate_overwrite,
+                                        self.prefs.verify_file,
+                                        download_count)
+            else:
+                if rpd_file.status ==  config.STATUS_DOWNLOAD_FAILED:
+                    rpd_file.status = config.STATUS_DOWNLOAD_AND_BACKUP_FAILED
+                else:
+                    rpd_file.status = config.STATUS_BACKUP_PROBLEM
+
+                self.file_download_finished(move_succeeded, rpd_file)
         else:
             self.file_download_finished(move_succeeded, rpd_file)
+
+    def backup_possible(self, file_type):
+        if file_type == rpdfile.FILE_TYPE_PHOTO:
+            return self.no_photo_backup_devices > 0
+        elif file_type == rpdfile.FILE_TYPE_VIDEO:
+            return self.no_video_backup_devices > 0
+        else:
+            logger.critical("Unrecognized file type when determining if backup is possible")
 
 
     def multiple_backup_devices(self, file_type):
@@ -2641,22 +2695,24 @@ class RapidApp(dbus.service.Object):
                 self.time_remaining.update(scan_pid, bytes_downloaded=chunk_downloaded)
 
             elif msg_type == rpdmp.MSG_FILE:
-                backup_succeeded, rpd_file = data
+                backup_succeeded, do_backup, rpd_file = data
 
                 # Only show an error message if there is more than one device
                 # backing up files of this type - if that is the case,
-                # do not want to reply on showing an error message in the
+                # do not want to rely on showing an error message in the
                 # function file_download_finished, as it is only called once,
                 # when all files have been backed up
-                if not backup_succeeded and self.multiple_backup_devices(rpd_file.file_type):
+                if not backup_succeeded and self.multiple_backup_devices(rpd_file.file_type) and do_backup:
                     self.log_error(config.SERIOUS_ERROR,
                         rpd_file.error_title,
                         rpd_file.error_msg, rpd_file.error_extra_detail)
 
-                self.download_tracker.file_backed_up(rpd_file.unique_id)
-                if self.download_tracker.all_files_backed_up(rpd_file.unique_id,
+                if do_backup:
+                    self.download_tracker.file_backed_up(rpd_file.unique_id)
+                    if self.download_tracker.all_files_backed_up(rpd_file.unique_id,
                                                              rpd_file.file_type):
-                    self.file_download_finished(backup_succeeded, rpd_file)
+                        logger.debug("File %s will not be backed up to any more locations", rpd_file.download_name)
+                        self.file_download_finished(backup_succeeded or not do_backup, rpd_file)
             return True
         else:
             return False
@@ -2901,7 +2957,7 @@ class RapidApp(dbus.service.Object):
         files_to_download = self.download_tracker.get_no_files_in_download(scan_pid)
         file_types = self.download_tracker.get_file_types_present(scan_pid)
         completed = files_downloaded == files_to_download
-        if completed and (self.prefs.backup_images and len(self.backup_devices)):
+        if completed and (self.prefs.backup_images and self.backup_possible(file_type)):
             completed = self.download_tracker.all_files_backed_up(unique_id, file_type)
 
         if completed:
@@ -3753,6 +3809,22 @@ class RapidApp(dbus.service.Object):
 
         return (photo_size, video_size)
 
+    def check_file_types_to_be_downloaded(self, files_by_scan_pid):
+        """Determines what types of files need to be downloaded, setting
+        self.downloading_photos and self.downloading_videos accordingly"""
+        self.downloading_photos = False
+        self.downloading_videos = False
+        while not self.downloading_photos and not self.downloading_videos:
+            for scan_pid in files_by_scan_pid:
+                files = files_by_scan_pid[scan_pid]
+                if not self.downloading_photos:
+                    if self.files_of_type_present(files, rpdfile.FILE_TYPE_PHOTO):
+                        self.downloading_photos = True
+                if not self.downloading_videos:
+                    if self.files_of_type_present(files, rpdfile.FILE_TYPE_VIDEO):
+                        self.downloading_videos = True
+
+
     def check_download_folder_validity(self, files_by_scan_pid):
         """
         Checks validity of download folders based on the file types the user
@@ -3763,21 +3835,8 @@ class RapidApp(dbus.service.Object):
         """
         valid = True
         invalid_dirs = []
-        # first, check what needs to be downloaded - photos and / or videos
-        need_photo_folder = False
-        need_video_folder = False
-        while not need_photo_folder and not need_video_folder:
-            for scan_pid in files_by_scan_pid:
-                files = files_by_scan_pid[scan_pid]
-                if not need_photo_folder:
-                    if self.files_of_type_present(files, rpdfile.FILE_TYPE_PHOTO):
-                        need_photo_folder = True
-                if not need_video_folder:
-                    if self.files_of_type_present(files, rpdfile.FILE_TYPE_VIDEO):
-                        need_video_folder = True
 
-        # second, check validity
-        if need_photo_folder:
+        if self.downloading_photos:
             if not self.is_valid_download_dir(self.prefs.download_folder,
                                                         is_photo_dir=True):
                 valid = False
@@ -3786,7 +3845,7 @@ class RapidApp(dbus.service.Object):
                 logger.debug("Photo download folder is valid: %s",
                         self.prefs.download_folder)
 
-        if need_video_folder:
+        if self.downloading_videos:
             if not self.is_valid_download_dir(self.prefs.video_download_folder,
                                                         is_photo_dir=False):
                 valid = False
@@ -3797,6 +3856,19 @@ class RapidApp(dbus.service.Object):
 
 
         return (valid, invalid_dirs)
+
+    def backup_destinations_missing(self):
+        if self.prefs.backup_images and self.prefs.backup_device_autodetection:
+            photo_backup_ok = video_backup_ok = True
+            if self.downloading_photos and not self.backup_possible(rpdfile.FILE_TYPE_PHOTO):
+                photo_backup_ok = False
+            if self.downloading_videos and not self.backup_possible(rpdfile.FILE_TYPE_VIDEO):
+                video_backup_ok = False
+            if photo_backup_ok and video_backup_ok:
+                return None
+            else:
+                return (photo_backup_ok, video_backup_ok)
+        return None
 
     def same_file_system(self, file1, file2):
         """Returns True if the files / diretories are on the same file system
