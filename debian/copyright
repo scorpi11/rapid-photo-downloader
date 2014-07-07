@@ -40,6 +40,7 @@ License: other
 Files: debian/*
 Copyright: 2009 Damon Lynch <damonlynch@gmail.com>
            2009-2011 Julien Valroff <julien@debian.org>
+           2014      Jörg Frings-Fürst <debian@jff-webhosting.net>
 License: GPL-2+
 
 License: GPL-2+

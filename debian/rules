@@ -16,3 +16,6 @@ override_dh_auto_clean:
 	-rm rapid-photo-downloader.1
 	-rm -rf build/
 	dh_auto_clean
+
+override_dh_installchangelogs:
+	dh_installchangelogs rapid/ChangeLog

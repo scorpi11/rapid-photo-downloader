@@ -1,3 +1,13 @@
+rapid-photo-downloader (0.4.10-2) unstable; urgency=medium
+
+  * add debian/source/options
+  * add upstream changelog
+  * change debian/compat to 9
+  * change VCS
+  * New maintainer ( Closes: #753568 ) 
+
+ -- Jörg Frings-Fürst <debian@jff-webhosting.net>  Sat, 05 Jul 2014 21:48:39 +0200
+
 rapid-photo-downloader (0.4.10-1) unstable; urgency=medium
 
   * New upstream release
