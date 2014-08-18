@@ -12,6 +12,7 @@ rapid-photo-downloader (0.4.10-2) unstable; urgency=medium
   * debian/copyright:
     - Add myself to the list of authors for debian/*.
     - Update copyright years for 2014.
+    - Change License for rapid/ValidatedEntry.py from other to Expat.
     - Remove non-existing files.
   * debian/rules:
     - Install upstream changelog from rapid/ChangeLog.
@@ -19,7 +20,7 @@ rapid-photo-downloader (0.4.10-2) unstable; urgency=medium
     - Add missing Keywords entry to the .desktop file.
   * Change debian/compat to 9 (no changes required).
 
- -- Jörg Frings-Fürst <debian@jff-webhosting.net>  Mon, 18 Aug 2014 06:33:39 +0200
+ -- Jörg Frings-Fürst <debian@jff-webhosting.net>  Mon, 18 Aug 2014 14:35:55 +0200
 
 rapid-photo-downloader (0.4.10-1) unstable; urgency=medium
 
