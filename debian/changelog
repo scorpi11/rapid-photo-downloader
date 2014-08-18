@@ -1,12 +1,25 @@
 rapid-photo-downloader (0.4.10-2) unstable; urgency=medium
 
-  * add debian/source/options
-  * add upstream changelog
-  * change debian/compat to 9
-  * change VCS
-  * New maintainer ( Closes: #753568 ) 
+  * New maintainer (Closes: #753568).
+  * debian/control:
+    - Set myself as maintainer.
+    - Vcs:
+      + Remove upstream Vcs.
+      + Create a new git repository on alioth.
+      + Add the Fields Vcs-Browser and Vcs-Git.
+  * Add debian/source/options:
+    - Set compression to xz & compression-level to 9 to save space.
+  * debian/copyright:
+    - Add myself to the list of authors for debian/*.
+    - Update copyright years for 2014.
+    - Remove non-existing files.
+  * debian/rules:
+    - Install upstream changelog from rapid/ChangeLog.
+  * New debian/patches/10-keywords_desktop.patch
+    - Add missing Keywords entry to the .desktop file.
+  * Change debian/compat to 9 (no changes required).
 
- -- Jörg Frings-Fürst <debian@jff-webhosting.net>  Sat, 05 Jul 2014 21:48:39 +0200
+ -- Jörg Frings-Fürst <debian@jff-webhosting.net>  Mon, 18 Aug 2014 06:33:39 +0200
 
 rapid-photo-downloader (0.4.10-1) unstable; urgency=medium
 

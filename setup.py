@@ -86,6 +86,7 @@ photo and video renaming, and backup.
     data_files=[
         ('share/applications', ['data/rapid-photo-downloader.desktop']),
         ('share/pixmaps', ['data/icons/48x48/apps/rapid-photo-downloader.png', 'data/icons/rapid-photo-downloader.xpm']),
+        ('share/icons/hicolor/scalable/apps', glob.glob('data/icons/scalable/apps/*.svg')),
         ('share/icons/hicolor/16x16/apps', glob.glob('data/icons/16x16/apps/*.png')),
         ('share/icons/hicolor/22x22/apps', glob.glob('data/icons/22x22/apps/*.png')),
         ('share/icons/hicolor/24x24/apps', glob.glob('data/icons/24x24/apps/*.png')),

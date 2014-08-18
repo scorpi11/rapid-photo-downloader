@@ -1,0 +1,16 @@
+Description: Add _Keywords to .desktop file
+Author: Jörg Frings-Fürst <debian@jff-webhosting.net>
+Forwarded: not-needed
+Last-Update: 2014-08-18
+---
+This patch header follows DEP-3: http://dep.debian.net/deps/dep3/
+Index: trunk/data/rapid-photo-downloader.desktop
+===================================================================
+--- trunk.orig/data/rapid-photo-downloader.desktop	2012-05-30 08:26:48.000000000 +0200
++++ trunk/data/rapid-photo-downloader.desktop	2014-08-18 06:16:54.989481934 +0200
+@@ -9,3 +9,4 @@
+ Terminal=false
+ Type=Application
+ Categories=Graphics;Photography;
++Keywords=photo;download;graphics;photography;
+\ No newline at end of file
