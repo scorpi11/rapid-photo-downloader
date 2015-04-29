@@ -1,10 +1,11 @@
 Description: Remove empty directory from installation
 Author: Julien Valroff <julien@debian.org>
 
-diff -Nur -x '*.orig' -x '*~' rapid-photo-downloader/setup.py rapid-photo-downloader.new/setup.py
---- rapid-photo-downloader/setup.py	2009-07-26 14:18:01.000000000 +0200
-+++ rapid-photo-downloader.new/setup.py	2009-11-15 09:42:03.969423282 +0100
-@@ -66,7 +66,6 @@
+Index: trunk/setup.py
+===================================================================
+--- trunk.orig/setup.py
++++ trunk/setup.py
+@@ -86,7 +86,6 @@ photo and video renaming, and backup.
      data_files=[
          ('share/applications', ['data/rapid-photo-downloader.desktop']),
          ('share/pixmaps', ['data/icons/48x48/apps/rapid-photo-downloader.png', 'data/icons/rapid-photo-downloader.xpm']),
@@ -12,4 +13,3 @@ diff -Nur -x '*.orig' -x '*~' rapid-photo-downloader/setup.py rapid-photo-downlo
          ('share/icons/hicolor/16x16/apps', glob.glob('data/icons/16x16/apps/*.png')),
          ('share/icons/hicolor/22x22/apps', glob.glob('data/icons/22x22/apps/*.png')),
          ('share/icons/hicolor/24x24/apps', glob.glob('data/icons/24x24/apps/*.png')),
-
