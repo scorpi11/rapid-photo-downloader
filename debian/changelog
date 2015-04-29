@@ -5,6 +5,8 @@ rapid-photo-downloader (0.4.10-3) UNRELEASED; urgency=medium
   * New debian/lintian-overrides:
     - Override the warning "desktop-mime-but-no-exec-code" because
       the program don't use parameters for filenames.
+  * debian/copyright:
+    - Add year 2015.
 
  -- Jörg Frings-Fürst <debian@jff-webhosting.net>  Wed, 29 Apr 2015 10:34:43 +0200
 
