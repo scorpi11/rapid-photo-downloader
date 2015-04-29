@@ -7,6 +7,7 @@ rapid-photo-downloader (0.4.10-3) UNRELEASED; urgency=medium
       the program don't use parameters for filenames.
   * debian/copyright:
     - Add year 2015.
+  * Remove debian/source/options because compression xz is standard now.
 
  -- Jörg Frings-Fürst <debian@jff-webhosting.net>  Wed, 29 Apr 2015 10:34:43 +0200
 
