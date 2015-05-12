@@ -1,7 +1,9 @@
-rapid-photo-downloader (0.4.10-3) UNRELEASED; urgency=medium
+rapid-photo-downloader (0.4.10-3) unstable; urgency=medium
 
   * debian/control:
     - Bump Standards-Version to 3.9.6 (no changes required).
+    - Add dh-python to Build-Depends to prevent warning at build.
+    - Remove X-Python-Version 2.6 during installation errors.
   * New debian/lintian-overrides:
     - Override the warning "desktop-mime-but-no-exec-code" because
       the program don't use parameters for filenames.
@@ -10,7 +12,7 @@ rapid-photo-downloader (0.4.10-3) UNRELEASED; urgency=medium
   * Remove debian/source/options because compression xz is standard now.
   * Refresh patches.
 
- -- Jörg Frings-Fürst <debian@jff-webhosting.net>  Wed, 29 Apr 2015 10:34:43 +0200
+ -- Jörg Frings-Fürst <debian@jff-webhosting.net>  Mon, 11 May 2015 23:43:30 +0200
 
 rapid-photo-downloader (0.4.10-2) unstable; urgency=medium
 
