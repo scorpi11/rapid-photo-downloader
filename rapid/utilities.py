@@ -30,13 +30,13 @@ def get_full_path(path):
         return path
     else:
         return os.path.join(os.path.expanduser('~'), path)
-        
+
 def is_directory(path):
-    
+
     # for some very strange reason, doing it the GIO way fails with
     # unknown type, even for directories!
     return os.path.isdir(path)
-    
+
     if False:
         d = gio.File(path)
         if d.query_exists():
@@ -44,14 +44,14 @@ def is_directory(path):
             file_type = file_info.get_file_type()
             if file_type == gio.FILE_TYPE_DIRECTORY:
                 return True
-            
+
         return False
 
 def format_size_for_user(bytes, zero_string="", with_decimals=True, kb_only=False):
     """Format an int containing the number of bytes into a string suitable for
     printing out to the user.  zero_string is the string to use if bytes == 0.
     source: https://develop.participatoryculture.org/trac/democracy/browser/trunk/tv/portable/util.py?rev=3993
-    
+
     """
     if bytes > (1 << 30) and not kb_only:
         value = (bytes / (1024.0 * 1024.0 * 1024.0))
@@ -84,10 +84,10 @@ def format_size_for_user(bytes, zero_string="", with_decimals=True, kb_only=Fals
 def register_iconsets(icon_info):
     """
     Register icons in the icon set if they're not already used
-    
+
     From http://faq.pygtk.org/index.py?req=show&file=faq08.012.htp
     """
-    
+
     icon_factory = gtk.IconFactory()
     stock_ids = gtk.stock_list_ids()
     for stock_id, file in icon_info:
@@ -113,14 +113,14 @@ def image_to_pixbuf(image):
     # this is also from the pygtk FAQ
     IS_RGBA = image.mode=='RGBA'
     return gtk.gdk.pixbuf_new_from_data(
-            image.tostring(), # data
+            image.tobytes(), # data
             gtk.gdk.COLORSPACE_RGB, # color mode
             IS_RGBA, # has alpha
             8, # bits
             image.size[0], # width
             image.size[1], # height
             (IS_RGBA and 4 or 3) * image.size[0] # rowstride
-            ) 
+            )
 
 def pixbuf_to_image(pb):
     assert(pb.get_colorspace() == gtk.gdk.COLORSPACE_RGB)
@@ -131,22 +131,22 @@ def pixbuf_to_image(pb):
     mode = pb.get_has_alpha() and "RGBA" or "RGB"
     image = Image.frombuffer(mode, dimensions, pixels,
                             "raw", mode, stride, 1)
-                            
+
     if mode == "RGB":
         # convert to having an alpha value, so that the image can
-        # act as a mask in the drop shadow paste 
+        # act as a mask in the drop shadow paste
         image = image.convert("RGBA")
 
     return image
-    
+
 def pythonify_version(v):
     """ makes version number a version number in distutils sense"""
     return distutils.version.StrictVersion(v.replace( '~',''))
-    
+
 def human_readable_version(v):
     """ returns a version in human readable form"""
     v = v.replace('~a', ' alpha ')
     v = v.replace('~b', ' beta ')
     v = v.replace('~rc', ' RC ')
     return v
-        
+
