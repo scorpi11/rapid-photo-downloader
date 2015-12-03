@@ -7,15 +7,15 @@ msgid ""
 msgstr ""
 "Project-Id-Version: rapid\n"
 "Report-Msgid-Bugs-To: FULL NAME <EMAIL@ADDRESS>\n"
-"POT-Creation-Date: 2014-01-21 21:34+0600\n"
-"PO-Revision-Date: 2014-01-22 00:14+0000\n"
-"Last-Translator: Miroslav Matejaš <silverspace@ubuntu-hr.org>\n"
+"POT-Creation-Date: 2014-02-23 21:38+0500\n"
+"PO-Revision-Date: 2015-10-16 09:47+0000\n"
+"Last-Translator: gogo <trebelnik2@gmail.com>\n"
 "Language-Team: Croatian <hr@li.org>\n"
 "MIME-Version: 1.0\n"
 "Content-Type: text/plain; charset=UTF-8\n"
 "Content-Transfer-Encoding: 8bit\n"
-"X-Launchpad-Export-Date: 2014-01-23 13:56+0000\n"
-"X-Generator: Launchpad (build 16901)\n"
+"X-Launchpad-Export-Date: 2015-10-22 09:42+0000\n"
+"X-Generator: Launchpad (build 17812)\n"
 
 #. Translators: if neccessary, for guidance in how to translate this program, you may see http://damonlynch.net/translate.html
 #: rapid/rapid.py:117 rapid/rapid.py:1820 rapid/glade3/rapid.ui.h:15
@@ -169,7 +169,7 @@ msgstr "video"
 #: rapid/rapid.py:2845 rapid/preferencesdialog.py:1631 rapid/rpdfile.py:141
 #: rapid/rpdfile.py:286
 msgid "photo"
-msgstr "slika"
+msgstr "fotografija"
 
 #: rapid/rapid.py:2872
 #, python-format
@@ -1861,8 +1861,8 @@ msgid "Video backup location:"
 msgstr ""
 
 #: rapid/glade3/prefs.ui.h:79
-msgid "Back up"
-msgstr ""
+msgid "Backup"
+msgstr "Sigurnosna kopija"
 
 #: rapid/glade3/prefs.ui.h:80
 msgid "<span weight=\"bold\" size=\"x-large\">Miscellaneous</span>"
@@ -2084,9 +2084,6 @@ msgstr ""
 
 #~ msgid "Automation"
 #~ msgstr "Automatizacija"
-
-#~ msgid "Backup"
-#~ msgstr "Sigurnosna kopija"
 
 #~ msgid "Download Folder"
 #~ msgstr "Direktorij preuzimanja"

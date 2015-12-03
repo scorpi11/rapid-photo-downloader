@@ -129,10 +129,10 @@ class PicklablePIL:
     def __init__(self, image):
         self.size = image.size
         self.mode = image.mode
-        self.image_data = image.tostring()
+        self.image_data = image.tobytes()
 
     def get_image(self):
-        return Image.fromstring(self.mode, self.size, self.image_data)
+        return Image.frombytes(self.mode, self.size, self.image_data)
 
     def get_pixbuf(self):
         return image_to_pixbuf(self.get_image())

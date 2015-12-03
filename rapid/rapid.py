@@ -352,7 +352,7 @@ class DeviceCollection(gtk.TreeView):
 
 
 def create_cairo_image_surface(pil_image, image_width, image_height):
-        imgd = pil_image.tostring("raw","BGRA", 0, 1)
+        imgd = pil_image.tobytes("raw","BGRA", 0, 1)
         data = array.array('B',imgd)
         stride = image_width * 4
         image = cairo.ImageSurface.create_for_data(data, cairo.FORMAT_ARGB32,

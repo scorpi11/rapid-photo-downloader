@@ -7,15 +7,15 @@ msgid ""
 msgstr ""
 "Project-Id-Version: rapid\n"
 "Report-Msgid-Bugs-To: FULL NAME <EMAIL@ADDRESS>\n"
-"POT-Creation-Date: 2014-01-21 21:34+0600\n"
-"PO-Revision-Date: 2014-01-22 00:14+0000\n"
-"Last-Translator: Damon Lynch <damonlynch@gmail.com>\n"
+"POT-Creation-Date: 2014-02-23 21:38+0500\n"
+"PO-Revision-Date: 2014-10-06 15:01+0000\n"
+"Last-Translator: Jaroslav Lichtblau <Unknown>\n"
 "Language-Team: Czech <cs@li.org>\n"
 "MIME-Version: 1.0\n"
 "Content-Type: text/plain; charset=UTF-8\n"
 "Content-Transfer-Encoding: 8bit\n"
-"X-Launchpad-Export-Date: 2014-01-23 13:56+0000\n"
-"X-Generator: Launchpad (build 16901)\n"
+"X-Launchpad-Export-Date: 2015-10-22 09:42+0000\n"
+"X-Generator: Launchpad (build 17812)\n"
 
 #. Translators: if neccessary, for guidance in how to translate this program, you may see http://damonlynch.net/translate.html
 #: rapid/rapid.py:117 rapid/rapid.py:1820 rapid/glade3/rapid.ui.h:15
@@ -86,6 +86,8 @@ msgid ""
 "Do you really want to download from here? On some systems, scanning this "
 "location can take a very long time."
 msgstr ""
+"Opravdu chcete stahovat odtud? Na některých systémech může sken této lokace "
+"trvat velmi dlouho."
 
 #: rapid/rapid.py:2267 rapid/glade3/rapid.ui.h:6
 msgid "Download"
@@ -123,6 +125,7 @@ msgstr "Stahování nemůže pokračovat"
 #, python-format
 msgid "No backup device contains a valid folder for backing up %(filetype)s"
 msgstr ""
+"Žádný záložní přístroj neobsahuje platý adresář pro zálohování %(filetype)s"
 
 #: rapid/rapid.py:2388 rapid/rapid.py:2843 rapid/rapid.py:3680
 #: rapid/rpdfile.py:139
@@ -136,7 +139,7 @@ msgstr "videa"
 
 #: rapid/rapid.py:2393
 msgid "Backup problem"
-msgstr ""
+msgstr "Chyba zálohování"
 
 #: rapid/rapid.py:2802
 msgid "About 1 second remaining"
@@ -408,12 +411,16 @@ msgid ""
 "automatically detect devices from which to download, overwriting existing "
 "program preferences"
 msgstr ""
+"automaticky detekovat přístroje ze kterých se má stahovat, nadřazené "
+"momentálnímu nastavení programu"
 
 #: rapid/rapid.py:4096
 msgid ""
 "manually specify the PATH of the device from which to download, overwriting "
 "existing program preferences"
 msgstr ""
+"ručně vybrat cestu k přístroji ze kterého se má stahovat, nadřazené "
+"momentálnímu nastavení programu"
 
 #: rapid/rapid.py:4097
 msgid "reset all program settings and preferences and exit"
@@ -424,6 +431,8 @@ msgid ""
 "Error: specify device auto-detection or manually specify a device's path "
 "from which to download, but do not do both."
 msgstr ""
+"Chyba: vyberte autodetekci přístroje nebo ručně nastavte cestu ze které se "
+"má stahovat, ale ne obojí."
 
 #: rapid/rapid.py:4133
 #, python-format
@@ -461,17 +470,17 @@ msgstr "Chyba: %(inst)s"
 #: rapid/backupfile.py:163
 #, python-format
 msgid "Backup %(file_type)s overwritten"
-msgstr ""
+msgstr "Záloha %(file_type)s přepsána"
 
 #: rapid/backupfile.py:166
 #, python-format
 msgid "%(file_type)s not backed up"
-msgstr ""
+msgstr "%(file_type)s nebylo zazálohováno"
 
 #: rapid/backupfile.py:168
 #, python-format
 msgid "Backup of %(file_type)s already exists"
-msgstr ""
+msgstr "Záloha %(file_type)s již existuje"
 
 #: rapid/backupfile.py:209 rapid/copyfiles.py:201 rapid/copyfiles.py:219
 #: rapid/subfolderfile.py:217 rapid/subfolderfile.py:335
@@ -486,7 +495,7 @@ msgstr ""
 
 #: rapid/copyfiles.py:214
 msgid "An unknown error occurred"
-msgstr ""
+msgstr "Došlo k neznámé chybě"
 
 #: rapid/device.py:80
 msgid "Device Detected"
@@ -841,12 +850,12 @@ msgstr "DD"
 #. Translators: for an explanation of what this means, see http://damonlynch.net/rapid/documentation/index.html#renamedateandtime
 #: rapid/generatenameconfig.py:270
 msgid "Month (full)"
-msgstr ""
+msgstr "Měsíc (celý)"
 
 #. Translators: for an explanation of what this means, see http://damonlynch.net/rapid/documentation/index.html#renamedateandtime
 #: rapid/generatenameconfig.py:272
 msgid "Month (abbreviated)"
-msgstr ""
+msgstr "Měsíc (zkrácený)"
 
 #. Translators: for an explanation of what this means, see http://damonlynch.net/rapid/documentation/index.html#renamedateandtime
 #: rapid/generatenameconfig.py:274
@@ -963,7 +972,7 @@ msgstr "Vložte cestu k ignorování"
 
 #: rapid/preferencesdialog.py:834
 msgid "Specify a path that will never be scanned for photos or videos"
-msgstr ""
+msgstr "Upřesnit cestu, ve které nebudou nikdy hledány fotografie a videa"
 
 #: rapid/preferencesdialog.py:839
 msgid "Path:"
@@ -1025,6 +1034,9 @@ msgid ""
 "you correct them:\n"
 " %s"
 msgstr ""
+"Následující regulární výrazy jsou neplatné a budou odstraněny, pokud je "
+"neopravíte:\n"
+" %s"
 
 #: rapid/preferencesdialog.py:1764
 #, python-format
@@ -1033,6 +1045,8 @@ msgid ""
 "it:\n"
 " %s"
 msgstr ""
+"Tento regulární výraz je neplatný a bude odstraněn pokud ho neopravíte:\n"
+" %s"
 
 #: rapid/preferencesdialog.py:1765
 msgid "Invalid regular expression"
@@ -1167,7 +1181,7 @@ msgstr "Při kopírování %(filetype)s došlo k chybě."
 #: rapid/problemnotification.py:98
 #, python-format
 msgid "The %(filetype)s did not download correctly"
-msgstr ""
+msgstr "%(filetype)s nebylo správně staženo"
 
 #: rapid/problemnotification.py:101 rapid/problemnotification.py:102
 #, python-format
@@ -1188,6 +1202,8 @@ msgid ""
 "%(image1)s was taken on %(image1_date)s at %(image1_time)s, and %(image2)s "
 "on %(image2_date)s at %(image2_time)s."
 msgstr ""
+"%(image1)s byl vyfocen %(image1_date)s v %(image1_time)s, a %(image2)s  "
+"%(image2_date)s v %(image2_time)s."
 
 #: rapid/problemnotification.py:111
 #, python-format
@@ -1222,7 +1238,7 @@ msgstr "Chyba: %(errorno)s %(strerror)s"
 msgid ""
 "File verification failed. The downloaded version is different from the "
 "original."
-msgstr ""
+msgstr "Ověření souboru selhalo. Stažená verze se liší od originálu."
 
 #: rapid/problemnotification.py:213
 msgid "The metadata might be corrupt."
@@ -1332,10 +1348,12 @@ msgid ""
 "File verification failed on %(volume)s. The backed up version is different "
 "from the downloaded version."
 msgstr ""
+"Ověření souboru selhalo na %(volume)s. Zálohovaná verze je jiná než ta "
+"stažená."
 
 #: rapid/problemnotification.py:337
 msgid "File verification failed on these devices: "
-msgstr ""
+msgstr "Ověření souboru selhalo na těchto přístrojích: "
 
 #: rapid/problemnotification.py:347
 #, python-format
@@ -1463,7 +1481,7 @@ msgstr "Cesta: %s"
 
 #: rapid/glade3/rapid.ui.h:1
 msgid "About..."
-msgstr ""
+msgstr "O aplikaci..."
 
 #: rapid/glade3/rapid.ui.h:2
 msgid "_Check All"
@@ -1471,11 +1489,11 @@ msgstr "Zaškrtnout _všechny"
 
 #: rapid/glade3/rapid.ui.h:3
 msgid "Check All Photos"
-msgstr ""
+msgstr "Označit všechny fotografie"
 
 #: rapid/glade3/rapid.ui.h:4
 msgid "Check All Videos"
-msgstr ""
+msgstr "Označit všechna videa"
 
 #: rapid/glade3/rapid.ui.h:5
 msgid "_Make a Donation..."
@@ -1487,19 +1505,19 @@ msgstr "_Nápověda online..."
 
 #: rapid/glade3/rapid.ui.h:8
 msgid "Help"
-msgstr ""
+msgstr "Nápověda"
 
 #: rapid/glade3/rapid.ui.h:9
 msgid "Preferences"
-msgstr ""
+msgstr "Nastavení"
 
 #: rapid/glade3/rapid.ui.h:10
 msgid "Quit"
-msgstr ""
+msgstr "Ukončit"
 
 #: rapid/glade3/rapid.ui.h:11
 msgid "Refresh"
-msgstr ""
+msgstr "Obnovit"
 
 #: rapid/glade3/rapid.ui.h:12
 msgid "_Report a Problem..."
@@ -1507,7 +1525,7 @@ msgstr "_Ohlásit problém..."
 
 #: rapid/glade3/rapid.ui.h:13
 msgid "Translate this Application..."
-msgstr ""
+msgstr "Přeložit tuto aplikaci..."
 
 #: rapid/glade3/rapid.ui.h:14
 msgid "_Uncheck All"
@@ -1645,6 +1663,9 @@ msgid ""
 "install either the <i>hachoir metadata</i> and <i>kaa metadata</i> packages "
 "for python, or <i>exiftool</i>."
 msgstr ""
+"Omlouváme se, možnost stahování videa je vypnuta. Pro stahování videí "
+"nainstalujte prosím buď <i>hachoir metadata</i> a <i>kaa metadata</i> "
+"balíčky pro python, nebo <i>exiftool</i>."
 
 #: rapid/glade3/prefs.ui.h:18
 msgid ""
@@ -1767,6 +1788,15 @@ msgid ""
 "setting it to PTP mode. If that is not possible, a card reader must be "
 "used.</i>"
 msgstr ""
+"Přístroje nastavují odkud má probíhat stahování fotek a videí, jaké jsou "
+"fotoaparáty, pamětové karty nebo přenosné datove zdroje.\n"
+"\n"
+"Můžete stahovat z několika přístrojů naráz, nebo můžete vybrat cestu na svůj "
+"disk.\n"
+"\n"
+"<i>Přímé stahování z fotoaparátů je momentálně pouze experimentální. Pokud "
+"stahování přímo z fotoaparátu funguje špatně nebo vůbec, zkuste nastavit PTP "
+"mód. Pokud toto není možné, je třeba použít čtečku karet.</i>"
 
 #: rapid/glade3/prefs.ui.h:48
 msgid "Automatically detect Portable Storage Devices"
@@ -1784,6 +1814,11 @@ msgid ""
 "When this option is enabled, and a potential device is detected, you will be "
 "prompted to determine if it should be scanned or not."
 msgstr ""
+"Pokud povolíte automatickou detekci přenosných pamětoých médií, bude "
+"skenován celý přístroj. Tot může na velkých přístrojích trvat déle.\n"
+"\n"
+"Pokud je tato možnost zapnuta a je detekován přístroj, budete dotázáni "
+"jestli se má prohledávání opravdu spustit."
 
 #: rapid/glade3/prefs.ui.h:53
 msgid "Location:"
@@ -1794,6 +1829,8 @@ msgid ""
 "If you disable automatic detection, choose the exact location of the photos "
 "and videos."
 msgstr ""
+"Pokud vypnete automatickou detekci, vyberte přesné umístění fotografií a "
+"videí."
 
 #: rapid/glade3/prefs.ui.h:55
 msgid "<span weight=\"bold\" size=\"x-large\">Device Options</span>"
@@ -1809,6 +1846,9 @@ msgid ""
 "always scan or ignore when automatic detection of Portable Storage Devices "
 "is enabled."
 msgstr ""
+"Uložené cesty jsou ty, které jsou přiřazeny přístrojům které jste vybrali "
+"vždy prohledávat nebo ignorovat, pokud je zapnuta automatická detekce "
+"přenosných paměťových médií."
 
 #: rapid/glade3/prefs.ui.h:58
 msgid "Ignored Paths"
@@ -1820,6 +1860,9 @@ msgid ""
 "devices for photos or videos. Any path ending with the values below will not "
 "be scanned."
 msgstr ""
+"Upřesněte koncovou část jakékoliv cesty kterou chcete ignorovat při "
+"prohledávání přístrojů pro fotografie a videa. Jakákoliv cesta končící níže "
+"vypsanými hodnotami nebude prohledána."
 
 #: rapid/glade3/prefs.ui.h:61
 msgid "Re_move All"
@@ -1845,6 +1888,7 @@ msgstr "<b>Záloha</b>"
 msgid ""
 "If you disable automatic detection, choose the exact backup locations."
 msgstr ""
+"Pokud vypnete automatickou detekci, vyberte přesné umístění pro zálohy."
 
 #: rapid/glade3/prefs.ui.h:67
 msgid "Automatically detect backup devices"
@@ -1900,8 +1944,8 @@ msgid "Video backup location:"
 msgstr "Umístění zálohy videí:"
 
 #: rapid/glade3/prefs.ui.h:79
-msgid "Back up"
-msgstr ""
+msgid "Backup"
+msgstr "Záloha"
 
 #: rapid/glade3/prefs.ui.h:80
 msgid "<span weight=\"bold\" size=\"x-large\">Miscellaneous</span>"
@@ -1937,7 +1981,7 @@ msgstr "Automaticky otáčet obrázky formátu JPEG"
 
 #: rapid/glade3/prefs.ui.h:89
 msgid "Verify files as they are downloaded"
-msgstr ""
+msgstr "Ověřovat soubory při stahování"
 
 #: rapid/glade3/prefs.ui.h:90
 msgid "Performance"
@@ -2142,9 +2186,6 @@ msgstr "Importovat fotky a videa spolehlivě"
 
 #~ msgid "<i>Example: /home/user/photos</i>"
 #~ msgstr "<i>Příklad: /home/user/photos</i>"
-
-#~ msgid "Backup"
-#~ msgstr "Záloha"
 
 #~ msgid "Backup location:"
 #~ msgstr "Umístění zálohy:"
