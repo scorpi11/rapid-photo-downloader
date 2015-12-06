@@ -1,9 +1,10 @@
-rapid-photo-downloader (0.4.11-1) UNRELEASED; urgency=medium
+rapid-photo-downloader (0.4.11-1) unstable; urgency=medium
 
   * New upstream release (Closes: #806975, #806976).
   * Remove debian/menu by reason of tech-ctte bug #741573.
+  * Rewrite debian/watch to track the last version.
 
- -- Jörg Frings-Fürst <debian@jff-webhosting.net>  Thu, 03 Dec 2015 22:59:03 +0100
+ -- Jörg Frings-Fürst <debian@jff-webhosting.net>  Sun, 06 Dec 2015 02:58:59 +0100
 
 rapid-photo-downloader (0.4.10-3) unstable; urgency=medium
 
