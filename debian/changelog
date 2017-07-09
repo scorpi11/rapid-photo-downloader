@@ -9,6 +9,8 @@ rapid-photo-downloader (0.9.0-1) UNRELEASED; urgency=medium
     - Add requested python 3 and remove unneeded python 2 to/from Build-Depends.
     - Change Vcs-Browser and Homepage to secure URI.
     - Add X-Python3-Version and remove X-Python-Version.
+  * debian/rules:
+    - Use pkg-info.mk instead parsing the output of dpkg-parsechangelog.
   * Declare compliance with Debian Policy 4.0.0. (No changes needed).
   * Bump compat to 10:
     - Change debian/compat to 10.
