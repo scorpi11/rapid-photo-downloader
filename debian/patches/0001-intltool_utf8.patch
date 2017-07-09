@@ -1,0 +1,9 @@
+Index: trunk/po/POTFILES.in
+===================================================================
+--- trunk.orig/po/POTFILES.in
++++ trunk/po/POTFILES.in
+@@ -1,3 +1,4 @@
++[encoding: UTF-8]
+ raphodo/aboutdialog.py
+ raphodo/backupfile.py
+ raphodo/backuppanel.py

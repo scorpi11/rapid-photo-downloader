@@ -1,3 +1,21 @@
+rapid-photo-downloader (0.9.0-1) UNRELEASED; urgency=medium
+
+  * New upstream release (Closes: #867527, #790600):
+    - Remove obsolate patches:
+      + 05_removed-empty-directory.diff
+      + 10-keywords_desktop.patch
+    - Add new patch 0001-intltool_utf8.patch to fix Debian build errors.
+  * debian/control:
+    - Add requested python 3 and remove unneeded python 2 to/from Build-Depends.
+    - Change Vcs-Browser and Homepage to secure URI.
+    - Add X-Python3-Version and remove X-Python-Version.
+  * Declare compliance with Debian Policy 4.0.0. (No changes needed).
+  * Bump compat to 10:
+    - Change debian/compat to 10.
+    - Change debhelper version at debian/control to >= 10.
+
+ -- Jörg Frings-Fürst <debian@jff-webhosting.net>  Thu, 06 Jul 2017 23:01:19 +0200
+
 rapid-photo-downloader (0.4.11-1) unstable; urgency=medium
 
   * New upstream release (Closes: #806975, #806976).

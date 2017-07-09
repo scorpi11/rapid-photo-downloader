@@ -3,37 +3,51 @@ Section: graphics
 Priority: optional
 Maintainer: Jörg Frings-Fürst <debian@jff-webhosting.net>
 Build-Depends:
- debhelper (>= 9),
+ debhelper (>= 10),
  dh-python,
- python,
- gettext
-Standards-Version: 3.9.6
-X-Python-Version: 2.7
-Homepage: http://damonlynch.net/rapid
+ intltool,
+ python3-all,
+ python3-setuptools,
+ python3-xdg
+Standards-Version: 4.0.0
+X-Python3-Version: >= 3.6
+Homepage: https://damonlynch.net/rapid
 Vcs-Git: git://anonscm.debian.org/collab-maint/rapid-photo-downloader.git
-Vcs-Browser: http://anonscm.debian.org/cgit/collab-maint/rapid-photo-downloader.git
+Vcs-Browser: https://anonscm.debian.org/cgit/collab-maint/rapid-photo-downloader.git
 
 Package: rapid-photo-downloader
 Architecture: all
 Depends:
- ${python:Depends},
+ ${python3:Depends},
  ${misc:Depends},
- python-dbus,
- python-gtk2 (>= 2.12),
- python-glade2 (>= 2.17),
- python-gconf (>= 2.28),
- python-gnome2 (>= 2.28),
- python-pyexiv2 (>= 0.3),
- python-notify (>= 0.1.1),
- python-imaging (>= 1.1.7),
- librsvg2-common (>= 2.26),
- gnome-icon-theme,
+ python3-arrow,
+ python3-colorlog,
+ python3-dateutil,
+ python3-dbus,
+ python3-easygui,
+ python3-exif,
+ python3-gi,
+ python3-gphoto2cffi,
+ python3-pyqt5 (>= 5.4),
+ python3-psutil,
+ python3-requests,
+ python3-sortedcontainers,
+ python3-zmq,
+# python3-gtk2 (>= 2.12),
+# python3-glade2 (>= 2.17),
+# python3-gconf (>= 2.28),
+# python3-gnome2 (>= 2.28),
+ python3-pyexiv2 (>= 0.3),
+# python3-notify (>= 0.1.1),
+# python3-imaging (>= 1.1.7),
+# librsvg2-common (>= 2.26),
+# gnome-icon-theme,
  libimage-exiftool-perl,
- exiv2,
- exiftran
+# exiv2,
+# exiftran
 Recommends:
- python-kaa-metadata,
- python-hachoir-metadata,
+ python3-kaa-metadata,
+ python3-hachoir-metadata,
  ffmpegthumbnailer
 Description: Photo downloader (importer) from cameras, memory cards, other devices
  Rapid Photo Downloader can be used by both professional and amateur
