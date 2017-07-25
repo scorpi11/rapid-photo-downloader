@@ -730,6 +730,7 @@ class RapidWindow(QMainWindow):
 
         # For meaning of 'Devices', see devices.py
         self.devices = DeviceCollection(self.exiftool_process, self)
+        self.backup_devices = BackupDeviceCollection(rapidApp=self)
 
         logging.debug("Starting thumbnail daemon model")
 
@@ -826,8 +827,11 @@ class RapidWindow(QMainWindow):
                 logging.warning("Desktop environment is Unity, but could not load Unity 7.0 module")
             else:
                 # Unity auto-generated desktop files use underscores, it seems
-                for launcher in ('rapid_photo_downloader.desktop',
-                                 'rapid-photo-downloader.desktop'):
+                launchers = (
+                    'net.damonlynch.rapid-photo-downloader.desktop',
+                    'net.damonlynch.rapid_photo_downloader.desktop',
+                )
+                for launcher in launchers:
                     desktop_launcher = Unity.LauncherEntry.get_for_desktop_id(launcher)
                     if desktop_launcher is not None:
                         self.desktop_launchers.append(desktop_launcher)
@@ -838,6 +842,13 @@ class RapidWindow(QMainWindow):
                                   "program's .desktop file")
                 else:
                     logging.debug("Unity progress indicator found")
+
+        self.createPathViews()
+
+        self.createActions()
+        logging.debug("Laying out main window")
+        self.createMenus()
+        self.createLayoutAndButtons(centralWidget)
 
         logging.debug("Have GIO module: %s", have_gio)
         self.gvfsControlsMounts = gvfs_controls_mounts() and have_gio
@@ -881,13 +892,6 @@ class RapidWindow(QMainWindow):
             self.gvolumeMonitor.partitionUnmounted.connect(self.partitionUmounted)
             self.gvolumeMonitor.volumeAddedNoAutomount.connect(self.noGVFSAutoMount)
             self.gvolumeMonitor.cameraPossiblyRemoved.connect(self.cameraRemoved)
-
-        self.createPathViews()
-
-        self.createActions()
-        logging.debug("Laying out main window")
-        self.createMenus()
-        self.createLayoutAndButtons(centralWidget)
 
         logging.debug("Starting version check")
         self.newVersion = NewVersion(self)
@@ -1030,8 +1034,6 @@ class RapidWindow(QMainWindow):
         logging.debug("...copy files manager started")
 
         self.splash.setProgress(80)
-
-        self.backup_devices = BackupDeviceCollection(rapidApp=self)
 
         self.backupThread = QThread()
         self.backupmq = BackupManager(logging_port=self.logging_port)
@@ -1326,19 +1328,19 @@ class RapidWindow(QMainWindow):
             if current_version < stable_version.version:
                 self.latest_version = stable_version
 
-            if check_dev_version and current_version < dev_version.version:
+            if check_dev_version and (
+                current_version < dev_version.version or
+                current_version < stable_version.version
+                ):
                 if dev_version.version > stable_version.version:
                     self.latest_version = dev_version
                 else:
                     self.latest_version = stable_version
 
-            # remove in development testing code if in production!
             if (
                     self.latest_version is not None and str(self.latest_version.version) not in
                     self.prefs.ignore_versions
-                ): # or True:
-
-                self.latest_version = dev_version
+                ):
 
                 version = str(self.latest_version.version)
                 changelog_url = self.latest_version.changelog_url

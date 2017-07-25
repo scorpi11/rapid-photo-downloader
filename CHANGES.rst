@@ -1,6 +1,40 @@
 Changelog for Rapid Photo Downloader
 ====================================
 
+0.9.1 (2017-07-10)
+------------------
+
+ - Add support for downloading, renaming and backing up log files, which can
+   be associated with videos made using Magic Lantern.
+
+ - Updated program AppData, renaming .desktop and .appdata.xml files to
+   conform to reversed fully qualified domain name requirements.
+
+ - Fixed bug in checking for new stable version.
+
+ - Rearranged order of startup tasks to avoid rare bug where the user
+   interface is not initialized before devices are handled.
+
+ - Updated install script to automatically download latest version and
+   run interactively only if asked to.
+
+ - Updated install.py script to allow installation on Debian buster/sid.
+
+ - Install PyQt5 from PyPi on x86_64 platforms with Python 3.5 or 3.6,
+   avoiding segfaults on exit in Fedora and missing program icons in some
+   Linux distributions.
+
+ - To be able to generate video thumbnails for a wider range of video formats,
+   on Debian-like Linux distributions and Fedora, where possible the
+   install.py script installs the packages gstreamer-libav and
+   gstreamer-plugins-good.
+
+ - With rawkit 0.6.0 now supporting libraw 0.18, recent Linux distributions
+   like Fedora 26 and Ubuntu 17.04 / 17.10 can now render thumbnails from
+   raw files like DNG files produced by Android phones.
+
+ - Updated Czech, French, German, Slovak and Spanish translations.
+
 0.9.0 (2017-07-03)
 ------------------
 
