@@ -348,10 +348,10 @@ class ThumbnailRowsSQL:
         if len(uids) == 0:
             return
 
-        # Limit to number of parameters: 999
+        # Limit to number of parameters: 900
         # See https://www.sqlite.org/limits.html
-        if len(uids) > 999:
-            uid_chunks = divide_list_on_length(uids, 999)
+        if len(uids) > 900:
+            uid_chunks = divide_list_on_length(uids, 900)
             for chunk in uid_chunks:
                 self._update_marked(chunk, marked)
         else:
@@ -370,10 +370,10 @@ class ThumbnailRowsSQL:
             # logging.debug('%s (%s, <uid>)', query, job_code)
             self.conn.execute(query, (job_code, uids[0]))
         else:
-            # Limit to number of parameters: 999
+            # Limit to number of parameters: 900
             # See https://www.sqlite.org/limits.html
-            if len(uids) > 999:
-                name_chunks = divide_list_on_length(uids, 999)
+            if len(uids) > 900:
+                name_chunks = divide_list_on_length(uids, 900)
                 for chunk in name_chunks:
                     self._mass_set_job_code_assigned(chunk, job_code)
             else:
@@ -412,6 +412,10 @@ class ThumbnailRowsSQL:
                                     'LIMIT 1', (scan_id,)).fetchone()
         else:
             row = self.conn.execute('SELECT uid FROM files WHERE downloaded=0 LIMIT 1').fetchone()
+        return row is not None
+
+    def any_files_download_completed(self) -> bool:
+        row = self.conn.execute('SELECT uid FROM files WHERE downloaded=1 LIMIT 1').fetchone()
         return row is not None
 
     def any_files(self, scan_id: Optional[int]=None) -> bool:
@@ -501,10 +505,10 @@ class ThumbnailRowsSQL:
         if len(uids) == 0:
             return
 
-        # Limit to number of parameters: 999
+        # Limit to number of parameters: 900
         # See https://www.sqlite.org/limits.html
-        if len(uids) > 999:
-            name_chunks = divide_list_on_length(uids, 999)
+        if len(uids) > 900:
+            name_chunks = divide_list_on_length(uids, 900)
             for chunk in name_chunks:
                 self._delete_uids(chunk)
         else:
@@ -620,13 +624,20 @@ class DownloadedSQL:
         else:
             return None
 
+
 class CacheSQL:
-    def __init__(self, location: str=None) -> None:
+    def __init__(self, location: str=None, create_table_if_not_exists: bool=True) -> None:
+        """
+
+        :param location: path on the file system where the Table exists
+        :param create_table_if_not_exists:
+        """
         if location is None:
             location = get_program_cache_directory(create_if_not_exist=True)
         self.db = os.path.join(location, self.db_fs_name())
         self.table_name = 'cache'
-        self.update_table()
+        if create_table_if_not_exists:
+            self.update_table()
 
     def db_fs_name(self) -> str:
         return 'thumbnail_cache.sqlite'
@@ -640,8 +651,7 @@ class CacheSQL:
         conn = sqlite3.connect(self.db, detect_types=sqlite3.PARSE_DECLTYPES)
 
         if reset:
-            conn.execute(r"""DROP TABLE IF EXISTS {tn}""".format(
-                tn=self.table_name))
+            conn.execute(r"""DROP TABLE IF EXISTS {tn}""".format(tn=self.table_name))
             conn.execute("VACUUM")
 
         conn.execute("""CREATE TABLE IF NOT EXISTS {tn} (
@@ -682,10 +692,12 @@ class CacheSQL:
 
         conn = sqlite3.connect(self.db)
 
-        conn.execute(r"""INSERT OR REPLACE INTO {tn} (uri, size, mtime, mdatatime,
-        md5_name, orientation_unknown, failure) VALUES (?,?,?,?,?,?,?)""".format(
-            tn=self.table_name), (uri, size, mtime, mdatatime,
-                                  md5_name, orientation_unknown, failure))
+        conn.execute(
+            r"""INSERT OR REPLACE INTO {tn} (uri, size, mtime, mdatatime,
+            md5_name, orientation_unknown, failure) VALUES (?,?,?,?,?,?,?)""".format(
+                tn=self.table_name
+            ), (uri, size, mtime, mdatatime, md5_name, orientation_unknown, failure)
+        )
 
         conn.commit()
         conn.close()
@@ -726,10 +738,10 @@ class CacheSQL:
             return
 
         conn = sqlite3.connect(self.db)
-        # Limit to number of parameters: 999
+        # Limit to number of parameters: 900
         # See https://www.sqlite.org/limits.html
-        if len(md5_names) > 999:
-            name_chunks = divide_list_on_length(md5_names, 999)
+        if len(md5_names) > 900:
+            name_chunks = divide_list_on_length(md5_names, 900)
             for chunk in name_chunks:
                 self._delete(chunk, conn)
         else:

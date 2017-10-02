@@ -28,6 +28,9 @@ import hashlib
 from datetime import datetime
 import shutil
 import logging
+import locale
+# Use the default locale as defined by the LANG variable
+locale.setlocale(locale.LC_ALL, '')
 from typing import Optional, Tuple
 from gettext import gettext as _
 
@@ -116,7 +119,7 @@ class BackupFilesWorker(WorkerInPublishPullPipeline, FileCopy):
                                   dest_dir, self.device_name)
                     os.makedirs(dest_dir)
                     logging.debug("...backup subfolder created")
-                except OSError as inst:
+                except (OSError, PermissionError, FileNotFoundError) as inst:
                     # There is a minuscule chance directory may have been
                     # created by another process between the time it
                     # takes to query and the time it takes to create a

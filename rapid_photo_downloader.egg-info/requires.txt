@@ -1,15 +1,15 @@
-gphoto2
-pyzmq
-psutil
-pyxdg
 arrow
-python-dateutil
 colorlog
-pyprind
-rawkit
-easygui
 colour
+easygui
+gphoto2
+psutil
 pymediainfo
+pyprind
+python-dateutil
+pyxdg
+pyzmq
+rawkit
 sortedcontainers
 
 [:python_version == "3.4"]

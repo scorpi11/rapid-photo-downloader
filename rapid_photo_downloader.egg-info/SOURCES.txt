@@ -110,6 +110,7 @@ raphodo/rapid.py
 raphodo/rememberthisdialog.py
 raphodo/renameandmovefile.py
 raphodo/renamepanel.py
+raphodo/rescan.py
 raphodo/resources.qrc
 raphodo/rotatedpushbutton.py
 raphodo/rpdfile.py
@@ -122,6 +123,7 @@ raphodo/thumbnaildisplay.py
 raphodo/thumbnailer.py
 raphodo/thumbnailextractor.py
 raphodo/thumbnailpara.py
+raphodo/timeutils.py
 raphodo/toggleswitch.py
 raphodo/toggleview.py
 raphodo/utilities.py

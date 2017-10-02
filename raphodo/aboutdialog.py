@@ -28,11 +28,14 @@ from gettext import gettext as _
 from PyQt5.QtCore import Qt, pyqtSlot
 from PyQt5.QtGui import QPixmap,  QFont
 
-from PyQt5.QtWidgets import (QDialog, QLabel, QVBoxLayout, QDialogButtonBox, QSizePolicy,
-                             QHBoxLayout, QStackedWidget, QWidget, QScrollArea, QPushButton)
+from PyQt5.QtWidgets import (
+    QDialog, QLabel, QVBoxLayout, QDialogButtonBox, QSizePolicy, QHBoxLayout, QStackedWidget,
+    QWidget, QScrollArea, QPushButton
+)
 
 import raphodo.qrc_resources
 import raphodo.__about__ as __about__
+from raphodo.viewutils import translateButtons
 
 
 class AboutDialog(QDialog):
@@ -138,12 +141,14 @@ class AboutDialog(QDialog):
         Emanuele Grande <caccolangrifata@gmail.com>
         Torben Gundtofte-Bruun <torben@g-b.dk>
         Мирослав Николић <miroslavnikolic@rocketmail.com>
+        Harald H <haarektrans@gmail.com>
         Joachim Johansson <joachim.j@gmail.com>
+        Evgeny Kozlov <evgeny.kozlov.mailbox@gmail.com>
+        Toni Lähdekorpi <toni@lygon.net>
         Jean-Marc Lartigue <m.balthazar@orange.fr>
         Miroslav Matejaš <silverspace@ubuntu-hr.org>
-        Nicolás M. Zahlut <nzahlut@live.com>
         Erik M
-        Toni Lähdekorpi <toni@lygon.net>
+        Frederik Müller <spheniscus@freenet.de>
         Jose Luis Navarro <jlnavarro111@gmail.com>
         Tomas Novak <kuvaly@seznam.cz>
         Abel O'Rian <abel.orian@gmail.com>
@@ -164,6 +169,7 @@ class AboutDialog(QDialog):
         Dimitris Xenakis <dx@nkdx.gr>
         Aron Xu <happyaron.xu@gmail.com>
         Koji Yokota <yokota6@gmail.com>
+        Nicolás M. Zahlut <nzahlut@live.com>
         梁其学 <yalongbay@gmail.com>
         """
 
@@ -214,7 +220,10 @@ class AboutDialog(QDialog):
 
         buttonBox = QDialogButtonBox()
         closeButton = buttonBox.addButton(QDialogButtonBox.Close)  # type: QPushButton
-        self.creditsButton = buttonBox.addButton(_('Credits'), QDialogButtonBox.HelpRole)  # type: QPushButton
+        translateButtons(buttonBox)
+        self.creditsButton = buttonBox.addButton(
+            _('Credits'), QDialogButtonBox.HelpRole
+        )  # type: QPushButton
         self.creditsButton.setDefault(False)
         self.creditsButton.setCheckable(True)
         closeButton.setDefault(True)
