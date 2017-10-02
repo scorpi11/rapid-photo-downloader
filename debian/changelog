@@ -1,4 +1,4 @@
-rapid-photo-downloader (0.9.0-1) UNRELEASED; urgency=medium
+rapid-photo-downloader (0.9.1-1) UNRELEASED; urgency=medium
 
   * New upstream release (Closes: #867527, #790600):
     - Remove obsolate patches:
