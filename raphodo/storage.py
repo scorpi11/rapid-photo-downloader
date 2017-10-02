@@ -54,12 +54,13 @@ import time
 import subprocess
 import shlex
 import pwd
+import shutil
 from collections import namedtuple
 from typing import Optional, Tuple, List, Dict, Any
-from urllib.request import pathname2url
+from urllib.request import pathname2url, quote
 from tempfile import NamedTemporaryFile
 
-from PyQt5.QtCore import (QStorageInfo, QObject, pyqtSignal, QFileSystemWatcher, pyqtSlot)
+from PyQt5.QtCore import (QStorageInfo, QObject, pyqtSignal, QFileSystemWatcher, pyqtSlot, QTimer)
 from xdg.DesktopEntry import DesktopEntry
 from xdg import BaseDirectory
 import xdg
@@ -96,6 +97,8 @@ PROGRAM_DIRECTORY = 'rapid-photo-downloader'
 
 
 def get_distro_id(id_or_id_like: str) -> Distro:
+    if id_or_id_like[0] in ('"', "'"):
+        id_or_id_like = id_or_id_like[1:-1]
     try:
         return Distro[id_or_id_like.strip()]
     except KeyError:
@@ -154,11 +157,11 @@ def get_media_dir() -> str:
         run_media_dir = '/run{}'.format(media_dir)
         distro = get_distro()
         if os.path.isdir(run_media_dir) and distro not in (
-                Distro.ubuntu, Distro.debian, Distro.neon, Distro.galliumos):
+                Distro.ubuntu, Distro.debian, Distro.neon, Distro.galliumos, Distro.peppermint):
             if distro not in (Distro.fedora, Distro.manjaro, Distro.arch, Distro.opensuse,
-                              Distro.gentoo):
+                              Distro.gentoo, Distro.antergos):
                 logging.debug("Detected /run/media directory, but distro does not appear to "
-                              "be Fedora, Arch, openSUSE, Gentoo or Manjaro")
+                              "be Fedora, Arch, openSUSE, Gentoo, Manjaro or Antergos")
                 log_os_release()
             return run_media_dir
         return media_dir
@@ -303,25 +306,26 @@ def mountPaths():
         yield m.rootPath()
 
 
-def has_non_empty_dcim_folder(path: str) -> bool:
+def has_one_or_more_folders(path: str, folders: List[str]) -> bool:
     """
-    Checks to see if below the path there is a DCIM folder,
-    if the folder is readable, and if it has any contents
+    Checks to see if directly below the path there is a folder
+    from the list of specified folders, and if the folder is readable.
     :param path: path to check
-    :return: True if has valid DCIM, False otherwise
+    :return: True if has one or more valid folders, False otherwise
     """
 
     try:
-        has_dcim = "DCIM" in os.listdir(path)
+        contents = os.listdir(path)
+        for folder in folders:
+            if folder in contents:
+                full_path = os.path.join(path, folder)
+                if os.path.isdir(full_path) and os.access(full_path, os.R_OK):
+                    return True
     except (PermissionError, FileNotFoundError, OSError):
         return False
     except:
         logging.error("Unknown error occurred while probing potential source folder %s", path)
         return False
-    if has_dcim:
-        dcim_folder = os.path.join(path, 'DCIM')
-        if os.path.isdir(dcim_folder) and os.access(dcim_folder, os.R_OK):
-            return len(os.listdir(dcim_folder)) > 0
     return False
 
 
@@ -352,6 +356,8 @@ def get_desktop() -> Desktop:
         env = 'unity'
     elif env == 'x-cinnamon':
         env = 'cinnamon'
+    elif env == 'ubuntu:gnome':
+        env = 'ubuntugnome'
     try:
         return Desktop[env]
     except KeyError:
@@ -549,14 +555,15 @@ def get_default_file_manager(remove_args: bool = True) -> Optional[str]:
     assert sys.platform.startswith('linux')
     cmd = shlex.split('xdg-mime query default inode/directory')
     try:
-        desktop_file = subprocess.check_output(cmd, universal_newlines=True)
+        desktop_file = subprocess.check_output(cmd, universal_newlines=True)  # type: str
     except:
         return None
     # Remove new line character from output
     desktop_file = desktop_file[:-1]
     if desktop_file.endswith(';'):
         desktop_file = desktop_file[:-1]
-    for desktop_path in ('/usr/local/share/applications/', '/usr/share/applications/'):
+
+    for desktop_path in (os.path.join(d, 'applications') for d in BaseDirectory.xdg_data_dirs):
         path = os.path.join(desktop_path, desktop_file)
         if os.path.exists(path):
             try:
@@ -572,6 +579,15 @@ def get_default_file_manager(remove_args: bool = True) -> Optional[str]:
                 return fm.split()[0]
             else:
                 return fm
+
+    # Special case: LXQt
+    if get_desktop() == Desktop.lxqt:
+        if shutil.which('pcmanfm-qt'):
+            return 'pcmanfm-qt'
+
+
+_desktop = get_desktop()
+_quoted_comma = quote(',')
 
 
 def get_uri(full_file_name: Optional[str]=None,
@@ -604,6 +620,7 @@ def get_uri(full_file_name: Optional[str]=None,
             else:
                 prefix = 'gphoto2://' + pathname2url('[{}]'.format(camera_details.port))
         else:
+            prefix = ''
             # Attempt to generate a URI accepted by desktop environments
             if camera_details.is_mtp:
                 if full_file_name:
@@ -611,22 +628,31 @@ def get_uri(full_file_name: Optional[str]=None,
                 elif path:
                     path = remove_topmost_directory_from_path(path)
 
-                desktop = get_desktop()
-                if gvfs_controls_mounts():
-                    prefix = 'mtp://' + pathname2url('[{}]/{}'.format(
-                        camera_details.port, camera_details.storage_desc))
-                elif desktop == Desktop.kde:
-                    prefix = 'mtp:/' + pathname2url('{}/{}'.format(
-                        camera_details.display_name, camera_details.storage_desc))
+                if gvfs_controls_mounts() or _desktop == Desktop.lxqt:
+                    prefix = 'mtp://' + pathname2url(
+                        '[{}]/{}'.format(camera_details.port, camera_details.storage_desc)
+                    )
+                elif _desktop == Desktop.kde:
+                    prefix = 'mtp:/' + pathname2url(
+                        '{}/{}'.format(camera_details.display_name, camera_details.storage_desc)
+                    )
                     # Dolphin doesn't highlight the file if it's passed.
                     # Instead it tries to open it, but fails.
                     # So don't pass the file, just the directory it's in.
                     if full_file_name:
                         full_file_name = os.path.dirname(full_file_name)
                 else:
-                    logging.error("Don't know how to generate MTP prefix for %s", desktop.name)
+                    logging.error("Don't know how to generate MTP prefix for %s", _desktop.name)
             else:
                 prefix = 'gphoto2://' + pathname2url('[{}]'.format(camera_details.port))
+
+            if _desktop == Desktop.lxqt:
+                # pcmanfm-qt does not like the quoted form of the comma
+                prefix = prefix.replace(_quoted_comma, ',')
+                if full_file_name:
+                    # pcmanfm-qt does not like the the filename as part of the path
+                    full_file_name = os.path.dirname(full_file_name)
+
     if full_file_name or path:
         uri = '{}{}'.format(prefix, pathname2url(full_file_name or path))
     else:
@@ -1173,11 +1199,28 @@ if have_gio:
                         break
             return to_unmount
 
+        @pyqtSlot(str, str, bool, bool, int)
+        def reUnmountCamera(self, model: str,
+                          port: str,
+                          download_starting: bool,
+                          on_startup: bool,
+                          attempt_no: int) -> None:
+
+            logging.info(
+                "Attempt #%s to unmount camera %s on port %s",
+                attempt_no + 1, model, port
+            )
+            self.unmountCamera(
+                model=model, port=port, download_starting=download_starting, on_startup=on_startup,
+                attempt_no=attempt_no
+            )
+
         def unmountCamera(self, model: str,
                           port: str,
                           download_starting: bool=False,
                           on_startup: bool=False,
-                          mount_point: Optional[Gio.Mount]=None) -> bool:
+                          mount_point: Optional[Gio.Mount]=None,
+                          attempt_no: Optional[int]=0) -> bool:
             """
             Unmount camera mounted on gvfs mount point, if it is
             mounted. If not mounted, ignore.
@@ -1201,8 +1244,10 @@ if have_gio:
 
             if to_unmount is not None:
                 logging.debug("GIO: Attempting to unmount %s...", model)
-                to_unmount.unmount_with_operation(0, None, None, self.unmountCameraCallback,
-                                                  (model, port, download_starting, on_startup))
+                to_unmount.unmount_with_operation(
+                    0, None, None, self.unmountCameraCallback,
+                    (model, port, download_starting, on_startup, attempt_no)
+                )
                 return True
 
             return False
@@ -1220,7 +1265,7 @@ if have_gio:
             unmounted, in the format of libgphoto2
             """
 
-            model, port, download_starting, on_startup = user_data
+            model, port, download_starting, on_startup, attempt_no = user_data
             try:
                 if mount.unmount_with_operation_finish(result):
                     logging.debug("...successfully unmounted {}".format(model))
@@ -1229,9 +1274,18 @@ if have_gio:
                     logging.debug("...failed to unmount {}".format(model))
                     self.cameraUnmounted.emit(False, model, port, download_starting, on_startup)
             except GLib.GError as e:
-                logging.error('Exception occurred unmounting {}'.format(model))
-                logging.exception('Traceback:')
-                self.cameraUnmounted.emit(False, model, port, download_starting, on_startup)
+                if e.code == 26 and attempt_no < 10:
+                    attempt_no += 1
+                    QTimer.singleShot(
+                        750, lambda : self.reUnmountCamera(
+                            model, port, download_starting,
+                            on_startup, attempt_no
+                        )
+                    )
+                else:
+                    logging.error('Exception occurred unmounting {}'.format(model))
+                    logging.exception('Traceback:')
+                    self.cameraUnmounted.emit(False, model, port, download_starting, on_startup)
 
         def unmountVolume(self, path: str) -> None:
             """

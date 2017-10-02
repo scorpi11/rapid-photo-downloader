@@ -37,6 +37,7 @@ from gettext import gettext as _
 
 import raphodo.qrc_resources as qrc_resources
 from raphodo.preferences import Preferences
+from raphodo.viewutils import translateButtons
 
 tips = (
     (
@@ -68,6 +69,34 @@ tips = (
             "downloading."
         ),
         'markall.png'
+    ),
+    (
+        _(
+            "After a download finishes, an icon replaces the thumbnail's checkbox. The icon's "
+            "color indicates whether the download was successful (green), had file renaming "
+            "problems (yellow/orange), or failed (red)."
+        ),
+        'downloaded.png'
+    ),
+    (
+        _(
+            """
+            In case of any problems, a red icon will appear at the bottom of the window
+            indicating how many error reports there are. Clicking on it opens the Error Report 
+            window.
+            """
+        ),
+        'errorreporticon.png',
+        _(
+            """
+            The Error Report window lists any problems encountered before, during or after the 
+            download. An orange triangle represents a warning, a red circle indicates a failure, 
+            and a black circle indicates more serious failures. You can click on the hyperlinks to 
+            open its file or device in a file manager. You can also search the reports using the 
+            search box in the lower left of the Error Report window.
+            """
+        ),
+        'errorreport.png',
     ),
     (
         _(
@@ -301,7 +330,7 @@ a Job Code for them before the download begins.
             """
 When you give your photos and videos unique filenames, you'll never be confused as to 
 which file is which. Using <b>sequence numbers</b> to make filenames unique is highly 
-recommended!.
+recommended!
             """
         ),
         'photoeditordefault.png',
@@ -364,7 +393,7 @@ Several of the program's preferences can be set from the command line, including
 sources, destinations, and backups. Additionally, settings can be reset to their 
 default state, and caches and remembered files cleared.            
             """
-        ),
+        ) + _("You can also import program preferences from the older 0.4 version."),
         'commandline.png'
     ),
     (
@@ -471,6 +500,7 @@ class DidYouKnowDialog(QDialog):
         self.previousButton = QPushButton(_('&Previous'))
 
         buttons = QDialogButtonBox(QDialogButtonBox.Close)
+        translateButtons(buttons)
         buttons.addButton(self.previousButton, QDialogButtonBox.ActionRole)
         buttons.addButton(self.nextButton, QDialogButtonBox.ActionRole)
         self.previousButton.clicked.connect(self.previousButtonClicked)

@@ -30,8 +30,12 @@ import hashlib
 import logging
 import pickle
 from operator import attrgetter
+from itertools import chain
 from collections import defaultdict
 from typing import Dict, Optional, Tuple
+import locale
+# Use the default locale as defined by the LANG variable
+locale.setlocale(locale.LC_ALL, '')
 
 import gphoto2 as gp
 
@@ -50,6 +54,8 @@ from raphodo.problemnotification import (
     FileCopyProblem, CameraInitializationProblem
 )
 from raphodo.storage import get_uri
+from raphodo.preferences import Preferences
+from raphodo.rescan import RescanCamera
 
 
 def copy_file_metadata(src: str, dst: str) -> Optional[Tuple]:
@@ -72,12 +78,12 @@ def copy_file_metadata(src: str, dst: str) -> Optional[Tuple]:
 
     try:
         os.utime(dst, (st.st_atime, st.st_mtime))
-    except OSError as inst:
+    except (OSError, PermissionError, FileNotFoundError) as inst:
         errors.append(inst)
 
     try:
         os.chmod(dst, mode)
-    except OSError as inst:
+    except (OSError, PermissionError, FileNotFoundError) as inst:
         errors.append(inst)
 
     if hasattr(os, 'chflags') and hasattr(st, 'st_flags'):
@@ -109,8 +115,8 @@ def copy_camera_file_metadata(mtime: float, dst: str) -> Optional[Tuple]:
 
     try:
         os.utime(dst, (mtime, mtime))
-    except OSError as inst:
-        return (inst)
+    except (OSError, PermissionError, FileNotFoundError) as inst:
+        return inst,  # note the comma: return a Tuple
 
 
 class FileCopy:
@@ -163,7 +169,7 @@ class FileCopy:
                 rpd_file.md5 = hashlib.md5(src_bytes).hexdigest()
 
             return True
-        except (OSError, FileNotFoundError) as e:
+        except (OSError, FileNotFoundError, PermissionError) as e:
             self.problems.append(
                 FileCopyProblem(
                     name=os.path.basename(source), uri=get_uri(full_file_name=source), exception=e
@@ -174,6 +180,18 @@ class FileCopy:
             except AttributeError:
                 msg = str(e)
             logging.error("%s. Failed to copy %s to %s", msg, source, destination)
+            return False
+        except Exception as e:
+            self.problems.append(
+                FileCopyProblem(
+                    name=os.path.basename(source), uri=get_uri(full_file_name=source), exception=e
+                )
+            )
+            try:
+                msg = '%s: %s' % (e.errno, e.strerror)
+            except AttributeError:
+                msg = str(e)
+            logging.error("Unexpected error: %s. Failed to copy %s to %s", msg, source, destination)
             return False
 
 
@@ -285,7 +303,7 @@ class CopyFilesWorker(WorkerInPublishPullPipeline, FileCopy):
         else:
             try:
                 shutil.copyfile(associate_file_fullname, temp_full_name)
-            except OSError as e:
+            except (OSError, FileNotFoundError, PermissionError) as e:
                 logging.error("Failed to download %s file: %s", file_type, associate_file_fullname)
                 logging.error("%s: %s", e.errno, e.strerror)
                 name = os.path.basename(associate_file_fullname)
@@ -313,9 +331,44 @@ class CopyFilesWorker(WorkerInPublishPullPipeline, FileCopy):
         self.scan_id = args.scan_id
         self.verify_file = args.verify_file
 
-        # Initialize use of camera only if it's needed
         self.camera = None
-        self.camera_initialization_failed = False
+
+        # To workaround a bug in iOS and possibly other devices, check if need to rescan the files
+        # on the device
+        rescan_check = [
+            rpd_file for rpd_file in args.files
+            if rpd_file.from_camera and not rpd_file.cache_full_file_name
+         ]
+        no_rescan = [
+            rpd_file for rpd_file in args.files
+            if not rpd_file.from_camera or rpd_file.cache_full_file_name
+        ]
+
+        if rescan_check:
+            prefs = Preferences()
+            # Initialize camera
+            try:
+                self.camera = Camera(
+                    args.device.camera_model, args.device.camera_port,
+                    raise_errors=True, specific_folders=prefs.folders_to_scan
+                )
+            except CameraProblemEx as e:
+                self.problems.append(
+                    CameraInitializationProblem(gp_code=e.gp_code)
+                )
+                logging.error("Could not initialize camera %s", self.display_name)
+            else:
+                rescan = RescanCamera(camera=self.camera, prefs=prefs)
+                rescan.rescan_camera(rpd_files=rescan_check)
+                rescan_check = rescan.rpd_files
+                if rescan.missing_rpd_files:
+                    logging.error(
+                        "%s files could not be relocated on %s",
+                        len(rescan.missing_rpd_files), self.camera.display_name
+                    )
+                    rescan_check = list(chain(rescan_check, rescan.missing_rpd_files))
+
+        rpd_files = list(chain(rescan_check, no_rescan))
 
         random_filename = GenerateRandomFileName()
 
@@ -335,7 +388,7 @@ class CopyFilesWorker(WorkerInPublishPullPipeline, FileCopy):
         # Sort the files to be copied by modification time
         # Important to do this with respect to sequence numbers, or else
         # they'll be downloaded in what looks like a random order
-        rpd_files = sorted(args.files, key=attrgetter('modification_time'))
+        rpd_files = sorted(rpd_files, key=attrgetter('modification_time'))
 
         self.display_name = args.device.display_name
 
@@ -371,7 +424,7 @@ class CopyFilesWorker(WorkerInPublishPullPipeline, FileCopy):
                     try:
                         shutil.move(rpd_file.cache_full_file_name, temp_full_file_name)
                         copy_succeeded = True
-                    except OSError as inst:
+                    except (OSError, PermissionError, FileNotFoundError) as inst:
                         copy_succeeded = False
                         logging.error("Could not move cached file %s to temporary file %s. Error "
                                       "code: %s", rpd_file.cache_full_file_name,
@@ -395,7 +448,7 @@ class CopyFilesWorker(WorkerInPublishPullPipeline, FileCopy):
                     copy_succeeded = self.copy_from_filesystem(source, destination, rpd_file)
                     try:
                         os.remove(source)
-                    except (OSError, FileNotFoundError) as e:
+                    except (OSError, PermissionError, FileNotFoundError) as e:
                         logging.error("Error removing RPD Cache file %s while copying %s. Error "
                                       "code: %s", source, rpd_file.full_file_name, e.errno)
                         self.problems.append(
@@ -419,19 +472,6 @@ class CopyFilesWorker(WorkerInPublishPullPipeline, FileCopy):
             if not rpd_file.cache_full_file_name:
                 if rpd_file.from_camera:
                     # Scenario 2
-                    if self.camera is None and not self.camera_initialization_failed:
-                        try:
-                            self.camera = Camera(
-                                args.device.camera_model, args.device.camera_port,
-                                raise_errors=True
-                            )
-                        except CameraProblemEx as e:
-                            self.problems.append(
-                                CameraInitializationProblem(gp_code=e.gp_code)
-                            )
-                            logging.error("Could not initialize camera %s", self.display_name)
-                            self.camera_initialization_failed = True
-
                     if not self.camera:
                         copy_succeeded = False
                         logging.error(
@@ -488,7 +528,7 @@ class CopyFilesWorker(WorkerInPublishPullPipeline, FileCopy):
                         rpd_file, temp_name, dest_dir, rpd_file.xmp_file_full_name, 'XMP'
                     )
 
-                # copy magic lantern LOG file if there is one
+                # copy Magic Lantern LOG file if there is one
                 if rpd_file.log_file_full_name:
                     rpd_file.temp_log_full_name = self.copy_associate_file(
                         rpd_file, temp_name, dest_dir, rpd_file.log_file_full_name, 'LOG'

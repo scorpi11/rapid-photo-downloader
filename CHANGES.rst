@@ -1,6 +1,146 @@
 Changelog for Rapid Photo Downloader
 ====================================
 
+0.9.4 (2017-09-30)
+------------------
+
+ - No changes since 0.9.4 beta 1.
+
+0.9.4b1 (2017-09-26)
+--------------------
+
+ - Workaround bug in iOS devices that create on-the-fly subfolders from which
+   to download that vary each time the device is initialized.
+
+ - Add progress bars and badge counts when running under Ubuntu 17.10's Dash
+   to Dock extension.
+
+ - Don't crash when locale is not correctly set.
+
+ - Updated Dutch, French and German translations.
+
+0.9.3 (2017-09-13)
+------------------
+
+ - When requesting GIO to unmount a camera / phone so it can be accessed by
+   libgphoto2, retry several times if it fails. Sometimes a GIO client program
+   such as Gnome Files needs a few seconds to relinquish control of the
+   device.
+
+ - Fixed bug where a crash could occur when removing a camera that was in the
+   preliminary stages of being scanned.
+
+ - Fixed a bug introduced in 0.9.3b1 where photo and video numbers and sizes
+   were not displayed in the devices summary in the program's left-hand pane.
+
+ - Fixed a bug on Fedora where the maximum length for an sqlite3 query could
+   be exceeded.
+
+ - When running a user-installed python such as Anaconda or another custom
+   python, where possible the install.py script now switches over to using
+   the Linux distribution's system python.
+
+ - Under Python 3.6 or newer, bumped required version of pyzmq up to 16.0.2,
+   hopefully avoiding a segfault observed with pyzmq 15.1.0 and ZeroMQ 4.1.5.
+   See the Release Notes for more details.
+
+ - Updated Catalan, Czech, Dutch, French, German, Greek, Hungarian, Japanese,
+   Kabyle, Norwegian Nynorsk, Russian, and Spanish translations.
+
+0.9.3b1 (2017-09-05)
+--------------------
+
+ - The preference value "Scan non-camera devices lacking a DCIM folder" is
+   replaced with the new preference value "Scan only specific folders on
+   devices", along with a list of folders to be scanned. By default, the
+   default folders to scan are DCIM, PRIVATE, and MP_ROOT, but you can change
+   these defaults using the program preferences. The change was made to
+   account for camera and phone manufacturers whose devices save photos and
+   videos in locations that differ from the DCIM specification.
+
+ - Updated Catalan, German and Italian translations. Other translations will
+   be updated for the final 0.9.3 release.
+
+0.9.2 (2017-08-06)
+------------------
+
+ - When displaying the time in the Timeline in a locale that does not use a
+   twelve hour clock, correctly display the time using the 24 hour clock. If
+   the times or dates being displayed in the Timeline are not displayed
+   correctly in your language, please file a bug report.
+
+ - Fixed a bug where an exception could occur when clicking on some Timeline
+   entries or displaying their thumbnails as a tooltip. It occurred when the
+   Timeline had one or more entries in the right-most column that spanned
+   more than one calendar day. The code that generates the Timeline is among
+   the most complex in the application. If you notice any problems, please
+   file a bug report.
+
+ - When a download device is inserted and downloaded files are already in the
+   main window, the program will now ask if the completed downloads should be
+   cleared. A new, associated program preference controls if the program
+   should query and what action to take.
+
+ - Improved visual appearance of preferences window.
+
+ - Fixed a bug where the thumbnail extractors might crash when the thumbnail
+   cache database had not yet been created, which could happen in unusual
+   circumstances such as when the disk was under particularly heavy load.
+
+ - Fixed bug extracting date/time metadata from videos where devices that
+   create videos from which metadata cannot be extracted until the entire
+   video is downloaded from the device.
+
+ - When running LXQt, now assume the default file manager is pcmanfm-qt,
+   regardless of what the mime-type handler reports. URIs passed to it
+   now have the specific file stripped from the path, avoiding errors with
+   pcmanfm-qt opening it. Currently, compared to more mature platforms like
+   Gnome, LXQt has limitations that limit Rapid Photo Downloader's
+   functionality.
+
+ - Added uninstall and uninstall including dependencies options to the
+   install.py script.
+
+ - Added localization to the install.py script. The install script now embeds
+   the files needed for localization, and utilizes them if needed.
+
+ - The install.py script now checks key installation folders for ownership
+   and permission problems, fixing them if necessary.
+
+ - The install.py script now correctly parses openSUSE's zypper output to
+   ascertain distribution packages that are already installed, saving time
+   during installation.
+
+ - In install.py, catch return code 104 from zypper se when no package is
+   found.
+
+ - Added support for Peppermint OS to the install.py script.
+
+ - Terminate program at startup if the program's own module imports are being
+   loaded from conflicting sources, indicating more than one copy of the
+   program has been installed.
+
+ - Report gphoto2 errors on the command line and Error Reports window with
+   the name of the error rather than its numeric code.
+
+ - Catch file permission errors more effectively in copy, rename, and backup
+   processes.
+
+ - Fixed bug when deleting certain sample videos from a device that had
+   already been removed.
+
+ - Updated Belarusian, Chinese (Simplified), Czech, Dutch, French, German,
+   Hungarian, Japanese, Norwegian Bokmal, Norwegian Nynorsk, Russian and
+   Spanish translations.
+
+ - Applied a patch from Mikael Wiesel to fix a bug where several strings were
+   not available for translation. Additionally made available for translation
+   some buttons whose text was untranslated. Moreover, humanized times such as
+   "one hour ago" (all of which are generated using the python library Arrow)
+   are now localized where Arrow supports it. Finally, date/times in tooltips
+   that appear over thumbnails are now localized, and locale date / times are
+   used in download subfolder and filename generation for values like months.
+
 0.9.1 (2017-07-10)
 ------------------
 

@@ -481,6 +481,7 @@ class Desktop(Enum):
     mate = 6
     lxde = 7
     lxqt = 8
+    ubuntugnome = 9
     unknown = 10
 
 
@@ -495,6 +496,8 @@ class Distro(Enum):
     opensuse = 8
     gentoo = 9
     galliumos = 10
+    peppermint = 11
+    antergos = 12
 
 
 orientation_offset = dict(
@@ -588,3 +591,20 @@ class RememberThisMessage(Enum):
 class RememberThisButtons(Enum):
     yes_no = 1
     ok = 2
+
+
+class CompletedDownloads(IntEnum):
+    keep = 1
+    clear = 2
+    prompt = 3
+
+
+class TreatRawJpeg(IntEnum):
+    one_photo = 1
+    two_photos = 2
+
+
+class MarkRawJpeg(IntEnum):
+    no_jpeg = 1
+    no_raw = 2
+    both = 3
