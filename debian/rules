@@ -14,9 +14,9 @@ override_dh_auto_configure:
 #	dh_auto_install -- --install-lib=/usr/share/rapid-photo-downloader --install-scripts=/usr/share/rapid-photo-downloader
 
 override_dh_auto_clean:
-#	-rm rapid-photo-downloader.1
+	-rm rapid-photo-downloader.1
 	-rm -rf build/
-#	dh_auto_clean
+	dh_auto_clean
 
 override_dh_installchangelogs:
 	dh_installchangelogs CHANGES.rst
