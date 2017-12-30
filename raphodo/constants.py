@@ -259,6 +259,7 @@ class Sort(IntEnum):
     file_type = 5
     device = 6
 
+
 class JobCodeSort(IntEnum):
     last_used = 1
     code = 2
@@ -293,6 +294,7 @@ class Roles(IntEnum):
     device_type = Qt.UserRole + 19
     download_statuses = Qt.UserRole + 20
     job_code = Qt.UserRole + 21
+    uids = Qt.UserRole + 22
 
 
 class ExtractionTask(Enum):
@@ -402,6 +404,7 @@ class PrefPosition(Enum):
     positioned_in = 4
     not_here = 5
 
+
 # Values in minutes:
 proximity_time_steps = [5, 10, 15, 30, 45, 60, 90, 120, 180, 240, 480, 960, 1440]
 
@@ -438,6 +441,10 @@ DeviceShadingIntensity = 104
 # How many steps with which to highlight thumbnail cells
 FadeSteps = 20
 FadeMilliseconds = 700
+
+
+# horizontal and vertical margin for thumbnail rectangles
+thumbnail_margin = 10
 
 
 def minPanelWidth() -> int:
@@ -498,6 +505,7 @@ class Distro(Enum):
     galliumos = 10
     peppermint = 11
     antergos = 12
+    elementary = 13
 
 
 orientation_offset = dict(
@@ -608,3 +616,15 @@ class MarkRawJpeg(IntEnum):
     no_jpeg = 1
     no_raw = 2
     both = 3
+
+
+# see https://developer.mozilla.org/en-US/docs/Mozilla/Localization/Localization_and_Plurals
+class Plural(Enum):
+    zero = 1
+    two_form_single = 2
+    two_form_plural = 3
+
+
+# Use the character . to for download_name and path to indicate the user manually marked a
+# file as previously downloaded
+manually_marked_previously_downloaded = '.'
