@@ -1,6 +1,22 @@
-rapid-photo-downloader (0.9.4-1) UNRELEASED; urgency=medium
+rapid-photo-downloader (0.9.6-1.0) UNRELEASED; urgency=medium
 
-  * New upstream release (Closes: #867527, #790600):
+  [ Antoine Beaupré ]
+  * Non-maintainer upload
+  * update to newer 0.9.6 release
+  * debian/watch:
+    - allow downloading older releases by looking at the download page
+      directly
+    - enable OpenPGP signature checks on tarballs
+  * debian/control
+    - depend on python3 explicitly otherwise build fails on stretch
+    - remove commented out dependencies
+    - remove dependencies redundant with requirements.txt
+    - depend on python 3.4 or above, as upstream
+  * debian/py3dist-overrides
+    - add new dependencies mappings
+
+  [ Jörg Frings-Fürst ]
+  * New upstream release (Closes: #867527, #790600, #866476):
     - Remove obsolate patches:
       + 05_removed-empty-directory.diff
       + 10-keywords_desktop.patch
@@ -16,7 +32,7 @@ rapid-photo-downloader (0.9.4-1) UNRELEASED; urgency=medium
     - Change debian/compat to 10.
     - Change debhelper version at debian/control to >= 10.
 
- -- Jörg Frings-Fürst <debian@jff-webhosting.net>  Thu, 06 Jul 2017 23:01:19 +0200
+ -- Antoine Beaupré <anarcat@debian.org>  Sat, 30 Dec 2017 12:20:05 -0500
 
 rapid-photo-downloader (0.4.11-1) unstable; urgency=medium
 
