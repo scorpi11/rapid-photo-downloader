@@ -36,6 +36,9 @@ rapid-photo-downloader (0.9.7-1.0) UNRELEASED; urgency=medium
     - debian/copyright
   * debian/copyright:
     - Add year 2018 to debian/*.
+  * debian/watch:
+    - Bump version to 4.
+    - Allow only numerical versions.
 
  -- Antoine Beaupré <anarcat@debian.org>  Sat, 30 Dec 2017 12:20:05 -0500
 
