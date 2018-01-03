@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 
-# Copyright (C) 2011-2017 Damon Lynch <damonlynch@gmail.com>
+# Copyright (C) 2011-2018 Damon Lynch <damonlynch@gmail.com>
 
 # This file is part of Rapid Photo Downloader.
 #
@@ -29,7 +29,7 @@ Project line length: 100 characters (i.e. word wrap at 99)
 """
 
 __author__ = 'Damon Lynch'
-__copyright__ = "Copyright 2011-2017, Damon Lynch"
+__copyright__ = "Copyright 2011-2018, Damon Lynch"
 
 import sys
 import logging
@@ -71,6 +71,7 @@ except (ImportError, ValueError):
 import zmq
 import psutil
 import gphoto2 as gp
+import sip
 from PyQt5 import QtCore
 from PyQt5.QtCore import (
     QThread, Qt, QStorageInfo, QSettings, QPoint, QSize, QTimer, QTextStream, QModelIndex,
@@ -93,7 +94,7 @@ from raphodo.storage import (
     has_one_or_more_folders, mountPaths, get_desktop_environment, get_desktop,
     gvfs_controls_mounts, get_default_file_manager, validate_download_folder,
     validate_source_folder, get_fdo_cache_thumb_base_directory, WatchDownloadDirs, get_media_dir,
-    StorageSpace
+    StorageSpace, gvfs_gphoto2_path
 )
 from raphodo.interprocess import (
     ScanArguments, CopyFilesArguments, RenameAndMoveFileData, BackupArguments,
@@ -639,6 +640,9 @@ class RapidWindow(QMainWindow):
                         "Version downgrade detected, from %s to %s",
                         __about__.__version__, previous_version
                     )
+                if pv < pkg_resources.parse_version('0.9.7b1'):
+                    # Remove any duplicate subfolder generation or file renaming custom presets
+                    self.prefs.filter_duplicate_generation_prefs()
 
     def startThreadControlSockets(self) -> None:
         """
@@ -808,7 +812,7 @@ class RapidWindow(QMainWindow):
             self.updateThumbnailModelAfterProximityChange
         )
 
-        self.file_manager = get_default_file_manager()
+        self.file_manager, self.file_manager_type = get_default_file_manager()
         if self.file_manager:
             logging.info("Default file manager: %s", self.file_manager)
         else:
@@ -1097,7 +1101,7 @@ class RapidWindow(QMainWindow):
         settings = QSettings()
         settings.beginGroup("MainWindow")
 
-        self.proximityButton.setChecked(settings.value("proximityButtonPressed", False, bool))
+        self.proximityButton.setChecked(settings.value("proximityButtonPressed", True, bool))
         self.proximityButtonClicked()
 
         self.sourceButton.setChecked(settings.value("sourceButtonPressed", True, bool))
@@ -2573,7 +2577,7 @@ class RapidWindow(QMainWindow):
         """
         Respond to This Computer Toggle Switch
 
-        :param on: whether swich is on or off
+        :param on: whether switch is on or off
         """
 
         if on:
@@ -2593,14 +2597,15 @@ class RapidWindow(QMainWindow):
         """
         Respond to Devices Toggle Switch
 
-        :param on: whether swich is on or off
+        :param on: whether switch is on or off
         """
 
         self.prefs.device_autodetection = on
         if not on:
             for scan_id in list(self.devices.volumes_and_cameras):
                 self.removeDevice(scan_id=scan_id, adjust_temporal_proximity=False)
-            if len(self.devices) == 0:
+            state = self.proximityStatePostDeviceRemoval()
+            if state == TemporalProximityState.empty:
                 self.temporalProximity.setState(TemporalProximityState.empty)
             else:
                 self.generateTemporalProximityTableData("devices were removed as a download source")
@@ -2609,6 +2614,19 @@ class RapidWindow(QMainWindow):
             # slider redraw itself
             QTimer.singleShot(100, self.devicesViewToggledOn)
         self.adjustLeftPanelSliderHandles()
+
+    def proximityStatePostDeviceRemoval(self) -> TemporalProximityState:
+        """
+        :return: set correct proximity state after a device is removed
+        """
+
+        # ignore devices that are scanning - we don't care about them, because the scan
+        # could take a long time, especially with phones
+        if len(self.devices) - len(self.devices.scanning) > 0:
+            # Other already scanned devices are present
+            return TemporalProximityState.regenerate
+        else:
+            return TemporalProximityState.empty
 
     @pyqtSlot()
     def devicesViewToggledOn(self) -> None:
@@ -4445,13 +4463,6 @@ Do you want to proceed with the download?
         Initiate Timeline generation if it's right to do so
         """
 
-        if len(self.devices.scanning):
-            logging.info(
-                "Was tasked to generate Timeline because %s, but ignoring request "
-                "because a scan is occurring", reason
-            )
-            return
-        
         if self.temporalProximity.state == TemporalProximityState.ctime_rebuild:
             logging.info(
                 "Was tasked to generate Timeline because %s, but ignoring request "
@@ -5105,7 +5116,8 @@ Do you want to proceed with the download?
             self.setDownloadCapabilities()
 
             if adjust_temporal_proximity:
-                if len(self.devices) == 0:
+                state = self.proximityStatePostDeviceRemoval()
+                if state == TemporalProximityState.empty:
                     self.temporalProximity.setState(TemporalProximityState.empty)
                 elif files_removed:
                     self.generateTemporalProximityTableData("a download source was removed")
@@ -5684,6 +5696,7 @@ def get_versions() -> List[str]:
         'Python executable: {}'.format(sys.executable),
         'Qt: {}'.format(QtCore.QT_VERSION_STR),
         'PyQt: {}'.format(QtCore.PYQT_VERSION_STR),
+        'SIP: {}'.format(sip.SIP_VERSION_STR),
         'ZeroMQ: {}'.format(zmq.zmq_version()),
         'Python ZeroMQ: {} ({} backend)'.format(zmq.pyzmq_version(), pyzmq_backend),
         'gPhoto2: {}'.format(gphoto2_version()),
@@ -6096,7 +6109,7 @@ def main():
             sys.exit(1)
 
         media_dir = get_media_dir()
-        auto_detect = args.path.startswith(media_dir)
+        auto_detect = args.path.startswith(media_dir) or gvfs_gphoto2_path(args.path)
         if auto_detect:
             this_computer_source = False
             this_computer_location = None

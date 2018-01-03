@@ -1,4 +1,4 @@
-# Copyright (C) 2007-2017 Damon Lynch <damonlynch@gmail.com>
+# Copyright (C) 2007-2018 Damon Lynch <damonlynch@gmail.com>
 
 # This file is part of Rapid Photo Downloader.
 #
@@ -18,7 +18,7 @@
 # see <http://www.gnu.org/licenses/>.
 
 __author__ = 'Damon Lynch'
-__copyright__ = "Copyright 2007-2017, Damon Lynch"
+__copyright__ = "Copyright 2007-2018, Damon Lynch"
 
 from enum import (Enum, IntEnum)
 from PyQt5.QtCore import Qt
@@ -259,6 +259,7 @@ class Sort(IntEnum):
     file_type = 5
     device = 6
 
+
 class JobCodeSort(IntEnum):
     last_used = 1
     code = 2
@@ -293,6 +294,7 @@ class Roles(IntEnum):
     device_type = Qt.UserRole + 19
     download_statuses = Qt.UserRole + 20
     job_code = Qt.UserRole + 21
+    uids = Qt.UserRole + 22
 
 
 class ExtractionTask(Enum):
@@ -402,13 +404,14 @@ class PrefPosition(Enum):
     positioned_in = 4
     not_here = 5
 
+
 # Values in minutes:
 proximity_time_steps = [5, 10, 15, 30, 45, 60, 90, 120, 180, 240, 480, 960, 1440]
 
 
 class TemporalProximityState(Enum):
     empty = 1
-    pending = 2
+    pending = 2  # e.g. 2 devices scanning, only 1 scan finished
     generating = 3
     regenerate = 4
     generated = 5
@@ -427,6 +430,11 @@ class StandardFileLocations(Enum):
     downloads = 8
 
 
+class FileManagerType(Enum):
+    regular = 1
+    select = 2
+
+
 max_remembered_destinations = 10
 
 ThumbnailBackgroundName = MediumGray
@@ -438,6 +446,10 @@ DeviceShadingIntensity = 104
 # How many steps with which to highlight thumbnail cells
 FadeSteps = 20
 FadeMilliseconds = 700
+
+
+# horizontal and vertical margin for thumbnail rectangles
+thumbnail_margin = 10
 
 
 def minPanelWidth() -> int:
@@ -482,7 +494,8 @@ class Desktop(Enum):
     lxde = 7
     lxqt = 8
     ubuntugnome = 9
-    unknown = 10
+    popgnome = 10
+    unknown = 11
 
 
 class Distro(Enum):
@@ -498,6 +511,7 @@ class Distro(Enum):
     galliumos = 10
     peppermint = 11
     antergos = 12
+    elementary = 13
 
 
 orientation_offset = dict(
@@ -608,3 +622,15 @@ class MarkRawJpeg(IntEnum):
     no_jpeg = 1
     no_raw = 2
     both = 3
+
+
+# see https://developer.mozilla.org/en-US/docs/Mozilla/Localization/Localization_and_Plurals
+class Plural(Enum):
+    zero = 1
+    two_form_single = 2
+    two_form_plural = 3
+
+
+# Use the character . to for download_name and path to indicate the user manually marked a
+# file as previously downloaded
+manually_marked_previously_downloaded = '.'

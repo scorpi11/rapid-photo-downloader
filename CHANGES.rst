@@ -1,6 +1,107 @@
 Changelog for Rapid Photo Downloader
 ====================================
 
+0.9.7 (2018-01-01)
+------------------
+
+ - Fixed bug where removing a download source while another source was being
+   scanned could cause a crash when the timeline was scrolled.
+
+ - Fixed bug where session sequence values were being reset every time a
+   download was initiated, not every time the program was started.
+
+ - Updated German, Hungarian and Norwegian Bokmal translations.
+
+0.9.7b1 (2017-12-18)
+--------------------
+
+ - Fix bug #1738174: Don't crash when right clicking in thumbnail checkbox
+   and no thumbnail is selected.
+
+ - Fix bug #1737416: Don't scan cameras when browsing "This Computer", and
+   detect if a camera mount has been passed via the command line (which can
+   happen when the program automatically launches in response to a camera
+   being attached to the computer).
+
+ - When opening a file in KDE's Dolphin file manager, select the file
+   (and thus highlight it), like is done with Gnome Files and several other
+   file managers.
+
+ - Fix bug #1737287: Don't allow identical entries in subfolder generation and
+   file renaming presets, where the preset names differ but their content is
+   the same.
+
+0.9.6 (2017-12-08)
+------------------
+
+ - When scrolling is synchronized, and you click on a thumbnail, the top of
+   the Timeline will be scrolled match to match it.
+
+ - Don't crash when only new files are displayed and the Timeline is scrolled
+   when scrolling is synchronized.
+
+ - Updated Czech, Dutch, Hungarian, Japanese, Russian, and Spanish
+   translations.
+
+0.9.6b2 (2017-12-05)
+--------------------
+
+ - Don't crash when Timeline ranges are selected and scrolling is
+   synchronized.
+
+0.9.6b1 (2017-12-05)
+--------------------
+
+ - The Timeline is now shown by default when the program is first run, or
+   settings are reset.
+
+ - Added option to synchronize Timeline with thumbnails. Scroll one, and the
+   other automatically scrolls too. Use the button at the bottom-right of the
+   Timeline to toggle this feature.
+
+ - After clearing a Timeline selection, the display of thumbnails will be
+   positioned such that the the photos in the previous selection are
+   visible. Previously, the thumbnails display would be scrolled all the way
+   to the top after the Timeline selection had been cleared.
+
+ - Added Hasselblad 3FR files to list of supported file formats. If you detect
+   any problems with the accuracy of the metadata from this format, please let
+   me know.
+
+ - Work around MediaInfoLib bug #695 that caused the libmediainfo shared
+   object file to be named incorrectly, making it appear to be missing.
+
+ - Correctly parse Distribution version in installer when running on Fedora,
+   Debian and Peppermint.
+
+ - Install PyQt 5.9.2 or greater. Upgrade pymediainfo to version 2.2.0 or
+   newer.
+
+ - Updated Catalan, Chinese, Czech, Danish, Dutch, French, German, Norwegian
+   Nyorsk, Russian, and Spanish translations.
+
+0.9.5 (2017-11-05)
+------------------
+
+ - Added check to install.py installation script and upgrade.py upgrade
+   script to ensure that SIP 4.19.3 is installed when PyQt 5.9 is installed.
+   The combination of SIP  4.19.4 and PyQt 5.9 causes Rapid Photo Downloader
+   to crash. Because SIP 4.19.4 is installed by default when installing
+   PyQt 5.9, the install and upgrade scripts forcibly revert to SIP 4.19.3
+   when PyQt 5.9 is installed.
+
+ - Add option to manually mark files as previously downloaded, allowing for
+   occasions when another program has already downloaded the files.
+   Right-click on one or more photo or video thumbnails to mark them as
+   previously downloaded.
+
+ - Add elementary OS to list of Linux distributions supported by the
+   install.py script.
+
+ - Fixed bug in upgrade script when reporting an operational failure.
+
+ - Updated Chinese, Dutch, Italian, and Norwegian Bokmal translations.
+
 0.9.4 (2017-09-30)
 ------------------
 
