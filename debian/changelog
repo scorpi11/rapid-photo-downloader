@@ -1,7 +1,8 @@
-rapid-photo-downloader (0.9.7-1.0) UNRELEASED; urgency=medium
+rapid-photo-downloader (0.9.7-1) unstable; urgency=medium
+
+  * Team upload
 
   [ Antoine Beaupré ]
-  * Non-maintainer upload
   * update to newer 0.9.7 release
   * debian/watch:
     - allow downloading older releases by looking at the download page
@@ -17,10 +18,9 @@ rapid-photo-downloader (0.9.7-1.0) UNRELEASED; urgency=medium
 
   [ Jörg Frings-Fürst ]
   * New upstream release (Closes: #867527, #790600, #866476):
-    - Remove obsolate patches:
+    - Remove obsolete patches:
       + 05_removed-empty-directory.diff
       + 10-keywords_desktop.patch
-    - Add new patch 0001-intltool_utf8.patch to fix Debian build errors.
   * debian/control:
     - Add requested python 3 and remove unneeded python 2 to/from Build-Depends.
     - Change Vcs-Browser and Homepage to secure URI.
@@ -48,7 +48,7 @@ rapid-photo-downloader (0.9.7-1.0) UNRELEASED; urgency=medium
     - Rewrite package metadata to the latest version.
   * Copy appdata file from usr/share/appdata to usr/share/metainfo.
 
- -- Antoine Beaupré <anarcat@debian.org>  Sat, 30 Dec 2017 12:20:05 -0500
+ -- Jörg Frings-Fürst <debian@jff.email>  Wed, 03 Jan 2018 21:42:13 +0100
 
 rapid-photo-downloader (0.4.11-1) unstable; urgency=medium
 
