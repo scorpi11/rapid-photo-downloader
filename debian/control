@@ -8,6 +8,7 @@ Build-Depends:
  intltool,
  python3,
  python3-all,
+ python3-pymediainfo,
  python3-setuptools,
  python3-xdg
 Standards-Version: 4.1.3
