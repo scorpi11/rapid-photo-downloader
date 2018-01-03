@@ -27,7 +27,7 @@ rapid-photo-downloader (0.9.7-1.0) UNRELEASED; urgency=medium
     - Add X-Python3-Version and remove X-Python-Version.
   * debian/rules:
     - Use pkg-info.mk instead parsing the output of dpkg-parsechangelog.
-  * Declare compliance with Debian Policy 4.0.0. (No changes needed).
+  * Declare compliance with Debian Policy 4.1.3 (No changes needed).
   * Bump compat to 11:
     - Change debian/compat to 11.
     - Change debhelper version at debian/control to >= 11.
