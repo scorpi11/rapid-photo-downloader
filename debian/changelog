@@ -1,8 +1,8 @@
-rapid-photo-downloader (0.9.6-1.0) UNRELEASED; urgency=medium
+rapid-photo-downloader (0.9.7-1.0) UNRELEASED; urgency=medium
 
   [ Antoine Beaupré ]
   * Non-maintainer upload
-  * update to newer 0.9.6 release
+  * update to newer 0.9.7 release
   * debian/watch:
     - allow downloading older releases by looking at the download page
       directly
@@ -28,9 +28,9 @@ rapid-photo-downloader (0.9.6-1.0) UNRELEASED; urgency=medium
   * debian/rules:
     - Use pkg-info.mk instead parsing the output of dpkg-parsechangelog.
   * Declare compliance with Debian Policy 4.0.0. (No changes needed).
-  * Bump compat to 10:
-    - Change debian/compat to 10.
-    - Change debhelper version at debian/control to >= 10.
+  * Bump compat to 11:
+    - Change debian/compat to 11.
+    - Change debhelper version at debian/control to >= 11.
 
  -- Antoine Beaupré <anarcat@debian.org>  Sat, 30 Dec 2017 12:20:05 -0500
 

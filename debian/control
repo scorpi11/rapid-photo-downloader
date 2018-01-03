@@ -3,7 +3,7 @@ Section: graphics
 Priority: optional
 Maintainer: Jörg Frings-Fürst <debian@jff-webhosting.net>
 Build-Depends:
- debhelper (>= 10),
+ debhelper (>= 11),
  dh-python,
  intltool,
  python3,
