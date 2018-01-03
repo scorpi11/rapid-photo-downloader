@@ -1,6 +1,36 @@
 Changelog for Rapid Photo Downloader
 ====================================
 
+0.9.7 (2018-01-01)
+------------------
+
+ - Fixed bug where removing a download source while another source was being
+   scanned could cause a crash when the timeline was scrolled.
+
+ - Fixed bug where session sequence values were being reset every time a
+   download was initiated, not every time the program was started.
+
+ - Updated German, Hungarian and Norwegian Bokmal translations.
+
+0.9.7b1 (2017-12-18)
+--------------------
+
+ - Fix bug #1738174: Don't crash when right clicking in thumbnail checkbox
+   and no thumbnail is selected.
+
+ - Fix bug #1737416: Don't scan cameras when browsing "This Computer", and
+   detect if a camera mount has been passed via the command line (which can
+   happen when the program automatically launches in response to a camera
+   being attached to the computer).
+
+ - When opening a file in KDE's Dolphin file manager, select the file
+   (and thus highlight it), like is done with Gnome Files and several other
+   file managers.
+
+ - Fix bug #1737287: Don't allow identical entries in subfolder generation and
+   file renaming presets, where the preset names differ but their content is
+   the same.
+
 0.9.6 (2017-12-08)
 ------------------
 
