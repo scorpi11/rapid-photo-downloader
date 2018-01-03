@@ -31,6 +31,11 @@ rapid-photo-downloader (0.9.7-1.0) UNRELEASED; urgency=medium
   * Bump compat to 11:
     - Change debian/compat to 11.
     - Change debhelper version at debian/control to >= 11.
+  * Change to my new email address:
+    - debian/control
+    - debian/copyright
+  * debian/copyright:
+    - Add year 2018 to debian/*.
 
  -- Antoine Beaupré <anarcat@debian.org>  Sat, 30 Dec 2017 12:20:05 -0500
 
