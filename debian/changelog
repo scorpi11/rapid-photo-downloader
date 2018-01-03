@@ -37,6 +37,7 @@ rapid-photo-downloader (0.9.7-1.0) UNRELEASED; urgency=medium
     - debian/copyright
   * debian/copyright:
     - Add year 2018 to debian/*.
+    - Add Antoine Beaupré <anarcat@debian.org> to debian/*
     - Update to the new upstream release.
   * debian/watch:
     - Bump version to 4.
@@ -45,6 +46,7 @@ rapid-photo-downloader (0.9.7-1.0) UNRELEASED; urgency=medium
     - Remove trailing whitespaces.
   * New patches/0700-appstream-metadata.patch:
     - Rewrite package metadata to the latest version.
+  * Copy appdata file from usr/share/appdata to usr/share/metainfo.
 
  -- Antoine Beaupré <anarcat@debian.org>  Sat, 30 Dec 2017 12:20:05 -0500
 

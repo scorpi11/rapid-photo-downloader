@@ -10,8 +10,11 @@ include /usr/share/dpkg/pkg-info.mk
 override_dh_auto_configure:
 	pod2man --section=1 --release=$(DEB_SOURCE) --center "" doc/rapid-photo-downloader.1.pod > rapid-photo-downloader.1
 
-#override_dh_auto_install:
-#	dh_auto_install -- --install-lib=/usr/share/rapid-photo-downloader --install-scripts=/usr/share/rapid-photo-downloader
+override_dh_auto_install:
+	dh_auto_install
+	mv $(CURDIR)/debian/rapid-photo-downloader/usr/share/appdata/net.damonlynch.rapid-photo-downloader.appdata.xml \
+	    $(CURDIR)/debian/rapid-photo-downloader/usr/share/metainfo/
+	$(RM) -d $(CURDIR)/debian/rapid-photo-downloader/usr/share/appdata/
 
 override_dh_auto_clean:
 	-rm rapid-photo-downloader.1
