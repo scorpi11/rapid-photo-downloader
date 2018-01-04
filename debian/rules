@@ -1,16 +1,20 @@
 #!/usr/bin/make -f
+#export DH_VERBOSE=1
 
-DEBVERS := $(shell dpkg-parsechangelog | sed -n -e 's/^Version: //p')
-VERSION := $(shell echo '$(DEBVERS)' | sed -e 's/^[[:digit:]]*://' -e 's/[~-].*//')
+
+include /usr/share/dpkg/pkg-info.mk
 
 %:
-	dh $@ --with python2
+	dh $@ --with python3 --buildsystem=pybuild
 
 override_dh_auto_configure:
-	pod2man --section=1 --release=$(VERSION) --center "" doc/rapid-photo-downloader.pod > rapid-photo-downloader.1
+	pod2man --section=1 --release=$(DEB_SOURCE) --center "" doc/rapid-photo-downloader.1.pod > rapid-photo-downloader.1
 
 override_dh_auto_install:
-	dh_auto_install -- --install-lib=/usr/share/rapid-photo-downloader --install-scripts=/usr/share/rapid-photo-downloader
+	dh_auto_install
+	mv $(CURDIR)/debian/rapid-photo-downloader/usr/share/appdata/net.damonlynch.rapid-photo-downloader.appdata.xml \
+	    $(CURDIR)/debian/rapid-photo-downloader/usr/share/metainfo/
+	$(RM) -d $(CURDIR)/debian/rapid-photo-downloader/usr/share/appdata/
 
 override_dh_auto_clean:
 	-rm rapid-photo-downloader.1
@@ -18,4 +22,4 @@ override_dh_auto_clean:
 	dh_auto_clean
 
 override_dh_installchangelogs:
-	dh_installchangelogs rapid/ChangeLog
+	dh_installchangelogs CHANGES.rst

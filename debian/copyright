@@ -4,19 +4,40 @@ Upstream-Contact: Damon Lynch <damonlynch@gmail.com>
 Source: https://launchpad.net/rapid
 
 Files: *
-Copyright: 2007-2014 Damon Lynch <damonlynch@gmail.com>
+Copyright: 2007-2018 Damon Lynch <damonlynch@gmail.com>
            2002-2006 Stephen Kennedy <stevek@gnome.org>
+License: GPL-2+
+
+Files: setup.py
+Copyright: 2009-2017 Damon Lynch <damonlynch@gmail.com>
+           2004-2012 Canonical Ltd
+           2014      Donald Stufft
+License: GPL-2+
+
+Files: raphodo/storage.py
+Copyright: 2015-2017 Damon Lynch <damonlynch@gmail.com>
+           2008-2015 Canonical Ltd.
+           2013      Bernard Baeyens
+License: GPL-2+
+
+Files: raphodo/aboutdialog.py
+Copyright: 2007-2018 Damon Lynch <damonlynch@gmail.com>
+           2008-2015 Canonical Ltd.
+           2013      Bernard Baeyens
+           2012-2015 Jim Easterbrook
+           2012      Sven Marnach
+License: GPL-2+
+
+Files: po/*
+Copyright: 2009-2017 Rosetta Contributors and Canonical Ltd
 License: GPL-2+
 
 Files: debian/*
 Copyright: 2009      Damon Lynch <damonlynch@gmail.com>
            2009-2014 Julien Valroff <julien@debian.org>
-           2014-2015 Jörg Frings-Fürst <debian@jff-webhosting.net>
+           2017      Antoine Beaupré <anarcat@debian.org>
+           2014-2018 Jörg Frings-Fürst <debian@jff.email>
 License: GPL-2+
-
-Files: rapid/ValidatedEntry.py
-Copyright: 2006      Daniel J. Popowich <dpopowich@astro.umass.edu>
-License: Expat
 
 License: GPL-2+
  This program is free software; you can redistribute it and/or modify
@@ -35,14 +56,3 @@ License: GPL-2+
  .
  On Debian systems, the complete text of the GNU General Public
  License can be found in the file `/usr/share/common-licenses/GPL-2'.
-
-License: Expat
- Permission is hereby granted, free of charge, to any person obtaining a
- copy of this software and associated documentation files (the "Software"),
- to deal in the Software without restriction, including without limitation
- the rights to use, copy, modify, merge, publish, distribute, sublicense,
- and/or sell copies of the Software, and to permit persons to whom the
- Software is furnished to do so, subject to the following conditions:
- .
- The above copyright notice and this permission notice shall be included
- in all copies or substantial portions of the Software.

@@ -1,0 +1,23 @@
+Description: Rewrite package metadata latest version
+Author: Jölrg Frings-Fürst <debian@jff.email>
+Last-Update: 2018-01-03
+---
+This patch header follows DEP-3: http://dep.debian.net/deps/dep3/
+Index: trunk/data/net.damonlynch.rapid-photo-downloader.appdata.xml.in
+===================================================================
+--- trunk.orig/data/net.damonlynch.rapid-photo-downloader.appdata.xml.in
++++ trunk/data/net.damonlynch.rapid-photo-downloader.appdata.xml.in
+@@ -1,6 +1,6 @@
+ <?xml version="1.0" encoding="UTF-8"?>
+ <!-- Copyright 2014-2017 Damon Lynch <damonlynch@gmail.com> -->
+-<application>
++<component>
+   <id type="desktop">net.damonlynch.rapid-photo-downloader</id>
+   <provides>
+     <id>rapid-photo-downloader.desktop</id>
+@@ -67,4 +67,4 @@
+     </screenshot>
+   </screenshots>
+   <updatecontact>damonlynch@gmail.com</updatecontact>
+-</application>
++</component>
