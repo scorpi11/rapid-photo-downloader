@@ -48,7 +48,7 @@ rapid-photo-downloader (0.9.7-1) unstable; urgency=medium
     - Rewrite package metadata to the latest version.
   * Copy appdata file from usr/share/appdata to usr/share/metainfo.
 
- -- Jörg Frings-Fürst <debian@jff.email>  Wed, 03 Jan 2018 21:42:13 +0100
+ -- Jörg Frings-Fürst <debian@jff.email>  Thu, 04 Jan 2018 10:34:46 +0100
 
 rapid-photo-downloader (0.4.11-1) unstable; urgency=medium
 
