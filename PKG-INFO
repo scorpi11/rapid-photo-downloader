@@ -1,6 +1,6 @@
 Metadata-Version: 1.1
 Name: rapid-photo-downloader
-Version: 0.9.7
+Version: 0.9.9
 Summary: Downloads, renames and backs up photos and videos from cameras, phones, memory cards and other devices
 Home-page: http://www.damonlynch.net/rapid
 Author: Damon Lynch
@@ -100,6 +100,7 @@ Description: Rapid Photo Downloader
             - Notify 0.7
          - `python-gphoto2`_ 1.4.0 or newer
          - pyzmq_
+         - tornado_
          - psutil_ 3.4.2 or newer
          - pyxdg_
          - Arrow_
@@ -215,6 +216,7 @@ Description: Rapid Photo Downloader
         .. _Qt: https://www.qt.io/
         .. _SortedContainers: http://www.grantjenks.com/docs/sortedcontainers/
         .. _Requests: http://docs.python-requests.org/
+        .. _tornado: http://www.tornadoweb.org/
 Keywords: photo,video,download,ingest,import,camera,phone,backup,rename,photography,photographer,transfer,copy,raw,cr2,nef,arw
 Platform: UNKNOWN
 Classifier: Development Status :: 5 - Production/Stable

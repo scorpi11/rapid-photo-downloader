@@ -59,11 +59,11 @@ class AboutDialog(QDialog):
         title_bottom = 45
         left_margin = 16
 
-        transparency = "rgba(0, 0, 0, 200)"
+        transparency = "rgba(0, 0, 0, 130)"
 
         # Standard About view
 
-        msg = """Copyright &copy; 2007-2017 Damon Lynch.<br><br>
+        msg = """Copyright &copy; 2007-2018 Damon Lynch.<br><br>
         <a href="http://www.damonlynch.net/rapid" %(link_style)s>
         www.damonlynch.net/rapid</a><br><br>
         This program comes with absolutely no warranty.<br>
@@ -114,7 +114,7 @@ class AboutDialog(QDialog):
         Portions copyright © 2012-2015 Jim Easterbrook.
         Portions copyright © 2012 Sven Marnach.
 
-        Photo %(photolink)s copyright © 2014 Damon Lynch, all rights reserved.
+        Photo %(photolink)s copyright © 2014-2018 Damon Lynch, all rights reserved.
         Camera icon courtesy %(artlink1)s.
         Video camera icon courtesy %(artlink2)s.
         Home icon courtesy %(artlink3)s.
@@ -178,8 +178,8 @@ class AboutDialog(QDialog):
             credits_text = credits_text.replace(i, j)
 
         credits_text = credits_text % dict(
-            photolink="""<a href="https://500px.com/photo/65727425/afghan-men-pulling-heavy-load-by
-            -damon-lynch" style="color: white;">Afghan Men Pulling Heavy Load</a>""",
+            photolink="""<a href="https://500px.com/photo/246096445/afghan-men-pulling-heavy-load-
+            by-damon-lynch" style="color: white;">Afghan Men Pulling Heavy Load</a>""",
             artlink1='<a href="http://www.webalys.com" style="color: white;">Vincent Le Moign</a>',
             artlink2="""<a href="https://www.iconfinder.com/bluewolfski" style="color: white;">The
                  Pictographers</a>""",

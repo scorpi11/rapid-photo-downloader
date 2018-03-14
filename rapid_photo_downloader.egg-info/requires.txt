@@ -1,0 +1,18 @@
+arrow
+colorlog
+colour
+easygui
+gphoto2
+psutil
+pymediainfo
+pyprind
+python-dateutil
+pyxdg
+pyzmq
+rawkit
+sortedcontainers
+tornado
+
+[:python_version == "3.4"]
+scandir
+typing

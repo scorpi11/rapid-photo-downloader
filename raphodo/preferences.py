@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 
-# Copyright (C) 2011-2017 Damon Lynch <damonlynch@gmail.com>
+# Copyright (C) 2011-2018 Damon Lynch <damonlynch@gmail.com>
 
 # This file is part of Rapid Photo Downloader.
 #
@@ -19,7 +19,7 @@
 # see <http://www.gnu.org/licenses/>.
 
 __author__ = 'Damon Lynch'
-__copyright__ = "Copyright 2011-2017, Damon Lynch"
+__copyright__ = "Copyright 2011-2018, Damon Lynch"
 
 import logging
 import re
@@ -37,7 +37,7 @@ from raphodo.storage import (
 )
 from raphodo.generatenameconfig import *
 import raphodo.constants as constants
-from raphodo.constants import PresetPrefType
+from raphodo.constants import PresetPrefType, FileType
 from raphodo.utilities import available_cpu_count, make_internationalized_list
 import raphodo.__about__
 from raphodo.rpdfile import ALL_KNOWN_EXTENSIONS
@@ -446,8 +446,7 @@ class Preferences:
     def restore(self, key: str) -> None:
         self[key] = self.defaults[key]
 
-    def get_preset(self, preset_type: PresetPrefType) -> Tuple[List[str],
-                                                                         List[List[str]]]:
+    def get_preset(self, preset_type: PresetPrefType) -> Tuple[List[str], List[List[str]]]:
         """
         Returns the custom presets for the particular type.
 
@@ -477,7 +476,7 @@ class Preferences:
 
     def set_preset(self, preset_type: PresetPrefType,
                    preset_names: List[str],
-                   preset_pref_lists: List[str]) -> None:
+                   preset_pref_lists: List[List[str]]) -> None:
         """
         Saves a list of custom presets in the user's preferences.
 
@@ -543,7 +542,7 @@ class Preferences:
         """
         :return True if any of the pref lists contain a stored sequence no
         """
-        for pref_list in self.get_pref_lists():
+        for pref_list in self.get_pref_lists(file_name_only=True):
             if self._pref_list_uses_component(pref_list, STORED_SEQ_NUMBER):
                 return True
         return False
@@ -552,7 +551,7 @@ class Preferences:
         """
         :return True if any of the pref lists contain a session sequence no
         """
-        for pref_list in self.get_pref_lists():
+        for pref_list in self.get_pref_lists(file_name_only=True):
             if self._pref_list_uses_component(pref_list, SESSION_SEQ_NUMBER):
                 return True
         return False
@@ -561,7 +560,7 @@ class Preferences:
         """
         :return True if any of the pref lists contain a sequence letter
         """
-        for pref_list in self.get_pref_lists():
+        for pref_list in self.get_pref_lists(file_name_only=True):
             if self._pref_list_uses_component(pref_list, SEQUENCE_LETTER):
                 return True
         return False
@@ -717,12 +716,15 @@ class Preferences:
             v += s + "\n"
         return v
 
-    def get_pref_lists(self) -> Tuple[List[str], List[str], List[str], List[str]]:
+    def get_pref_lists(self, file_name_only: bool) -> Tuple[List[str], ...]:
         """
         :return: a tuple of the photo & video rename and subfolder
          generation preferences
         """
-        return self.photo_rename, self.photo_subfolder, self.video_rename, self.video_subfolder
+        if file_name_only:
+            return self.photo_rename, self.video_rename
+        else:
+            return self.photo_rename, self.photo_subfolder, self.video_rename, self.video_subfolder
 
     def get_day_start_qtime(self) -> QTime:
         """
@@ -755,8 +757,8 @@ class Preferences:
         else:
             return Qt.Unchecked
 
-    def pref_uses_job_code(self, pref_list: List[str]):
-        """ Returns True if the particular preferences contains a job code"""
+    def pref_uses_job_code(self, pref_list: List[str]) -> bool:
+        """ Returns True if the particular preference contains a job code"""
         for i in range(0, len(pref_list), 3):
             if pref_list[i] == JOB_CODE:
                 return True
@@ -764,7 +766,7 @@ class Preferences:
 
     def any_pref_uses_job_code(self) -> bool:
         """ Returns True if any of the preferences contain a job code"""
-        for pref_list in self.get_pref_lists():
+        for pref_list in self.get_pref_lists(file_name_only=False):
             if self.pref_uses_job_code(pref_list):
                 return True
         return False
@@ -880,7 +882,7 @@ class Preferences:
         An empty list contains only one item: ['']
 
         :param key: the preference key
-        :param value: the value to add
+        :param value: the value to delete
         """
 
         # Must remove the value like this, otherwise the preference value

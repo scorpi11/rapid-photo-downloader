@@ -1,6 +1,42 @@
 Changelog for Rapid Photo Downloader
 ====================================
 
+0.9.9 (2018-03-08)
+------------------
+
+ - Fix bug #1750879: Sequence numbers increment incorrectly for videos when
+   Synchronize RAW+JPEG enabled.
+
+ - Fix bug in sequence letter generation.
+
+ - Enable the disabling of new version checks in both the program logic and
+   the user interface, which is useful for Linux distributions. To disable the
+   check, Linux package maintainers should patch the file constants.py to
+   change the line `disable_version_check = False` to `disable_version_check =
+   True`.
+
+ - Include tornado as a dependency instead of relying on the deprecated
+   mini-tornado found in pyzmq.
+
+0.9.8 (2018-02-18)
+------------------
+
+ - On Sony files, use ExifTool to get shutter count metadata. Please note, not
+   all Sony models produce this metadata.
+
+0.9.8b1 (2018-02-13)
+--------------------
+
+ - Don't crash when choosing an existing subfolder generation preset from the
+   editor windows that is currently not displayed in the main window's drop-
+   down gear menu.
+
+ - Don't crash when getting tooltip for backup devices when no backup devices
+   exist.
+
+ - Updated Brazilian Portuguese, German and Greek translations.
+
+
 0.9.7 (2018-01-01)
 ------------------
 
