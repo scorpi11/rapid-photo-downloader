@@ -2,6 +2,7 @@ Source: rapid-photo-downloader
 Section: graphics
 Priority: optional
 Maintainer: Jörg Frings-Fürst <debian@jff.email>
+Uploaders: Antoine Beaupré <anarcat@debian.org>
 Build-Depends:
  debhelper (>= 11),
  dh-python,
