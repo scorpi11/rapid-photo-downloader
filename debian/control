@@ -4,7 +4,7 @@ Priority: optional
 Maintainer: Jörg Frings-Fürst <debian@jff.email>
 Uploaders: Antoine Beaupré <anarcat@debian.org>
 Build-Depends:
- debhelper (>= 11),
+ debhelper (>= 11~),
  dh-python,
  intltool,
  python3,
