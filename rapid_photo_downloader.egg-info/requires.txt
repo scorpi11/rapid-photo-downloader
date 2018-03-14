@@ -11,6 +11,7 @@ pyxdg
 pyzmq
 rawkit
 sortedcontainers
+tornado
 
 [:python_version == "3.4"]
 scandir

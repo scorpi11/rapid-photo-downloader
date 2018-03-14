@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 
-# Copyright (C) 2011-2017 Damon Lynch <damonlynch@gmail.com>
+# Copyright (C) 2011-2018 Damon Lynch <damonlynch@gmail.com>
 
 # This file is part of Rapid Photo Downloader.
 #
@@ -29,7 +29,7 @@ Project line length: 100 characters (i.e. word wrap at 99)
 """
 
 __author__ = 'Damon Lynch'
-__copyright__ = "Copyright 2011-2017, Damon Lynch"
+__copyright__ = "Copyright 2011-2018, Damon Lynch"
 
 import sys
 import logging
@@ -94,7 +94,7 @@ from raphodo.storage import (
     has_one_or_more_folders, mountPaths, get_desktop_environment, get_desktop,
     gvfs_controls_mounts, get_default_file_manager, validate_download_folder,
     validate_source_folder, get_fdo_cache_thumb_base_directory, WatchDownloadDirs, get_media_dir,
-    StorageSpace
+    StorageSpace, gvfs_gphoto2_path
 )
 from raphodo.interprocess import (
     ScanArguments, CopyFilesArguments, RenameAndMoveFileData, BackupArguments,
@@ -112,7 +112,7 @@ from raphodo.constants import (
     Desktop, BackupFailureType, DeviceState, Sort, Show, DestinationDisplayType,
     DisplayingFilesOfType, DownloadingFileTypes, RememberThisMessage, RightSideButton,
     CheckNewVersionDialogState, CheckNewVersionDialogResult, RememberThisButtons,
-    BackupStatus, CompletedDownloads
+    BackupStatus, CompletedDownloads, disable_version_check
 )
 from raphodo.thumbnaildisplay import (
     ThumbnailView, ThumbnailListModel, ThumbnailDelegate, DownloadStats, MarkedSummary
@@ -603,6 +603,15 @@ class RapidWindow(QMainWindow):
         elif self.prefs.auto_download_upon_device_insertion:
             logging.info("Auto download upon device insertion is on")
 
+        if self.prefs.list_not_empty('volume_whitelist'):
+            logging.info("Whitelisted devices: %s", " ; ".join(self.prefs.volume_whitelist))
+
+        if self.prefs.list_not_empty('volume_blacklist'):
+            logging.info("Blacklisted devices: %s", " ; ".join(self.prefs.volume_blacklist))
+
+        if self.prefs.list_not_empty('camera_blacklist'):
+            logging.info("Blacklisted cameras: %s", " ; ".join(self.prefs.camera_blacklist))
+
         self.prefs.verify_file = False
 
         logging.debug("Starting main ExifTool process")
@@ -640,6 +649,9 @@ class RapidWindow(QMainWindow):
                         "Version downgrade detected, from %s to %s",
                         __about__.__version__, previous_version
                     )
+                if pv < pkg_resources.parse_version('0.9.7b1'):
+                    # Remove any duplicate subfolder generation or file renaming custom presets
+                    self.prefs.filter_duplicate_generation_prefs()
 
     def startThreadControlSockets(self) -> None:
         """
@@ -809,7 +821,7 @@ class RapidWindow(QMainWindow):
             self.updateThumbnailModelAfterProximityChange
         )
 
-        self.file_manager = get_default_file_manager()
+        self.file_manager, self.file_manager_type = get_default_file_manager()
         if self.file_manager:
             logging.info("Default file manager: %s", self.file_manager)
         else:
@@ -928,27 +940,30 @@ class RapidWindow(QMainWindow):
             self.gvolumeMonitor.volumeAddedNoAutomount.connect(self.noGVFSAutoMount)
             self.gvolumeMonitor.cameraPossiblyRemoved.connect(self.cameraRemoved)
 
-        logging.debug("Starting version check")
-        self.newVersion = NewVersion(self)
-        self.newVersionThread = QThread()
-        self.newVersionThread.started.connect(self.newVersion.start)
-        self.newVersion.checkMade.connect(self.newVersionCheckMade)
-        self.newVersion.bytesDownloaded.connect(self.newVersionBytesDownloaded)
-        self.newVersion.fileDownloaded.connect(self.newVersionDownloaded)
-        self.reverifyDownloadedTar.connect(self.newVersion.reVerifyDownload)
-        self.newVersion.downloadSize.connect(self.newVersionDownloadSize)
-        self.newVersion.reverified.connect(self.installNewVersion)
-        self.newVersion.moveToThread(self.newVersionThread)
+        if disable_version_check:
+            logging.debug("Version check disabled")
+        else:
+            logging.debug("Starting version check")
+            self.newVersion = NewVersion(self)
+            self.newVersionThread = QThread()
+            self.newVersionThread.started.connect(self.newVersion.start)
+            self.newVersion.checkMade.connect(self.newVersionCheckMade)
+            self.newVersion.bytesDownloaded.connect(self.newVersionBytesDownloaded)
+            self.newVersion.fileDownloaded.connect(self.newVersionDownloaded)
+            self.reverifyDownloadedTar.connect(self.newVersion.reVerifyDownload)
+            self.newVersion.downloadSize.connect(self.newVersionDownloadSize)
+            self.newVersion.reverified.connect(self.installNewVersion)
+            self.newVersion.moveToThread(self.newVersionThread)
 
-        QTimer.singleShot(0, self.newVersionThread.start)
+            QTimer.singleShot(0, self.newVersionThread.start)
 
-        self.newVersionCheckDialog = NewVersionCheckDialog(self)
-        self.newVersionCheckDialog.finished.connect(self.newVersionCheckDialogFinished)
+            self.newVersionCheckDialog = NewVersionCheckDialog(self)
+            self.newVersionCheckDialog.finished.connect(self.newVersionCheckDialogFinished)
 
-        # if values set, indicates the latest version of the program, and the main
-        # download page on the Rapid Photo Downloader website
-        self.latest_version = None  # type: version_details
-        self.latest_version_download_page = None  # type: str
+            # if values set, indicates the latest version of the program, and the main
+            # download page on the Rapid Photo Downloader website
+            self.latest_version = None  # type: version_details
+            self.latest_version_download_page = None  # type: str
 
         # Track the creation of temporary directories
         self.temp_dirs_by_scan_id = {}
@@ -2446,7 +2461,8 @@ class RapidWindow(QMainWindow):
         self.menu.addSeparator()
         self.menu.addAction(self.helpAct)
         self.menu.addAction(self.didYouKnowAct)
-        self.menu.addAction(self.newVersionAct)
+        if not disable_version_check:
+            self.menu.addAction(self.newVersionAct)
         self.menu.addAction(self.reportProblemAct)
         self.menu.addAction(self.makeDonationAct)
         self.menu.addAction(self.translateApplicationAct)
@@ -2457,9 +2473,10 @@ class RapidWindow(QMainWindow):
 
     def doCheckForNewVersion(self) -> None:
         """Check online for a new program version"""
-        self.newVersionCheckDialog.reset()
-        self.newVersionCheckDialog.show()
-        self.checkForNewVersionRequest.emit()
+        if not disable_version_check:
+            self.newVersionCheckDialog.reset()
+            self.newVersionCheckDialog.show()
+            self.checkForNewVersionRequest.emit()
 
     def doSourceAction(self) -> None:
         self.sourceButton.animateClick()
@@ -2574,7 +2591,7 @@ class RapidWindow(QMainWindow):
         """
         Respond to This Computer Toggle Switch
 
-        :param on: whether swich is on or off
+        :param on: whether switch is on or off
         """
 
         if on:
@@ -2594,14 +2611,15 @@ class RapidWindow(QMainWindow):
         """
         Respond to Devices Toggle Switch
 
-        :param on: whether swich is on or off
+        :param on: whether switch is on or off
         """
 
         self.prefs.device_autodetection = on
         if not on:
             for scan_id in list(self.devices.volumes_and_cameras):
                 self.removeDevice(scan_id=scan_id, adjust_temporal_proximity=False)
-            if len(self.devices) == 0:
+            state = self.proximityStatePostDeviceRemoval()
+            if state == TemporalProximityState.empty:
                 self.temporalProximity.setState(TemporalProximityState.empty)
             else:
                 self.generateTemporalProximityTableData("devices were removed as a download source")
@@ -2610,6 +2628,19 @@ class RapidWindow(QMainWindow):
             # slider redraw itself
             QTimer.singleShot(100, self.devicesViewToggledOn)
         self.adjustLeftPanelSliderHandles()
+
+    def proximityStatePostDeviceRemoval(self) -> TemporalProximityState:
+        """
+        :return: set correct proximity state after a device is removed
+        """
+
+        # ignore devices that are scanning - we don't care about them, because the scan
+        # could take a long time, especially with phones
+        if len(self.devices) - len(self.devices.scanning) > 0:
+            # Other already scanned devices are present
+            return TemporalProximityState.regenerate
+        else:
+            return TemporalProximityState.empty
 
     @pyqtSlot()
     def devicesViewToggledOn(self) -> None:
@@ -4446,13 +4477,6 @@ Do you want to proceed with the download?
         Initiate Timeline generation if it's right to do so
         """
 
-        if len(self.devices.scanning):
-            logging.info(
-                "Was tasked to generate Timeline because %s, but ignoring request "
-                "because a scan is occurring", reason
-            )
-            return
-        
         if self.temporalProximity.state == TemporalProximityState.ctime_rebuild:
             logging.info(
                 "Was tasked to generate Timeline because %s, but ignoring request "
@@ -4558,8 +4582,9 @@ Do you want to proceed with the download?
         else:
             del self.gvolumeMonitor
 
-        self.newVersionThread.quit()
-        self.newVersionThread.wait(100)
+        if not disable_version_check:
+            self.newVersionThread.quit()
+            self.newVersionThread.wait(100)
 
         self.sendStopToThread(self.thumbnail_deamon_controller)
         self.thumbnaildaemonmqThread.quit()
@@ -5106,7 +5131,8 @@ Do you want to proceed with the download?
             self.setDownloadCapabilities()
 
             if adjust_temporal_proximity:
-                if len(self.devices) == 0:
+                state = self.proximityStatePostDeviceRemoval()
+                if state == TemporalProximityState.empty:
                     self.temporalProximity.setState(TemporalProximityState.empty)
                 elif files_removed:
                     self.generateTemporalProximityTableData("a download source was removed")
@@ -5678,9 +5704,16 @@ def get_versions() -> List[str]:
         pyzmq_backend = 'cython'
     else:
         pyzmq_backend = 'cffi'
+    try:
+        ram = psutil.virtual_memory()
+        total = format_size_for_user(ram.total)
+        used = format_size_for_user(ram.used)
+    except Exception:
+        total = used = 'unknown'
     versions = [
         'Rapid Photo Downloader: {}'.format(__about__.__version__),
         'Platform: {}'.format(platform.platform()),
+        'Memory: {} used of {}'.format(used, total),
         'Python: {}'.format(platform.python_version()),
         'Python executable: {}'.format(sys.executable),
         'Qt: {}'.format(QtCore.QT_VERSION_STR),
@@ -5705,6 +5738,11 @@ def get_versions() -> List[str]:
     try:
         versions.append('{}: {}'.format(*platform.libc_ver()))
     except:
+        pass
+    try:
+        import tornado
+        versions.append('Tornado: {}'.format(tornado.version))
+    except ImportError:
         pass
     return versions
 
@@ -6098,7 +6136,7 @@ def main():
             sys.exit(1)
 
         media_dir = get_media_dir()
-        auto_detect = args.path.startswith(media_dir)
+        auto_detect = args.path.startswith(media_dir) or gvfs_gphoto2_path(args.path)
         if auto_detect:
             this_computer_source = False
             this_computer_location = None

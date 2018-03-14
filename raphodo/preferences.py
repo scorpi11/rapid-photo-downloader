@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 
-# Copyright (C) 2011-2017 Damon Lynch <damonlynch@gmail.com>
+# Copyright (C) 2011-2018 Damon Lynch <damonlynch@gmail.com>
 
 # This file is part of Rapid Photo Downloader.
 #
@@ -19,7 +19,7 @@
 # see <http://www.gnu.org/licenses/>.
 
 __author__ = 'Damon Lynch'
-__copyright__ = "Copyright 2011-2017, Damon Lynch"
+__copyright__ = "Copyright 2011-2018, Damon Lynch"
 
 import logging
 import re
@@ -32,11 +32,13 @@ from PyQt5.QtCore import QSettings, QTime, Qt
 
 from gettext import gettext as _
 
-from raphodo.storage import (xdg_photos_directory, xdg_videos_directory, xdg_photos_identifier,
-                             xdg_videos_identifier)
+from raphodo.storage import (
+    xdg_photos_directory, xdg_videos_directory, xdg_photos_identifier, xdg_videos_identifier
+)
 from raphodo.generatenameconfig import *
 import raphodo.constants as constants
-from raphodo.utilities import available_cpu_count
+from raphodo.constants import PresetPrefType, FileType
+from raphodo.utilities import available_cpu_count, make_internationalized_list
 import raphodo.__about__
 from raphodo.rpdfile import ALL_KNOWN_EXTENSIONS
 
@@ -444,8 +446,7 @@ class Preferences:
     def restore(self, key: str) -> None:
         self[key] = self.defaults[key]
 
-    def get_preset(self, preset_type: constants.PresetPrefType) -> Tuple[List[str],
-                                                                         List[List[str]]]:
+    def get_preset(self, preset_type: PresetPrefType) -> Tuple[List[str], List[List[str]]]:
         """
         Returns the custom presets for the particular type.
 
@@ -473,9 +474,9 @@ class Preferences:
 
         return preset_names, preset_pref_lists
 
-    def set_preset(self, preset_type: constants.PresetPrefType,
+    def set_preset(self, preset_type: PresetPrefType,
                    preset_names: List[str],
-                   preset_pref_lists: List[str]) -> None:
+                   preset_pref_lists: List[List[str]]) -> None:
         """
         Saves a list of custom presets in the user's preferences.
 
@@ -491,15 +492,17 @@ class Preferences:
 
         preset = preset_type.name
 
-        if not preset_names:
-            self.settings.remove(preset)
-        else:
-            self.settings.beginWriteArray(preset)
-            for i in range(len(preset_names)):
-                self.settings.setArrayIndex(i)
-                self.settings.setValue('name', preset_names[i])
-                self.settings.setValue('pref_list', preset_pref_lists[i])
-            self.settings.endArray()
+        # Clear all the existing presets with that name.
+        # If we don't do this, when the array shrinks, old values can hang around,
+        # even though the array size is set correctly.
+        self.settings.remove(preset)
+
+        self.settings.beginWriteArray(preset)
+        for i in range(len(preset_names)):
+            self.settings.setArrayIndex(i)
+            self.settings.setValue('name', preset_names[i])
+            self.settings.setValue('pref_list', preset_pref_lists[i])
+        self.settings.endArray()
 
         self.settings.endGroup()
 
@@ -539,7 +542,7 @@ class Preferences:
         """
         :return True if any of the pref lists contain a stored sequence no
         """
-        for pref_list in self.get_pref_lists():
+        for pref_list in self.get_pref_lists(file_name_only=True):
             if self._pref_list_uses_component(pref_list, STORED_SEQ_NUMBER):
                 return True
         return False
@@ -548,7 +551,7 @@ class Preferences:
         """
         :return True if any of the pref lists contain a session sequence no
         """
-        for pref_list in self.get_pref_lists():
+        for pref_list in self.get_pref_lists(file_name_only=True):
             if self._pref_list_uses_component(pref_list, SESSION_SEQ_NUMBER):
                 return True
         return False
@@ -557,7 +560,7 @@ class Preferences:
         """
         :return True if any of the pref lists contain a sequence letter
         """
-        for pref_list in self.get_pref_lists():
+        for pref_list in self.get_pref_lists(file_name_only=True):
             if self._pref_list_uses_component(pref_list, SEQUENCE_LETTER):
                 return True
         return False
@@ -601,10 +604,12 @@ class Preferences:
 
         msg = ''
         valid = True
-        tests = ((self.photo_rename, DICT_IMAGE_RENAME_L0),
-                 (self.video_rename, DICT_VIDEO_RENAME_L0),
-                 (self.photo_subfolder, DICT_SUBFOLDER_L0),
-                 (self.video_subfolder, DICT_VIDEO_SUBFOLDER_L0))
+        tests = (
+            (self.photo_rename, DICT_IMAGE_RENAME_L0),
+            (self.video_rename, DICT_VIDEO_RENAME_L0),
+            (self.photo_subfolder, DICT_SUBFOLDER_L0),
+            (self.video_subfolder, DICT_VIDEO_SUBFOLDER_L0)
+        )
 
         # test file renaming
         for pref, pref_defn in tests[:2]:
@@ -622,23 +627,63 @@ class Preferences:
                 L1s = [pref[i] for i in range(0, len(pref), 3)]
 
                 if L1s[0] == SEPARATOR:
-                    raise PrefValueKeyComboError(_(
-                        "Subfolder preferences should not start with a %s") % os.sep)
+                    raise PrefValueKeyComboError(
+                        _("Subfolder preferences should not start with a %s") % os.sep
+                    )
                 elif L1s[-1] == SEPARATOR:
-                    raise PrefValueKeyComboError(_(
-                        "Subfolder preferences should not end with a %s") % os.sep)
+                    raise PrefValueKeyComboError(
+                        _("Subfolder preferences should not end with a %s") % os.sep
+                    )
                 else:
                     for i in range(len(L1s) - 1):
                         if L1s[i] == SEPARATOR and L1s[i + 1] == SEPARATOR:
-                            raise PrefValueKeyComboError(_(
-                                "Subfolder preferences should not contain "
-                                "two %s one after the other") % os.sep)
+                            raise PrefValueKeyComboError(
+                                _(
+                                    "Subfolder preferences should not contain two %s one after "
+                                    "the other"
+                                ) % os.sep
+                            )
 
             except PrefError as e:
                 valid = False
                 msg += e.msg + "\n"
 
-        return (valid, msg)
+        return valid, msg
+
+    def _filter_duplicate_generation_prefs(self, preset_type: PresetPrefType) -> None:
+        preset_names, preset_pref_lists = self.get_preset(preset_type=preset_type)
+        seen = set()
+        filtered_names = []
+        filtered_pref_lists = []
+        duplicates = []
+        for name, pref_list in zip(preset_names, preset_pref_lists):
+            value = tuple(pref_list)
+            if value in seen:
+                duplicates.append(name)
+            else:
+                seen.add(value)
+                filtered_names.append(name)
+                filtered_pref_lists.append(pref_list)
+
+        if duplicates:
+            human_readable = preset_type.name[len('preset_'):].replace('_', ' ')
+            logging.warning(
+                'Removed %s duplicate(s) from %s presets: %s',
+                len(duplicates), human_readable, make_internationalized_list(duplicates)
+            )
+            self.set_preset(
+                preset_type=preset_type, preset_names=filtered_names,
+                preset_pref_lists=filtered_pref_lists
+            )
+
+    def filter_duplicate_generation_prefs(self) -> None:
+        """
+        Remove any duplicate subfolder generation or file renaming custom presets
+        """
+
+        logging.info("Checking for duplicate name generation preference values")
+        for preset_type in PresetPrefType:
+            self._filter_duplicate_generation_prefs(preset_type)
 
     def must_synchronize_raw_jpg(self) -> bool:
         """
@@ -671,12 +716,15 @@ class Preferences:
             v += s + "\n"
         return v
 
-    def get_pref_lists(self) -> Tuple[List[str], List[str], List[str], List[str]]:
+    def get_pref_lists(self, file_name_only: bool) -> Tuple[List[str], ...]:
         """
         :return: a tuple of the photo & video rename and subfolder
          generation preferences
         """
-        return (self.photo_rename, self.photo_subfolder, self.video_rename, self.video_subfolder)
+        if file_name_only:
+            return self.photo_rename, self.video_rename
+        else:
+            return self.photo_rename, self.photo_subfolder, self.video_rename, self.video_subfolder
 
     def get_day_start_qtime(self) -> QTime:
         """
@@ -709,8 +757,8 @@ class Preferences:
         else:
             return Qt.Unchecked
 
-    def pref_uses_job_code(self, pref_list: List[str]):
-        """ Returns True if the particular preferences contains a job code"""
+    def pref_uses_job_code(self, pref_list: List[str]) -> bool:
+        """ Returns True if the particular preference contains a job code"""
         for i in range(0, len(pref_list), 3):
             if pref_list[i] == JOB_CODE:
                 return True
@@ -718,7 +766,7 @@ class Preferences:
 
     def any_pref_uses_job_code(self) -> bool:
         """ Returns True if any of the preferences contain a job code"""
-        for pref_list in self.get_pref_lists():
+        for pref_list in self.get_pref_lists(file_name_only=False):
             if self.pref_uses_job_code(pref_list):
                 return True
         return False
@@ -834,7 +882,7 @@ class Preferences:
         An empty list contains only one item: ['']
 
         :param key: the preference key
-        :param value: the value to add
+        :param value: the value to delete
         """
 
         # Must remove the value like this, otherwise the preference value

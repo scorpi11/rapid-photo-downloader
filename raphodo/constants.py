@@ -1,4 +1,4 @@
-# Copyright (C) 2007-2017 Damon Lynch <damonlynch@gmail.com>
+# Copyright (C) 2007-2018 Damon Lynch <damonlynch@gmail.com>
 
 # This file is part of Rapid Photo Downloader.
 #
@@ -18,7 +18,7 @@
 # see <http://www.gnu.org/licenses/>.
 
 __author__ = 'Damon Lynch'
-__copyright__ = "Copyright 2007-2017, Damon Lynch"
+__copyright__ = "Copyright 2007-2018, Damon Lynch"
 
 from enum import (Enum, IntEnum)
 from PyQt5.QtCore import Qt
@@ -28,6 +28,10 @@ PROGRAM_NAME = "Rapid Photo Downloader"
 logfile_name = 'rapid-photo-downloader.log'
 
 remote_versions_file = 'https://www.damonlynch.net/rapid/version.json'
+
+# If set to True, the ability to check for a new version will be removed
+# from the user interface and disabled in program logic.
+disable_version_check = False
 
 
 class CheckNewVersionDialogResult(IntEnum):
@@ -411,7 +415,7 @@ proximity_time_steps = [5, 10, 15, 30, 45, 60, 90, 120, 180, 240, 480, 960, 1440
 
 class TemporalProximityState(Enum):
     empty = 1
-    pending = 2
+    pending = 2  # e.g. 2 devices scanning, only 1 scan finished
     generating = 3
     regenerate = 4
     generated = 5
@@ -428,6 +432,11 @@ class StandardFileLocations(Enum):
     pictures = 6
     videos = 7
     downloads = 8
+
+
+class FileManagerType(Enum):
+    regular = 1
+    select = 2
 
 
 max_remembered_destinations = 10
@@ -489,7 +498,8 @@ class Desktop(Enum):
     lxde = 7
     lxqt = 8
     ubuntugnome = 9
-    unknown = 10
+    popgnome = 10
+    unknown = 11
 
 
 class Distro(Enum):

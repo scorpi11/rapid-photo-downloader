@@ -1,6 +1,72 @@
 Changelog for Rapid Photo Downloader
 ====================================
 
+0.9.9 (2018-03-08)
+------------------
+
+ - Fix bug #1750879: Sequence numbers increment incorrectly for videos when
+   Synchronize RAW+JPEG enabled.
+
+ - Fix bug in sequence letter generation.
+
+ - Enable the disabling of new version checks in both the program logic and
+   the user interface, which is useful for Linux distributions. To disable the
+   check, Linux package maintainers should patch the file constants.py to
+   change the line `disable_version_check = False` to `disable_version_check =
+   True`.
+
+ - Include tornado as a dependency instead of relying on the deprecated
+   mini-tornado found in pyzmq.
+
+0.9.8 (2018-02-18)
+------------------
+
+ - On Sony files, use ExifTool to get shutter count metadata. Please note, not
+   all Sony models produce this metadata.
+
+0.9.8b1 (2018-02-13)
+--------------------
+
+ - Don't crash when choosing an existing subfolder generation preset from the
+   editor windows that is currently not displayed in the main window's drop-
+   down gear menu.
+
+ - Don't crash when getting tooltip for backup devices when no backup devices
+   exist.
+
+ - Updated Brazilian Portuguese, German and Greek translations.
+
+
+0.9.7 (2018-01-01)
+------------------
+
+ - Fixed bug where removing a download source while another source was being
+   scanned could cause a crash when the timeline was scrolled.
+
+ - Fixed bug where session sequence values were being reset every time a
+   download was initiated, not every time the program was started.
+
+ - Updated German, Hungarian and Norwegian Bokmal translations.
+
+0.9.7b1 (2017-12-18)
+--------------------
+
+ - Fix bug #1738174: Don't crash when right clicking in thumbnail checkbox
+   and no thumbnail is selected.
+
+ - Fix bug #1737416: Don't scan cameras when browsing "This Computer", and
+   detect if a camera mount has been passed via the command line (which can
+   happen when the program automatically launches in response to a camera
+   being attached to the computer).
+
+ - When opening a file in KDE's Dolphin file manager, select the file
+   (and thus highlight it), like is done with Gnome Files and several other
+   file managers.
+
+ - Fix bug #1737287: Don't allow identical entries in subfolder generation and
+   file renaming presets, where the preset names differ but their content is
+   the same.
+
 0.9.6 (2017-12-08)
 ------------------
 
