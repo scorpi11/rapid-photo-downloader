@@ -1,3 +1,11 @@
+rapid-photo-downloader (0.9.9-2) unstable; urgency=medium
+
+  * remove python version dependency satisfied by oldstable
+  * update standards version, no change
+  * add missing runtime dependencies (Closes: #900709)
+
+ -- Antoine Beaupré <anarcat@debian.org>  Tue, 24 Jul 2018 21:51:03 -0400
+
 rapid-photo-downloader (0.9.9-1) unstable; urgency=medium
 
   * add patch to disable version checks'
