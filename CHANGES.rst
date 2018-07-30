@@ -1,6 +1,28 @@
 Changelog for Rapid Photo Downloader
 ====================================
 
+0.9.10 (2018-07-29)
+-------------------
+
+ - Fix bug #1784175: Make application compatible with changes to sip
+   introduced in PyQt 5.11, and do not install PyQt 5.11 on systems with
+   Python 3.5.3 or older.
+
+ - Fix bug #1775654: optional dependencies listed in setup.py as required.
+
+ - Fix bug #1755915: Crash while accessing non-existant SQL database 'cache'
+   while exiting.
+
+ - Fix bug #1764167: Division by zero error when scanning device that does not
+   report its size
+
+ - Fix bug #1774411: splash screen covering name-dialog when set to auto-
+   download
+
+ - Fixed bug in Appstream specification.
+
+ - Updated German translation.
+
 0.9.9 (2018-03-08)
 ------------------
 

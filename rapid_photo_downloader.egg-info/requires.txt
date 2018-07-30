@@ -1,11 +1,10 @@
+PyGObject
 arrow
 colorlog
-colour
 easygui
 gphoto2
 psutil
 pymediainfo
-pyprind
 python-dateutil
 pyxdg
 pyzmq
@@ -13,6 +12,12 @@ rawkit
 sortedcontainers
 tornado
 
-[:python_version == "3.4"]
+[:python_version < "3.5"]
 scandir
 typing
+
+[color_ouput]
+colour
+
+[progress_bar]
+pyprind
