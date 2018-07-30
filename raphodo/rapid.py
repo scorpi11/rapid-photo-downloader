@@ -53,6 +53,7 @@ import subprocess
 from urllib.request import pathname2url
 import tarfile
 import inspect
+from distutils.version import LooseVersion
 
 from gettext import gettext as _
 
@@ -71,7 +72,6 @@ except (ImportError, ValueError):
 import zmq
 import psutil
 import gphoto2 as gp
-import sip
 from PyQt5 import QtCore
 from PyQt5.QtCore import (
     QThread, Qt, QStorageInfo, QSettings, QPoint, QSize, QTimer, QTextStream, QModelIndex,
@@ -88,6 +88,11 @@ from PyQt5.QtWidgets import (
     QDesktopWidget, QStyledItemDelegate, QPushButton
 )
 from PyQt5.QtNetwork import QLocalSocket, QLocalServer
+
+if LooseVersion(QtCore.PYQT_VERSION_STR) >= LooseVersion('5.11'):
+    from PyQt5 import sip
+else:
+    import sip
 
 from raphodo.storage import (
     ValidMounts, CameraHotplug, UDisks2Monitor, GVolumeMonitor, have_gio,
@@ -763,7 +768,7 @@ class RapidWindow(QMainWindow):
             self.prefs.optimize_thumbnail_db = False
         else:
             # Recreate the cache on the file system
-            ThumbnailCacheSql(create_table_if_not_exists=True)
+            t = ThumbnailCacheSql(create_table_if_not_exists=True)
 
         # For meaning of 'Devices', see devices.py
         self.devices = DeviceCollection(self.exiftool_process, self)
@@ -2918,7 +2923,7 @@ Do you want to proceed with the download?
                              if scan_id in self.devices.thumbnailing]
         for scan_id in stop_thumbnailing:
             device = self.devices[scan_id]
-            if not scan_id in self.thumbnailModel.generating_thumbnails:
+            if scan_id not in self.thumbnailModel.generating_thumbnails:
                 logging.debug(
                     "Not terminating thumbnailing of %s because it's not in the thumbnail manager",
                     device.display_name
@@ -4421,6 +4426,7 @@ Do you want to proceed with the download?
         elif auto_start:
             self.displayMessageInStatusBar()
             if self.jobCodePanel.needToPromptForJobCode():
+                self.showMainWindow()
                 model.setSpinnerState(scan_id, DeviceState.idle)
                 start_download = self.jobCodePanel.getJobCodeBeforeDownload()
                 if not start_download:
@@ -5517,6 +5523,7 @@ Do you want to proceed with the download?
         Returns True if yes or there was no need to ask the user, False if the
         user said no.
         """
+
         self.showMainWindow()
         path = self.prefs.this_computer_path
         if path in (
@@ -5544,6 +5551,7 @@ Do you want to proceed with the download?
         :return: True if scans of such partitions should occur, else
         False
         """
+
         return self.prefs.device_autodetection and not self.prefs.scan_specific_folders
 
     def displayMessageInStatusBar(self) -> None:
