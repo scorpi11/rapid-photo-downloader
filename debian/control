@@ -32,6 +32,7 @@ Depends:
  gstreamer1.0-plugins-good,
  libimage-exiftool-perl,
  libmediainfo0v5,
+ python3-colour,
  python3-dbus,
  python3-exif,
  python3-gi,
