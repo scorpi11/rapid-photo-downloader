@@ -2,6 +2,7 @@ rapid-photo-downloader (0.9.10-1) unstable; urgency=medium
 
   * new upstream release
   * remove patch factored into upstream (0700-appstream-metadata.patch)
+  * remove cffi dependency, was noise from stretch
 
  -- Antoine Beaupré <anarcat@debian.org>  Sun, 05 Aug 2018 14:45:17 -0400
 
