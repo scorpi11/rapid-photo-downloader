@@ -1,6 +1,10 @@
 rapid-photo-downloader (0.9.10-1) UNRELEASED; urgency=medium
 
-  * New upstream release. 
+  * New upstream release.
+    - Refresh patches.
+  * debian/copyright:
+    - Use secure copyright format URI.
+  * Declare compliance with Debian Policy 4.1.5 (No changes needed).
 
  -- Jörg Frings-Fürst <debian@jff.email>  Tue, 07 Aug 2018 13:10:28 +0200
 
