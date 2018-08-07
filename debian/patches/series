@@ -2,4 +2,4 @@
 #10-keywords_desktop.patch
 #0001-intltool_utf8.patch
 11-no-version-check.patch
-0700-appstream-metadata.patch
+#0700-appstream-metadata.patch

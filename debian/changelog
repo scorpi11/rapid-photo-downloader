@@ -1,3 +1,9 @@
+rapid-photo-downloader (0.9.10-1) UNRELEASED; urgency=medium
+
+  * New upstream release. 
+
+ -- Jörg Frings-Fürst <debian@jff.email>  Tue, 07 Aug 2018 13:10:28 +0200
+
 rapid-photo-downloader (0.9.9-2) unstable; urgency=medium
 
   * remove python version dependency satisfied by oldstable

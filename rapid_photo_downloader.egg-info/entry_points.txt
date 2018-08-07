@@ -1,6 +1,0 @@
-[console_scripts]
-analyze-pv-structure = raphodo.analyzephotos:main
-
-[gui_scripts]
-rapid-photo-downloader = raphodo.rapid:main
-
