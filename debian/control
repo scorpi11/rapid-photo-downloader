@@ -23,6 +23,7 @@ Architecture: all
 Depends:
  ${python3:Depends},
  ${misc:Depends},
+ ${shlibs:Depends},
  gir1.2-gexiv2-0.10,
  gir1.2-gstreamer-1.0,
  gir1.2-gudev-1.0,
