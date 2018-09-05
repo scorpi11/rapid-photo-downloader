@@ -1,6 +1,34 @@
 Changelog for Rapid Photo Downloader
 ====================================
 
+0.9.11 (2018-08-26)
+-------------------
+
+ - Added CentOS 7.5 as supported Linux distribution. See the release notes
+   for installation instructions.
+
+ - Add weekday as locale's abbreviated and full name to file renaming and
+   subfolder generation options.
+
+ - Correct mistake in fixing bug #1775654: optional dependencies listed in
+   setup.py as required.
+
+ - Fix bug #1787707: install.py does not handle installer tar path with
+   spaces.
+
+ - Improve detection of openSUSE in install.py script.
+
+ - Better handle file managers that do not allow the selection of files using
+   command line arguments, which is important for desktops like Mate, LXDE,
+   and XFCE.
+
+ - Provide sensible fallback when system erroneously reports default file
+   manager.
+
+ - Updated Brazilian Portuguese, Czech, Dutch, French, Japanese, Kabyle,
+   Norwegian Nynorsk, and Spanish translations.
+
+
 0.9.10 (2018-07-29)
 -------------------
 

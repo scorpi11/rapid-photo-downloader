@@ -485,6 +485,9 @@ class RapidWindow(QMainWindow):
         for version in get_versions():
             logging.info('%s', version)
 
+        if disable_version_check:
+            logging.debug("Version checking disabled via code")
+
         if EXIFTOOL_VERSION is None:
             logging.error("ExifTool is either missing or has a problem")
 
@@ -854,8 +857,9 @@ class RapidWindow(QMainWindow):
         logging.debug("Probing for valid mounts")
         self.validMounts = ValidMounts(onlyExternalMounts=self.prefs.only_external_mounts)
 
-        logging.debug("Freedesktop.org thumbnails location: %s",
-                       get_fdo_cache_thumb_base_directory())
+        logging.debug(
+            "Freedesktop.org thumbnails location: %s", get_fdo_cache_thumb_base_directory()
+        )
 
         logging.debug("Probing desktop environment")
         desktop_env = get_desktop_environment()

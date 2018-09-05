@@ -1,4 +1,4 @@
-# Copyright (C) 2015-2017 Damon Lynch <damonlynch@gmail.com>
+# Copyright (C) 2015-2018 Damon Lynch <damonlynch@gmail.com>
 # Copyright (C) 2008-2015 Canonical Ltd.
 # Copyright (C) 2013 Bernard Baeyens
 
@@ -43,7 +43,7 @@ regarding mount points and XDG related functionality.
 """
 
 __author__ = 'Damon Lynch'
-__copyright__ = "Copyright 2011-2017, Damon Lynch. Copyright 2008-2015 Canonical Ltd. Copyright" \
+__copyright__ = "Copyright 2011-2018, Damon Lynch. Copyright 2008-2015 Canonical Ltd. Copyright" \
                 " 2013 Bernard Baeyens."
 
 import logging
@@ -75,7 +75,9 @@ from gi.repository import GUdev, UDisks, GLib
 
 from gettext import gettext as _
 
-from raphodo.constants import Desktop, Distro, FileManagerType
+from raphodo.constants import (
+    Desktop, Distro, FileManagerType, DefaultFileBrowserFallback, FileManagerBehavior
+)
 from raphodo.utilities import (
     process_running, log_os_release, remove_topmost_directory_from_path, find_mount_point
 )
@@ -106,9 +108,23 @@ def get_distro_id(id_or_id_like: str) -> Distro:
 
 
 def get_distro() -> Distro:
-    if os.path.isfile('/etc/os-release'):
-        with open('/etc/os-release', 'r') as f:
+    """
+    Determine the Linux distribution using /etc/os-release
+    """
+
+    os_release = '/etc/os-release'
+    if os.path.isfile(os_release):
+        with open(os_release, 'r') as f:
             for line in f:
+                if line.startswith('NAME='):
+                    if line.find('Korora') > 0:
+                        return Distro.korora
+                    if line.find('elementary') > 0:
+                        return Distro.elementary
+                    if line.find('CentOS Linux') > 0:
+                        return Distro.centos
+                    if line.find('openSUSE') > 0:
+                        return Distro.opensuse
                 if line.startswith('ID='):
                     return get_distro_id(line[3:])
                 if line.startswith('ID_LIKE='):
@@ -160,9 +176,11 @@ def get_media_dir() -> str:
                 Distro.ubuntu, Distro.debian, Distro.neon, Distro.galliumos, Distro.peppermint,
                 Distro.elementary):
             if distro not in (Distro.fedora, Distro.manjaro, Distro.arch, Distro.opensuse,
-                              Distro.gentoo, Distro.antergos):
-                logging.debug("Detected /run/media directory, but distro does not appear to "
-                              "be Fedora, Arch, openSUSE, Gentoo, Manjaro or Antergos")
+                              Distro.gentoo, Distro.antergos, Distro.korora, Distro.centos):
+                logging.debug(
+                    "Detected /run/media directory, but distro does not appear to be CentOS, "
+                    "Fedora, Arch, openSUSE, Gentoo, Korora, Manjaro, or Antergos"
+                )
                 log_os_release()
             return run_media_dir
         return media_dir
@@ -379,6 +397,11 @@ def get_desktop() -> Desktop:
         env = 'ubuntugnome'
     elif env == 'pop:gnome':
         env = 'popgnome'
+    elif env == 'gnome-classic:gnome':
+        env = 'gnome'
+    elif env == 'budgie:gnome':
+        env = 'gnome'
+
     try:
         return Desktop[env]
     except KeyError:
@@ -566,20 +589,67 @@ def get_fdo_cache_thumb_base_directory() -> str:
     return os.path.join(BaseDirectory.xdg_cache_home, 'thumbnails')
 
 
-def get_default_file_manager(remove_args: bool = True) -> Tuple[
-                                                        Optional[str], Optional[FileManagerType]]:
+# Module level variables important for determining among other things the generation of URIs
+# Pretty ugly, but the alternative is passing values around between several processes
+_desktop = get_desktop()
+_quoted_comma = quote(',')
+_default_file_manager_probed = False
+_default_file_manager = None
+_default_file_manager_type = None
+
+
+def _default_file_manager_for_desktop() -> Tuple[Optional[str], Optional[FileManagerType]]:
+    """
+    If default file manager cannot be determined using system tools, guess
+    based on desktop environment.
+
+    Sets module level globals if found.
+
+    :return: file manager command (without path), and type; if not detected, (None, None)
+    """
+
+    global _default_file_manager
+    global _default_file_manager_type
+
+    try:
+        fm = DefaultFileBrowserFallback[_desktop.name]
+        assert shutil.which(fm)
+        t = FileManagerBehavior[fm]
+        _default_file_manager = fm
+        _default_file_manager_type = t
+        return fm, t
+    except KeyError:
+        logging.debug("Error determining default file manager")
+        return None, None
+    except AssertionError:
+        logging.debug("Default file manager %s cannot be found")
+        return None, None
+
+
+def get_default_file_manager() -> Tuple[Optional[str], Optional[FileManagerType]]:
     """
     Attempt to determine the default file manager for the system
     :param remove_args: if True, remove any arguments such as %U from
      the returned command
-    :return: command (without path) if found, else None
+    :return: file manager command (without path), and type; if not detected, (None, None)
     """
+
+    global _default_file_manager_probed
+    global _default_file_manager
+    global _default_file_manager_type
+
+    if _default_file_manager_probed:
+        return _default_file_manager, _default_file_manager_type
+
+    _default_file_manager_probed = True
+
     assert sys.platform.startswith('linux')
     cmd = shlex.split('xdg-mime query default inode/directory')
     try:
         desktop_file = subprocess.check_output(cmd, universal_newlines=True)  # type: str
     except:
-        return None, None
+        return _default_file_manager_for_desktop()
+
     # Remove new line character from output
     desktop_file = desktop_file[:-1]
     if desktop_file.endswith(';'):
@@ -591,44 +661,46 @@ def get_default_file_manager(remove_args: bool = True) -> Tuple[
             try:
                 desktop_entry = DesktopEntry(path)
             except xdg.Exceptions.ParsingError:
-                return None, None
+                return _default_file_manager_for_desktop()
             try:
                 desktop_entry.parse(path)
             except:
-                return None, None
+                return _default_file_manager_for_desktop()
+
             fm = desktop_entry.getExec()
-            if fm.startswith('dolphin'):
-                file_manager_type = FileManagerType.select
-            else:
+
+            # Unhelpful results
+            if fm.startswith('baobab') or fm.startswith('exo-open'):
+                logging.debug('%s returned as default file manager: will substitute', fm)
+                return _default_file_manager_for_desktop()
+
+            # Strip away any extraneous arguments
+            fm_cmd = fm.split()[0]
+            try:
+                file_manager_type = FileManagerBehavior[fm_cmd]
+            except KeyError:
                 file_manager_type = FileManagerType.regular
-            if remove_args:
-                return fm.split()[0], file_manager_type
-            else:
-                return fm, file_manager_type
 
-    # Special case: LXQt
-    if get_desktop() == Desktop.lxqt:
-        if shutil.which('pcmanfm-qt'):
-            return 'pcmanfm-qt', FileManagerType.regular
+            _default_file_manager = fm_cmd
+            _default_file_manager_type = file_manager_type
+            return _default_file_manager, file_manager_type
 
-    return None, None
+    # Special case: no base dirs set, e.g. LXQt
+    return _default_file_manager_for_desktop()
+
 
 def open_in_file_manager(file_manager: str,
                          file_manager_type: FileManagerType,
                          uri: str) -> None:
-    if file_manager_type == FileManagerType.regular:
-        arg = ''
-    else:
+    if file_manager_type == FileManagerType.select:
         arg = '--select '
+    else:
+        arg = ''
 
-    cmd = '{} {}"{}"'.format(file_manager, arg, uri)
+    cmd = '{} {}{}'.format(file_manager, arg, uri)
     logging.debug("Launching: %s", cmd)
     args = shlex.split(cmd)
     subprocess.Popen(args)
-
-
-_desktop = get_desktop()
-_quoted_comma = quote(',')
 
 
 def get_uri(full_file_name: Optional[str]=None,
@@ -643,16 +715,19 @@ def get_uri(full_file_name: Optional[str]=None,
     :param path: straight path when not passing a full_file_name
     :param camera_details: see named tuple CameraDetails for parameters
     :param desktop_environment: if True, will to generate a URI accepted
-     by Gnome and KDE desktops, which means adjusting the URI if it appears to be an
-     MTP mount. Includes the port too.
+     by Gnome, KDE and other desktops, which means adjusting the URI if it appears to be an
+     MTP mount. Includes the port too, for cameras. Takes into account
+     file manager characteristics.
     :return: the URI
     """
+
+    if not _default_file_manager_probed:
+        get_default_file_manager()
 
     if camera_details is None:
         prefix = 'file://'
         if desktop_environment:
-            desktop = get_desktop()
-            if full_file_name and desktop == Desktop.mate:
+            if full_file_name and _default_file_manager_type == FileManagerType.dir_only_uri:
                 full_file_name = os.path.dirname(full_file_name)
     else:
         if not desktop_environment:
@@ -682,12 +757,13 @@ def get_uri(full_file_name: Optional[str]=None,
             else:
                 prefix = 'gphoto2://' + pathname2url('[{}]'.format(camera_details.port))
 
-            if _desktop == Desktop.lxqt:
+            if _default_file_manager == 'pcmanfm-qt':
                 # pcmanfm-qt does not like the quoted form of the comma
                 prefix = prefix.replace(_quoted_comma, ',')
                 if full_file_name:
                     # pcmanfm-qt does not like the the filename as part of the path
                     full_file_name = os.path.dirname(full_file_name)
+
 
     if full_file_name or path:
         uri = '{}{}'.format(prefix, pathname2url(full_file_name or path))
