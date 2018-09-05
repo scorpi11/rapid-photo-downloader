@@ -434,10 +434,6 @@ class StandardFileLocations(Enum):
     downloads = 8
 
 
-class FileManagerType(Enum):
-    regular = 1
-    select = 2
-
 
 max_remembered_destinations = 10
 
@@ -502,20 +498,54 @@ class Desktop(Enum):
     unknown = 11
 
 
+class FileManagerType(Enum):
+    regular = 1
+    select = 2
+    dir_only_uri = 3
+
+
+FileManagerBehavior = dict(
+    nautilus=FileManagerType.regular,
+    dolphin=FileManagerType.select,
+    caja=FileManagerType.dir_only_uri,
+    thunar=FileManagerType.dir_only_uri,
+    nemo=FileManagerType.regular,
+    pcmanfm=FileManagerType.dir_only_uri,
+)
+FileManagerBehavior['pcmanfm-qt'] = FileManagerType.dir_only_uri
+
+
+DefaultFileBrowserFallback = dict(
+    gnome='nautilus',
+    ubuntugnome='nautilus',
+    popgnome='nautilus',
+    unity='nautilus',
+    kde='dolphin',
+    cinnamon='nemo',
+    mate='caja',
+    xfce='thunar',
+    lxde='pcmanfm',
+    lxqt='pcmanfm-qt',
+)
+
+
 class Distro(Enum):
     debian = 1
     ubuntu = 2
     fedora = 3
-    unknown = 4
-    manjaro = 5
-    arch = 6
-    neon = 7
+    neon = 4
+    linuxmint = 5
+    korora = 6
+    arch = 7
     opensuse = 8
-    gentoo = 9
+    manjaro = 9
     galliumos = 10
     peppermint = 11
     antergos = 12
     elementary = 13
+    centos = 14
+    gentoo = 15
+    unknown = 20
 
 
 orientation_offset = dict(
