@@ -1,6 +1,6 @@
 PyGObject
 arrow
-colorlog
+colour
 easygui
 gphoto2
 psutil
@@ -17,7 +17,7 @@ scandir
 typing
 
 [color_ouput]
-colour
+colorlog
 
 [progress_bar]
 pyprind
