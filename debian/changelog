@@ -6,11 +6,13 @@ rapid-photo-downloader (0.9.11-1) unstable; urgency=medium
     - Change VCS-* to point to the new repository.
   * debian/copyright:
     - Use secure copyright format URI.
+    - Change source to new homepage.
+    - Add year 2018 to Antoine Beaupré.
   * debian/watch:
     - Use secure URI.
   * Declare compliance with Debian Policy 4.2.1 (No changes needed).
 
- -- Jörg Frings-Fürst <debian@jff.email>  Wed, 05 Sep 2018 18:02:00 +0200
+ -- Jörg Frings-Fürst <debian@jff.email>  Wed, 05 Sep 2018 18:26:44 +0200
 
 rapid-photo-downloader (0.9.9-2) unstable; urgency=medium
 
@@ -18,7 +20,7 @@ rapid-photo-downloader (0.9.9-2) unstable; urgency=medium
   * update standards version, no change
   * add missing runtime dependencies (Closes: #900709)
 
- -- Antoine Beaupré <anarcat@debian.org>  Tue, 24 Jul 2018 21:51:03 -0400
+ --  <anarcat@debian.org>  Tue, 24 Jul 2018 21:51:03 -0400
 
 rapid-photo-downloader (0.9.9-1) unstable; urgency=medium
 
