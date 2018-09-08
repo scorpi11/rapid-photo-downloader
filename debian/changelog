@@ -1,5 +1,6 @@
 rapid-photo-downloader (0.9.11-1) unstable; urgency=medium
 
+  [ Jörg Frings-Fürst ]
   * New upstream release.
     - Refresh patches.
   * debian/control:
@@ -12,7 +13,11 @@ rapid-photo-downloader (0.9.11-1) unstable; urgency=medium
     - Use secure URI.
   * Declare compliance with Debian Policy 4.2.1 (No changes needed).
 
- -- Jörg Frings-Fürst <debian@jff.email>  Wed, 05 Sep 2018 18:26:44 +0200
+  [ Antoine Beaupré ]
+  * Remove patch factored into upstream (0700-appstream-metadata.patch).
+  * Remove cffi dependency, was noise from stretch.
+
+ -- Jörg Frings-Fürst <debian@jff.email>  Sat, 08 Sep 2018 13:41:08 +0200
 
 rapid-photo-downloader (0.9.9-2) unstable; urgency=medium
 
