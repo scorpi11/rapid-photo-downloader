@@ -1,7 +1,7 @@
 Source: rapid-photo-downloader
 Section: graphics
 Priority: optional
-Maintainer: Jörg Frings-Fürst <debian@jff.email>
+Maintainer: Dr. Tobias Quathamer <toddy@debian.org>
 Uploaders: Antoine Beaupré <anarcat@debian.org>
 Build-Depends:
  debhelper (>= 11~),
