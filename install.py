@@ -72,7 +72,7 @@ except ImportError:
     )
     sys.exit(1)
 
-__version__ = '0.2.1'
+__version__ = '0.2.3'
 __title__ = _('Rapid Photo Downloader installer')
 __description__ = _("Download and install latest version of Rapid Photo Downloader.")
 
@@ -333,7 +333,8 @@ def pypi_pyqt5_capable() -> bool:
      else False.
     """
 
-    return platform.machine() == 'x86_64' and StrictVersion(platform.python_version()) >= StrictVersion('3.5.0')
+    return platform.machine() == 'x86_64' and \
+        LooseVersion(platform.python_version()) >= LooseVersion('3.5.0')
 
 
 def pyqt_511_2_compatible() -> bool:
@@ -343,7 +344,7 @@ def pyqt_511_2_compatible() -> bool:
     :return: True if this python version is compatible with PyQt 5.11.2
     """
 
-    return StrictVersion(platform.python_version()) > StrictVersion('3.5.3')
+    return LooseVersion(platform.python_version()) > LooseVersion('3.5.3')
 
 
 def pypi_pyqt5_version() -> bytes:
@@ -742,7 +743,7 @@ def query_uninstall(interactive: bool) -> bool:
     return get_yes_no(answer)
 
 
-def opensuse_missing_packages(packages: str):
+def opensuse_package_search(packages: str):
     """
     Return which of the packages have not already been installed on openSUSE.
 
@@ -756,7 +757,37 @@ def opensuse_missing_packages(packages: str):
         distro_family=Distro.opensuse, packages=packages, interactive=True, command='se', sudo=False
     )
     args = shlex.split(command_line)
-    output = subprocess.check_output(args, universal_newlines=True)
+    return subprocess.check_output(args, universal_newlines=True)
+
+def opensuse_known_packages(packages: str):
+    """
+    Return which of the packages listed are able
+    to be installed on this instance openSUSE.
+
+    Does not catch exceptions.
+
+    :param packages: the packages to to check, in a string separated by white space
+    :return: list of packages
+    """
+
+    output = opensuse_package_search(packages)
+
+    return [
+        package for package in packages.split()
+        if re.search(r"^i\+?\s+\|\s*{}".format(re.escape(package)), output, re.MULTILINE) is None
+    ]
+
+def opensuse_missing_packages(packages: str):
+    """
+    Return which of the packages have not already been installed on openSUSE.
+
+    Does not catch exceptions.
+
+    :param packages: the packages to to check, in a string separated by white space
+    :return: list of packages
+    """
+
+    output = opensuse_package_search(packages)
 
     return [
         package for package in packages.split()
@@ -873,13 +904,32 @@ def uninstall_old_version(distro_family: Distro, distro: Distro, interactive: bo
     pkg_name = 'rapid-photo-downloader'
 
     if distro_family == Distro.debian:
+        print(
+            _("Querying package system to see if an older version of Rapid Photo Downloader is "
+              "installed (this may take a while)..."
+              )
+        )
         try:
             cache = apt.Cache()
             pkg = cache[pkg_name]
             if pkg.is_installed and query_uninstall(interactive):
-                run_cmd(make_distro_packager_commmand(distro, pkg_name, interactive, 'remove'))
-        except Exception:
-            pass
+                try:
+                    v = pkg.versions[0]
+                    name = v.package
+                    version = v.version
+                    package = '{} {}'.format(name, version)
+                except Exception:
+                    package = pkg.name
+                print(_("Uninstalling system package"), package)
+                cmd = make_distro_packager_commmand(distro_family, pkg_name, interactive, 'remove')
+                run_cmd(cmd)
+        except Exception as e:
+            sys.stderr.write(_("Command failed") + "\n")
+            sys.stderr.write(_("Exiting") + "\n")
+            clean_locale_tmpdir()
+            sys.exit(1)
+
+
 
     elif distro_family == Distro.fedora:
         print(
@@ -904,7 +954,9 @@ def uninstall_old_version(distro_family: Distro, distro: Distro, interactive: bo
             q_inst = q.installed()
             i = q_inst.filter(name=pkg_name)
             if len(list(i)) and query_uninstall(interactive):
-                run_cmd(make_distro_packager_commmand(distro, pkg_name, interactive, 'remove'))
+                run_cmd(
+                    make_distro_packager_commmand(distro_family, pkg_name, interactive, 'remove')
+                )
 
     elif distro_family == Distro.opensuse:
         print(
@@ -916,7 +968,7 @@ def uninstall_old_version(distro_family: Distro, distro: Distro, interactive: bo
         try:
             if opensuse_package_installed('rapid-photo-downloader') \
                     and query_uninstall(interactive):
-                run_cmd(make_distro_packager_commmand(distro, pkg_name, interactive, 'rm'))
+                run_cmd(make_distro_packager_commmand(distro_family, pkg_name, interactive, 'rm'))
         except subprocess.CalledProcessError as e:
             if e.returncode != 104:
                 sys.stderr.write(_("Command failed") + "\n")
@@ -1126,7 +1178,8 @@ def install_required_distro_packages(distro: Distro,
                    'typelib-1_0-GExiv2-0_10 typelib-1_0-UDisks-2_0 typelib-1_0-Notify-0_7 ' \
                    'typelib-1_0-Gst-1_0 typelib-1_0-GUdev-1_0'
 
-        #TODO libmediainfo - not a default openSUSE package, sadly
+        if opensuse_known_packages('libmediainfo0'):
+            packages = '{} {}'.format(packages, 'libmediainfo0')
 
         if not pypi_pyqt5_capable():
             packages = 'python3-qt5 libqt5-qtimageformats {}'.format(packages)
