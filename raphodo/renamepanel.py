@@ -28,17 +28,19 @@ import logging
 from gettext import gettext as _
 
 
-from PyQt5.QtCore import (Qt, pyqtSlot, QTime)
-from PyQt5.QtWidgets import (QWidget, QSizePolicy, QComboBox, QFormLayout,
-                             QVBoxLayout, QLabel, QSpinBox, QTimeEdit, QCheckBox, QGroupBox,
-                             QScrollArea, QFrame, QGridLayout)
+from PyQt5.QtCore import Qt, pyqtSlot, QTime
+from PyQt5.QtWidgets import (
+    QWidget, QSizePolicy, QComboBox, QFormLayout, QVBoxLayout, QLabel, QSpinBox, QTimeEdit,
+    QCheckBox, QGroupBox, QScrollArea, QFrame
+)
 from PyQt5.QtGui import (QColor, QPalette)
 
 
-from raphodo.constants import (PresetPrefType, NameGenerationType,
-                               ThumbnailBackgroundName, PresetClass)
+from raphodo.constants import (
+    PresetPrefType, NameGenerationType, ThumbnailBackgroundName, PresetClass, FileType
+)
 from raphodo.utilities import platform_c_maxint
-from raphodo.rpdfile import FileType, Photo, Video
+from raphodo.rpdfile import Photo, Video
 from raphodo.nameeditor import PrefDialog, make_sample_rpd_file, PresetComboBox
 import raphodo.exiftool as exiftool
 import raphodo.generatename as gn

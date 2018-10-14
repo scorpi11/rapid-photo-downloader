@@ -82,6 +82,7 @@ raphodo/errorlog.py
 raphodo/excepthook.py
 raphodo/exiftool.py
 raphodo/filebrowse.py
+raphodo/fileformats.py
 raphodo/fileutilities.py
 raphodo/filmstrip.py
 raphodo/foldercombo.py
@@ -93,6 +94,7 @@ raphodo/iplogging.py
 raphodo/jobcodepanel.py
 raphodo/menubutton.py
 raphodo/messagewidget.py
+raphodo/metadataexiftool.py
 raphodo/metadataphoto.py
 raphodo/metadatavideo.py
 raphodo/nameeditor.py
@@ -104,6 +106,7 @@ raphodo/preferencedialog.py
 raphodo/preferences.py
 raphodo/primarybutton.py
 raphodo/problemnotification.py
+raphodo/programversions.py
 raphodo/proximity.py
 raphodo/qrc_resources.py
 raphodo/rapid.py
