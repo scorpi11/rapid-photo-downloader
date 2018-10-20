@@ -1,3 +1,10 @@
+rapid-photo-downloader (0.9.12-2) unstable; urgency=medium
+
+  * Use python3-sip module, not the bundled copy of PyQt5.
+    Thanks to Antoine Beaupré <anarcat@debian.org> (Closes: #911418)
+
+ -- Dr. Tobias Quathamer <toddy@debian.org>  Sat, 20 Oct 2018 23:23:01 +0200
+
 rapid-photo-downloader (0.9.12-1) unstable; urgency=medium
 
   [ Jörg Frings-Fürst ]
