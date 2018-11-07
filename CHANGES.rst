@@ -1,6 +1,27 @@
 Changelog for Rapid Photo Downloader
 ====================================
 
+0.9.13 (2018-11-06)
+-------------------
+
+ - Added support for Sigma X3F file format.
+
+ - Added support for installing into a Python virtual environment. See the file
+   README.rst for installation instructions. Thanks to Matthias Homann for his
+   code contribution.
+
+ - Fix bug #1797479: New version check results in confusing messages on stderr
+   when pip is not installed. Thanks to Eli Schwartz for the fix.
+
+ - Added Deepin to supported Linux distributions.
+
+ - Fixed bug #1801504: PyQt5_sip not installed or upgraded for local user when
+   system copy already installed (bug seen on Fedora 29).
+
+ - Import sip regardless of whether it is the private sip bundled with PyQt5
+   or a separate sip installation.
+
+
 0.9.12 (2018-09-28)
 -------------------
 

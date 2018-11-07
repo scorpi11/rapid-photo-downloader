@@ -72,7 +72,8 @@ except ImportError:
     )
     sys.exit(1)
 
-__version__ = '0.2.3'
+
+__version__ = '0.2.6'
 __title__ = _('Rapid Photo Downloader installer')
 __description__ = _("Download and install latest version of Rapid Photo Downloader.")
 
@@ -98,6 +99,13 @@ try:
 except ImportError:
     have_dnf = False
 
+# Must check wheel availability before importing pip
+try:
+    import wheel
+    need_wheel = False
+except:
+    need_wheel = True
+
 try:
     import pip
     have_pip = True
@@ -113,9 +121,21 @@ except ImportError:
     have_pyprind_progressbar = False
 
 
+try:
+    import gi
+    have_gi = True
+except ImportError:
+    have_gi = False
+
+
 os_release = '/etc/os-release'
 
 unknown_version = LooseVersion('0.0')
+
+# global variable used for constructing pip command
+pip_user = "--user"
+# command line argument to indicate installation into a virtual environment
+virtual_env_cmd_line_arg = '--virtual-env'
 
 
 class bcolors:
@@ -128,6 +148,17 @@ class bcolors:
     BOLD = '\033[1m'
     UNDERLINE = '\033[4m'
 
+
+gstreamer_message = '{}\n{}{}'.format(
+    bcolors.BOLD, _(
+        "To be able to generate thumbnails for a wider range of video formats, install "
+        "gstreamer1-libav after having first added an appropriate software repository such "
+        "as rpmfusion.org."
+    ),
+    bcolors.ENDC
+)
+
+display_gstreamer_message = False
 
 class Distro(Enum):
     debian = 1
@@ -145,12 +176,13 @@ class Distro(Enum):
     elementary = 13
     centos = 14
     gentoo = 15
+    deepin = 16
     unknown = 20
 
 
 debian_like = (
     Distro.debian, Distro.ubuntu, Distro.neon, Distro.linuxmint, Distro.galliumos,
-    Distro.peppermint, Distro.elementary
+    Distro.peppermint, Distro.elementary, Distro.deepin
 )
 fedora_like = (Distro.fedora, Distro.korora)
 arch_like = (Distro.arch, Distro.manjaro, Distro.antergos)
@@ -161,6 +193,10 @@ installer_cmds = {
     Distro.debian: 'apt-get',
     Distro.opensuse: 'zypper',
     Distro.centos: 'yum',
+}
+
+manually_mark_cmds = {
+    Distro.debian: ('apt-mark', 'manual'),
 }
 
 
@@ -181,6 +217,8 @@ def get_distro() -> Distro:
                         return Distro.centos
                     if line.find('openSUSE') > 0:
                         return Distro.opensuse
+                    if line.find('Deepin') > 0:
+                        return Distro.deepin
                 if line.startswith('ID='):
                     return get_distro_id(line[3:])
                 if line.startswith('ID_LIKE='):
@@ -269,6 +307,18 @@ def validate_installer(installer) -> None:
         sys.exit(1)
 
 
+def cleanup_on_exit(installer_to_delete_on_error: str) -> None:
+    """
+    Clean up temporary files before exiting
+
+    :param installer_to_delete_on_error: full path of installer tar file
+    """
+
+    if installer_to_delete_on_error:
+        delete_installer_and_its_temp_dir(installer_to_delete_on_error)
+    clean_locale_tmpdir()
+
+
 def pip_packages_required(distro: Distro):
     """
     Determine which packages are required to ensure all of pip, setuptools
@@ -279,7 +329,7 @@ def pip_packages_required(distro: Distro):
     packages = []
 
     if have_pip:
-        local_pip = custom_python() or user_pip()
+        local_pip = custom_python() or user_pip() or is_venv()
     else:
         packages.append('{}-pip'.format(python3_version(distro)))
         local_pip = False
@@ -291,9 +341,7 @@ def pip_packages_required(distro: Distro):
         except ImportError:
             packages.append(pip_package('setuptools', local_pip, distro))
 
-        try:
-            import wheel
-        except:
+        if need_wheel:
             packages.append(pip_package('wheel', local_pip, distro))
 
     return packages, local_pip
@@ -337,37 +385,52 @@ def pypi_pyqt5_capable() -> bool:
         LooseVersion(platform.python_version()) >= LooseVersion('3.5.0')
 
 
-def pyqt_511_2_compatible() -> bool:
+def pypi_versions(package_name: str):
     """
-    Python 3.5.3 or older fail to run with PyQt 5.11.2
+    Determine list of versions available for a package on PyPi.
+    No error checking.
 
-    :return: True if this python version is compatible with PyQt 5.11.2
-    """
-
-    return LooseVersion(platform.python_version()) > LooseVersion('3.5.3')
-
-
-def pypi_pyqt5_version() -> bytes:
-    """
-    :return: bytes containing correct version of PyQt5 to install from PyPi
+    :param package_name: package to search for
+    :return: list of string versions
     """
 
-    if not pyqt_511_2_compatible():
-        return b'PyQt5==5.10'
-    else:
-        return b'PyQt5>=5.11'
+    url = "https://pypi.python.org/pypi/{}/json".format(package_name)
+    data = requests.get(url).json()
+    return sorted(list(data["releases"].keys()), key=pkg_resources.parse_version, reverse=True)
 
 
-def uninstall_incompatible_pyqt5() -> None:
+def is_latest_pypi_package(package_name: str, show_message: bool=True) -> bool:
     """
-    If a version of PyQt > 5.10 is installed using pip on a system with
-    Python 3.5.3 or older, uninstall PyQt5
+    Determine if Python package is the most recently installable version
+    :param package_name: package to check
+    :param show_message: if True, show message to user indicating package will
+     be upgraded
+    :return: True if is most recent, else False
     """
 
-    if not pyqt_511_2_compatible():
-        version = python_package_version('PyQt5')
-        if version and StrictVersion(version) > StrictVersion('5.10'):
-            uninstall_pip_package(package='PyQt5', no_deps_only=False)
+    current = python_package_version(package_name)
+    if not current:
+        return False
+
+    try:
+        versions = pypi_versions(package_name)
+    except Exception:
+        versions = []
+    if not versions:
+        # Something has gone wrong in the versions check
+        print("Failed to determine latest version of Python package {}".format(package_name))
+        return False
+
+    latest = versions[0]
+
+    up_to_date = latest.strip() == current.strip()
+
+    if not up_to_date and show_message:
+
+        print()
+        print(_('{} will be upgraded from version {} to version {}').format(package_name, current, latest))
+
+    return up_to_date
 
 
 def make_pip_command(args: str, split: bool=True, disable_version_check: bool=True):
@@ -426,6 +489,30 @@ def make_distro_packager_commmand(distro_family: Distro,
         return '{}{} {} {} {}'.format(super, cmd, command, automatic, packages)
 
 
+def make_distro_mark_commmand(distro_family: Distro,
+                                  packages: str,
+                                  interactive: bool,
+                                  sudo: bool=True) -> str:
+    """
+    Construct a call to the Linux distribution's packaging command
+
+    :param distro_family: the Linux distribution
+    :param packages: packages to query / install / remove
+    :param sudo: whether to prefix the call with sudo
+    :return: the command line in string format
+    """
+
+    marker, command = manually_mark_cmds[distro_family]
+    cmd = shutil.which(marker)
+
+    if sudo:
+        super = 'sudo '
+    else:
+        super = ''
+
+    return '{}{} {} {}'.format(super, cmd, command, packages)
+
+
 def custom_python() -> bool:
     """
     :return: True if the python executable is a custom version of python, rather
@@ -435,9 +522,17 @@ def custom_python() -> bool:
     return not sys.executable.startswith('/usr/bin/python')
 
 
-def valid_system_python():
+def is_venv():
+    """
+    :return: True if the python running in venv or virtualenv
     """
 
+    return hasattr(sys, 'real_prefix') or \
+           (hasattr(sys, 'base_prefix') and sys.base_prefix != sys.prefix)
+
+
+def valid_system_python():
+    """
     :return: full path of python executable if a python at /usr/bin/python3 or /usr/bin/python is
     available that is version 3.4 or newer, else None if not found
     """
@@ -471,31 +566,81 @@ def user_pip() -> bool:
 
 def python_package_version(package: str) -> str:
     """
-    Determine the version of an installed Python package, according to pip
+    Determine the version of an installed Python package
     :param package: package name
     :return: version number, if could be determined, else ''
     """
 
-    args = make_pip_command('show {}'.format(package))
     try:
-        output = subprocess.check_output(args, universal_newlines=True)
-        r = re.search(r"""^Version:\s*(.+)""", output, re.MULTILINE)
-        if r:
-            return r.group(1)
-    except subprocess.CalledProcessError:
+        return pkg_resources.get_distribution(package).version
+    except pkg_resources.DistributionNotFound:
         return ''
 
 
-def match_pyqt5_and_sip():
-    if python_package_version('PyQt5') == '5.9' and \
-            StrictVersion(python_package_version('sip')) == StrictVersion('4.19.4'):
-        # Upgrade sip to a more recent version
-        args = make_pip_command('install -U --user sip')
-        try:
-            subprocess.check_call(args)
-        except subprocess.CalledProcessError:
-            sys.stderr.write("Error upgrading sip 4.19.4\n")
-            sys.exit(1)
+def popen_capture_output(cmd: str) -> int:
+    """
+    Run popen and get the command's return code
+
+    :param cmd: commmand to run using popen
+    :return: command's return code
+    """
+
+    with Popen(cmd, stdout=PIPE, stderr=PIPE, bufsize=1, universal_newlines=True) as p:
+        for line in p.stdout:
+            print(line, end='')
+        p.wait()
+        i = p.returncode
+
+    return i
+
+
+def install_pygobject_from_pip() -> int:
+    """
+    Install PyGObject using pip. Installs pycairo first.
+
+    :return: return code from pip
+    """
+
+    # First install cairo, so we don't get pip complaining it cannot build a wheel for PyGObject
+    cmd = make_pip_command(
+        'install {} -U --disable-pip-version-check pycairo'.format(pip_user)
+    )
+    i = popen_capture_output(cmd)
+    if i != 0:
+        return i
+
+    # Now PyGObject
+    cmd = make_pip_command(
+        'install {} -U --disable-pip-version-check PyGObject'.format(pip_user)
+    )
+    return popen_capture_output(cmd)
+
+
+def update_pyqt5_and_sip(venv: bool) -> int:
+    """
+    Update PyQt5 and sip to the latest versions from pypi, if the system is capable
+    of running PyQt5 from pypi
+
+    :param venv: whether being installed into a virtual environment
+    :return: return code from pip
+    """
+
+    if pypi_pyqt5_capable():
+
+        pip_installed = installed_using_pip('PyQt5') and installed_using_pip('PyQt5_sip')
+
+        if venv or not (pip_installed and is_latest_pypi_package('PyQt5')
+                and is_latest_pypi_package('PyQt5_sip')):
+
+            uninstall_pip_package('PyQt5', no_deps_only=False)
+            uninstall_pip_package('PyQt5_sip', no_deps_only=False)
+
+            cmd = make_pip_command(
+                'install {} --disable-pip-version-check PyQt5 PyQt5_sip'.format(pip_user)
+            )
+            return popen_capture_output(cmd)
+
+    return 0
 
 
 def python3_version(distro: Distro) -> str:
@@ -523,6 +668,32 @@ def pip_package(package: str, local_pip: bool, distro: Distro) -> str:
     return package if local_pip else '{}-{}'.format(python3_version(distro), package)
 
 
+def installed_using_pip(package) -> bool:
+    """
+    Determine if python package was installed using pip.
+
+    :param package: package name to search for
+    :return: True if installed via pip, else False
+    """
+
+    pip_install = False
+    try:
+        pkg = pkg_resources.get_distribution(package)
+        if pkg.has_metadata('INSTALLER'):
+            if pkg.get_metadata('INSTALLER').strip() == 'pip':
+                pip_install = True
+    except pkg_resources.DistributionNotFound:
+        pass
+    except Exception as e:
+        print(
+            'An unknown error occurred checking if Python package {} is installed '
+            'using pip'.format(package)
+        )
+        print(e)
+
+    return pip_install
+
+
 def get_yes_no(response: str) -> bool:
     """
     :param response: the user's response
@@ -532,9 +703,11 @@ def get_yes_no(response: str) -> bool:
     return response.lower() in ('y', 'yes', '')
 
 
-def local_folder_permissions(interactive) -> None:
+def local_folder_permissions(interactive: bool) -> None:
     """
     Check and if necessary fix ownership and permissions for key installation folders
+
+    :param interactive: whether user should confirm execution of command
     """
 
     if site.ENABLE_USER_SITE:
@@ -629,14 +802,18 @@ def restart_script(restart_with=None) -> None:
         executable = sys.executable
     else:
         executable = restart_with
+
+    print('Restarting script using', executable)
+
     os.execl(executable, executable, *args)
 
 
 def run_cmd(command_line: str,
-            restart=False,
-            exit_on_failure=True,
-            shell=False,
-            interactive=False) -> None:
+            restart: bool=False,
+            exit_on_failure: bool=True,
+            shell: bool=False,
+            interactive: bool=False,
+            installer_to_delete_on_error: str='') -> None:
     """
     Run command using subprocess.check_call, and then restart if requested.
 
@@ -647,6 +824,9 @@ def run_cmd(command_line: str,
     :param shell: if True, run the subprocess using a shell
     :param interactive: if True, the user should be prompted to confirm
      the command
+    :param installer_to_delete_on_error: full path of installer tar file, in
+     temporary directory. The temp directory will be completely removed
+     if there is an error.
     """
 
     print(_("The following command will be run:") + "\n")
@@ -659,6 +839,7 @@ def run_cmd(command_line: str,
         answer = input(_('Would you like to run the command now?') + ' [Y/n]: ')
         if not get_yes_no(answer):
             print(_('Answer is not yes, exiting.'))
+            cleanup_on_exit(installer_to_delete_on_error)
             sys.exit(0)
 
     args = shlex.split(command_line)
@@ -671,7 +852,7 @@ def run_cmd(command_line: str,
         sys.stderr.write(_("Command failed") + "\n")
         if exit_on_failure:
             sys.stderr.write(_("Exiting") + "\n")
-            clean_locale_tmpdir()
+            cleanup_on_exit(installer_to_delete_on_error)
             sys.exit(1)
     else:
         if restart:
@@ -743,6 +924,134 @@ def query_uninstall(interactive: bool) -> bool:
     return get_yes_no(answer)
 
 
+def debian_known_packages(packages: str):
+    """
+    Return which of the packages listed are able
+    to be installed on this instance.
+
+    Catches exceptions.
+
+    :param packages: the packages to to check, in a string separated by white space
+    :return: list of packages
+    """
+
+    known = []
+    command_line = 'apt-cache show {}'
+    for package in packages.split():
+        args = shlex.split(command_line.format(package))
+
+        try:
+            output = subprocess.check_output(
+                args, universal_newlines=True, stderr=subprocess.STDOUT
+            )
+            if re.search(r"^Package:\s+{}".format(re.escape(package)), output, re.MULTILINE):
+                known.append(package)
+        except subprocess.CalledProcessError:
+            pass
+
+    return known
+
+
+def debian_unknown_packages(packages: str):
+    """
+    Return which of the packages listed are unable
+    to be installed on this instance because the system does not know about them.
+
+    Catches exceptions.
+
+    :param packages: the packages to to check, in a string separated by white space
+    :return: list of packages
+    """
+
+    unknown = []
+    for package in packages.split():
+        if not debian_known_packages(package):
+            unknown.append(package)
+
+    return unknown
+
+
+def debian_package_installed(package: str) -> bool:
+    """
+    :param package: package to check
+    :return: True if the package is installed in the Debian-like distribution, else False
+    """
+
+    command_line = 'dpkg -s {}'
+    args = shlex.split(command_line.format(package))
+    try:
+        output = subprocess.check_output(args, universal_newlines=True, stderr=subprocess.STDOUT)
+        if output.find('Status: install ok installed') >= 0:
+            return True
+        else:
+            return False
+    except subprocess.CalledProcessError:
+        return False
+
+def fedora_known_packages(packages: str):
+    """
+    Return which of the packages listed are able
+    to be installed on this instance.
+
+    Catches exceptions.
+
+    :param packages: the packages to to check, in a string separated by white space
+    :return: list of packages
+    """
+
+    known = []
+    command_line = 'dnf list {}'
+    for package in packages.split():
+        args = shlex.split(command_line.format(package))
+
+        try:
+            output = subprocess.check_output(
+                args, universal_newlines=True, stderr=subprocess.STDOUT
+            )
+            known.append(package)
+        except subprocess.CalledProcessError:
+            pass
+
+    return known
+
+
+def fedora_unknown_packages(packages: str):
+    """
+    Return which of the packages listed are unable
+    to be installed on this instance because the system does not know about them.
+
+    Catches exceptions.
+
+    :param packages: the packages to to check, in a string separated by white space
+    :return: list of packages
+    """
+
+    unknown = []
+    for package in packages.split():
+        if not fedora_known_packages(package):
+            unknown.append(package)
+
+    return unknown
+
+
+def fedora_package_installed(package: str) -> bool:
+    """
+    :param package: package to check
+    :return: True if the package is installed in the Debian-like distribution, else False
+    """
+
+    command_line = 'dnf list installed {}'
+    args = shlex.split(command_line.format(package))
+    try:
+        output = subprocess.check_output(args, universal_newlines=True, stderr=subprocess.STDOUT)
+        if output.find('{}.'.format(package)) >= 0:
+            return True
+        else:
+            return False
+    except subprocess.CalledProcessError:
+        return False
+
+
 def opensuse_package_search(packages: str):
     """
     Return which of the packages have not already been installed on openSUSE.
@@ -758,6 +1067,7 @@ def opensuse_package_search(packages: str):
     )
     args = shlex.split(command_line)
     return subprocess.check_output(args, universal_newlines=True)
+
 
 def opensuse_known_packages(packages: str):
     """
@@ -776,6 +1086,7 @@ def opensuse_known_packages(packages: str):
         package for package in packages.split()
         if re.search(r"^i\+?\s+\|\s*{}".format(re.escape(package)), output, re.MULTILINE) is None
     ]
+
 
 def opensuse_missing_packages(packages: str):
     """
@@ -849,7 +1160,7 @@ def uninstall_pip_package(package: str, no_deps_only: bool) -> None:
      depends on it
     """
 
-    l_command_line = 'list --user'
+    l_command_line = 'list {}'.format(pip_user)
     if pip_version >= StrictVersion('9.0.0'):
         # pip 9.0 issues a red warning if format not specified
         l_command_line = '{} --format=columns'.format(l_command_line)
@@ -891,7 +1202,9 @@ def uninstall_with_deps():
         uninstall_pip_package(package, no_deps_only=True)
 
 
-def uninstall_old_version(distro_family: Distro, distro: Distro, interactive: bool) -> None:
+def uninstall_old_version(distro_family: Distro,
+                          interactive: bool,
+                          installer_to_delete_on_error: str) -> bool:
     """
     Uninstall old version of Rapid Photo Downloader that was installed using the
     distribution package manager and also with pip
@@ -899,7 +1212,13 @@ def uninstall_old_version(distro_family: Distro, distro: Distro, interactive: bo
     :param distro_family: the Linux distro family that this distro is in
     :param interactive: if True, the user should be prompted to confirm
      the commands
+    :param installer_to_delete_on_error: full path of installer tar file, in
+     temporary directory. The temp directory will be completely removed
+     if there is an error.
+    :return True if system package uninstalled, else False
     """
+
+    system_uninstall = False
 
     pkg_name = 'rapid-photo-downloader'
 
@@ -922,14 +1241,13 @@ def uninstall_old_version(distro_family: Distro, distro: Distro, interactive: bo
                     package = pkg.name
                 print(_("Uninstalling system package"), package)
                 cmd = make_distro_packager_commmand(distro_family, pkg_name, interactive, 'remove')
-                run_cmd(cmd)
+                run_cmd(cmd, installer_to_delete_on_error=installer_to_delete_on_error)
+                system_uninstall = True
         except Exception as e:
             sys.stderr.write(_("Command failed") + "\n")
             sys.stderr.write(_("Exiting") + "\n")
-            clean_locale_tmpdir()
+            cleanup_on_exit(installer_to_delete_on_error)
             sys.exit(1)
-
-
 
     elif distro_family == Distro.fedora:
         print(
@@ -955,8 +1273,11 @@ def uninstall_old_version(distro_family: Distro, distro: Distro, interactive: bo
             i = q_inst.filter(name=pkg_name)
             if len(list(i)) and query_uninstall(interactive):
                 run_cmd(
-                    make_distro_packager_commmand(distro_family, pkg_name, interactive, 'remove')
+                    make_distro_packager_commmand(distro_family, pkg_name, interactive, 'remove'),
+                    installer_to_delete_on_error=installer_to_delete_on_error
                 )
+                system_uninstall = True
+
 
     elif distro_family == Distro.opensuse:
         print(
@@ -968,22 +1289,34 @@ def uninstall_old_version(distro_family: Distro, distro: Distro, interactive: bo
         try:
             if opensuse_package_installed('rapid-photo-downloader') \
                     and query_uninstall(interactive):
-                run_cmd(make_distro_packager_commmand(distro_family, pkg_name, interactive, 'rm'))
+                run_cmd(
+                    make_distro_packager_commmand(distro_family, pkg_name, interactive, 'rm'),
+                    installer_to_delete_on_error=installer_to_delete_on_error
+                )
+                system_uninstall = True
+
         except subprocess.CalledProcessError as e:
             if e.returncode != 104:
                 sys.stderr.write(_("Command failed") + "\n")
                 sys.stderr.write(_("Exiting") + "\n")
-                clean_locale_tmpdir()
+                cleanup_on_exit(installer_to_delete_on_error)
                 sys.exit(1)
 
     print(_("Checking if previous version installed with pip..."))
     uninstall_pip_package('rapid-photo-downloader', no_deps_only=False)
 
+    return system_uninstall
 
-def check_packages_on_other_systems() -> None:
+
+
+def check_packages_on_other_systems(installer_to_delete_on_error: str) -> None:
     """
     Check to see if some (but not all) application dependencies are
     installed on systems that we are not explicitly analyzing.
+
+    :param installer_to_delete_on_error: full path of installer tar file, in
+     temporary directory. The temp directory will be completely removed
+     if there is an error.
     """
 
     import_msgs = []
@@ -993,13 +1326,9 @@ def check_packages_on_other_systems() -> None:
             import PyQt5
         except ImportError:
             import_msgs.append('python3 variant of PyQt5')
-    try:
-        import gi
-        have_gi = True
-    except ImportError:
+    if not have_gi:
         import_msgs.append('python3 variant of gobject introspection')
-        have_gi = False
-    if have_gi:
+    else:
         try:
             gi.require_version('GUdev', '1.0')
         except ValueError:
@@ -1030,64 +1359,118 @@ def check_packages_on_other_systems() -> None:
         install_error_message = "This program requires:\n{}\nPlease install them " \
                                 "using your distribution's standard installation tools.\n"
         sys.stderr.write(install_error_message.format('\n'.join(s for s in import_msgs)))
+        cleanup_on_exit(installer_to_delete_on_error=installer_to_delete_on_error)
         sys.exit(1)
 
 
 def install_required_distro_packages(distro: Distro,
                                      distro_family: Distro,
                                      version: LooseVersion,
-                                     interactive: bool) -> None:
+                                     interactive: bool,
+                                     system_uninstall: bool,
+                                     venv: bool,
+                                     installer_to_delete_on_error: str) -> None:
     """
     Install packages supplied by the Linux distribution
     :param distro: the specific Linux distribution
-    :param distro_family: the family of distros the Linux distribution belongs too
+    :param distro_family: the family of distros the Linux distribution belongs
+     to
     :param version: the Linux distribution's version
     :param interactive: if True, the user should be prompted to confirm
      the commands
+    :param system_uninstall: if True, the system package Rapid Photo Downloader
+     was uninstalled
+    :param venv: installing into a virtual environment
+    :param installer_to_delete_on_error: full path of installer tar file, in
+     temporary directory. The temp directory will be completely removed
+     if there is an error.
     """
 
     if distro_family == Distro.debian:
 
-        cache = apt.Cache()
+        if have_apt:
+            cache = apt.Cache()
+        else:
+            cache = []
+
         missing_packages = []
-        packages = 'gstreamer1.0-libav gstreamer1.0-plugins-good ' \
-             'libimage-exiftool-perl python3-dev ' \
-             'intltool gir1.2-gexiv2-0.10 python3-gi gir1.2-gudev-1.0 ' \
-             'gir1.2-udisks-2.0 gir1.2-notify-0.7 gir1.2-glib-2.0 gir1.2-gstreamer-1.0 '\
-             'libgphoto2-dev g++ exiv2 libraw-bin python3-setuptools python3-wheel'
+        packages = 'gstreamer1.0-libav gstreamer1.0-plugins-good libimage-exiftool-perl '\
+                   'python3-dev intltool libgphoto2-dev g++ exiv2 libraw-bin build-essential ' \
+                   'python3-wheel python3-setuptools'
+
+        set_manually_installed = []
 
         # For some strange reason, setuptools and wheel must be manually specified on Linux Mint
         # It's odd because sometimes setuptools imports even without this package, and other times,
         # it doesn't
-        
-        optional_system_packages = (
-            op for op in 'python3-easygui python3-sortedcontainers python3-tornado python3-zmq ' \
-                         'python3-arrow python3-psutil python3-colorlog'.split()
-            if op in cache
-        )
-        if optional_system_packages:
-            packages = '{} {}'.format(packages, ' '.join(optional_system_packages))
-            
-        for p in ('libmediainfo0v5', 'libmediainfo0'):
-            if p in cache:
-                packages = '{} {}'.format(packages, p)
-                break
 
-        if not pypi_pyqt5_capable():
-            packages = 'qt5-image-formats-plugins python3-pyqt5 {}'.format(packages)
+        if not venv:
+            assert have_apt
 
-        if not have_requests:
-            packages = 'python3-requests {}'.format(packages)
+            base_python_packages = 'gir1.2-gexiv2-0.10 python3-gi gir1.2-gudev-1.0 ' \
+                 'gir1.2-udisks-2.0 gir1.2-notify-0.7 gir1.2-glib-2.0 gir1.2-gstreamer-1.0 '\
+                 'python3-requests'
+
+            packages = '{} {}'.format(packages, base_python_packages)
+
+            optional_python_packages = (
+                op for op in 'python3-easygui python3-sortedcontainers python3-tornado ' \
+                             'python3-zmq python3-arrow python3-psutil python3-colorlog'.split()
+                if op in cache
+            )
+            if optional_python_packages:
+                packages = '{} {}'.format(packages, ' '.join(optional_python_packages))
+
+            if not pypi_pyqt5_capable():
+                packages = 'qt5-image-formats-plugins python3-pyqt5 {}'.format(packages)
+        else:
+
+            build_source_packages = 'libgirepository1.0-dev libbz2-dev libreadline-dev ' \
+                                    'libssl-dev zlib1g-dev libsqlite3-dev wget curl llvm '\
+                                    'libncurses5-dev libncursesw5-dev xz-utils tk-dev '\
+                                    'libcairo2-dev libzmq5'
+
+            packages = '{} {}'.format(packages, build_source_packages)
+            unknown_packages = debian_unknown_packages(packages)
+            if unknown_packages:
+                for package in unknown_packages:
+                    print(
+                        _('The following package is unknown on your system: {}\n').format(
+                            package
+                        )
+                    )
+                cleanup_on_exit(installer_to_delete_on_error=installer_to_delete_on_error)
+                sys.exit(1)
+
+        if have_apt:
+            for p in ('libmediainfo0v5', 'libmediainfo0'):
+                if p in cache:
+                    packages = '{} {}'.format(packages, p)
+                    break
+        else:
+            package = ' '.join(debian_known_packages('libmediainfo0v5 libmediainfo0'))
+            if package:
+                packages = '{} {}'.format(packages, package)
 
         for package in packages.split():
-            try:
-                if not cache[package].is_installed:
+            if have_apt:
+                try:
+                    p = cache[package]
+                    if not p.is_installed:
+                        missing_packages.append(package)
+                    elif system_uninstall and p.is_auto_installed:
+                        set_manually_installed.append(package)
+                except KeyError:
+                        print(
+                            _('The following package is unknown on your system: {}\n').format(
+                                package
+                            )
+                        )
+                        cleanup_on_exit(installer_to_delete_on_error=installer_to_delete_on_error)
+                        sys.exit(1)
+            else:
+                if not debian_package_installed(package):
                     missing_packages.append(package)
-            except KeyError:
-                    print(
-                        _('The following package is unknown on your system: {}\n').format(package)
-                    )
-                    sys.exit(1)
 
         if missing_packages:
             print(
@@ -1095,66 +1478,114 @@ def install_required_distro_packages(distro: Distro,
                     "To continue, some packages required to run the application will be installed."
                 ) + "\n"
             )
+
             run_cmd(
                 make_distro_packager_commmand(
                     distro_family, ' '.join(missing_packages), interactive
-                ), interactive=interactive
+                ),
+                interactive=interactive, installer_to_delete_on_error=installer_to_delete_on_error
+            )
+
+        # If there are any packages to mark as manually installed, do so now
+        if set_manually_installed:
+            run_cmd(
+                make_distro_mark_commmand(
+                    distro_family, ' '.join(set_manually_installed), interactive
+                ),
+                interactive=interactive, installer_to_delete_on_error=installer_to_delete_on_error
             )
 
     elif distro_family == Distro.fedora:
 
         missing_packages = []
-        packages = 'gstreamer1-libav gstreamer1-plugins-good ' \
-                   'gobject-introspection python3-gobject ' \
+        global display_gstreamer_message
+        optional_gstreamer_package = 'gstreamer1-libav'
+
+        packages = 'gstreamer1-plugins-good ' \
                    'libgphoto2-devel zeromq-devel exiv2 perl-Image-ExifTool LibRaw-devel gcc-c++ ' \
-                   'rpm-build python3-devel intltool python3-tornado ' \
-                   'python3-easygui python3-psutil libmediainfo python3-gexiv2'
+                   'rpm-build python3-devel intltool libmediainfo python3-wheel'
 
-        if not pypi_pyqt5_capable():
-            packages = 'qt5-qtimageformats python3-qt5 {}'.format(packages)
+        if not venv:
 
-        if not have_requests:
-            packages = 'python3-requests {}'.format(packages)
+            base_python_packages = 'python3-gexiv2 python3-easygui python3-psutil ' \
+                                   'python3-tornado gobject-introspection python3-gobject'
 
-        print(_("Querying installed and available packages (this may take a while)"))
+            packages = '{} {} {}'.format(packages, base_python_packages, optional_gstreamer_package)
 
-        with dnf.Base() as base:
-            # Code from http://dnf.readthedocs.org/en/latest/use_cases.html
 
-            # Repositories serve as sources of information about packages.
-            base.read_all_repos()
-            # A sack is needed for querying.
-            base.fill_sack()
+            if not pypi_pyqt5_capable():
+                packages = 'qt5-qtimageformats python3-qt5 {}'.format(packages)
 
-            # A query matches all packages in sack
-            q = base.sack.query()
+            if not have_requests:
+                packages = 'python3-requests {}'.format(packages)
 
-            # Derived query matches only available packages
-            q_avail = q.available()
-            # Derived query matches only installed packages
-            q_inst = q.installed()
+        else:
+            build_source_packages = 'gcc zlib-devel bzip2 bzip2-devel readline-devel '\
+                                    'sqlite sqlite-devel openssl-devel tk-devel git ' \
+                                    'python3-cairo-devel cairo-gobject-devel ' \
+                                    'gobject-introspection-devel zeromq'
 
-            installed = [pkg.name for pkg in q_inst.run()]
-            available = [pkg.name for pkg in q_avail.run()]
+            packages = '{} {}'.format(packages, build_source_packages)
 
-            for package in packages.split():
-                if package not in installed:
-                    if package in available:
-                        missing_packages.append(package)
-                    elif package == 'gstreamer1-libav':
-                        print(
-                            bcolors.BOLD + "\nTo be able to generate thumbnails for a wider range "
-                            "of video formats, install gstreamer1-libav after having first added "
-                            "an appropriate software repository such as rpmfusion.org." +
-                            bcolors.ENDC
+            print(_("Querying installed and available packages (this may take a while)"))
+
+            unknown_packages = fedora_unknown_packages(packages)
+            if unknown_packages:
+                for package in unknown_packages:
+                    print(
+                        _('The following package is unknown on your system: {}\n').format(
+                            package
                         )
-                    else:
-                        sys.stderr.write(
-                            'The following package is unavailable on your system: {}\n'.format(
-                                package
+                    )
+                cleanup_on_exit(installer_to_delete_on_error=installer_to_delete_on_error)
+                sys.exit(1)
+
+            if fedora_unknown_packages(optional_gstreamer_package):
+                display_gstreamer_message = True
+            else:
+                packages = '{} {}'.format(packages, optional_gstreamer_package)
+
+        if have_dnf:
+
+            print(_("Querying installed and available packages (this may take a while)"))
+
+            with dnf.Base() as base:
+                # Code from http://dnf.readthedocs.org/en/latest/use_cases.html
+
+                # Repositories serve as sources of information about packages.
+                base.read_all_repos()
+                # A sack is needed for querying.
+                base.fill_sack()
+
+                # A query matches all packages in sack
+                q = base.sack.query()
+
+                # Derived query matches only available packages
+                q_avail = q.available()
+                # Derived query matches only installed packages
+                q_inst = q.installed()
+
+                installed = [pkg.name for pkg in q_inst.run()]
+                available = [pkg.name for pkg in q_avail.run()]
+
+                for package in packages.split():
+                    if package not in installed:
+                        if package in available:
+                            missing_packages.append(package)
+                        elif package == 'gstreamer1-libav':
+                            display_gstreamer_message = True
+                        else:
+                            sys.stderr.write(
+                                'The following package is unavailable on your system: {}\n'.format(
+                                    package
+                                )
                             )
-                        )
-                        sys.exit(1)
+                            cleanup_on_exit(installer_to_delete_on_error=installer_to_delete_on_error)
+                            sys.exit(1)
+        else:
+            for package in packages.split():
+                if not fedora_package_installed(package):
+                    missing_packages.append(package)
 
         if missing_packages:
             print(
@@ -1166,26 +1597,36 @@ def install_required_distro_packages(distro: Distro,
             run_cmd(
                 make_distro_packager_commmand(
                     distro_family, ' '.join(missing_packages), interactive
-                ), interactive=interactive
+                ),
+                interactive=interactive, installer_to_delete_on_error=installer_to_delete_on_error
             )
 
     elif distro_family == Distro.opensuse:
 
-        packages = 'girepository-1_0 python3-gobject ' \
-                   'zeromq-devel exiv2 exiftool python3-devel ' \
-                   'libgphoto2-devel libraw-devel gcc-c++ rpm-build intltool ' \
-                   'python3-psutil python3-tornado ' \
-                   'typelib-1_0-GExiv2-0_10 typelib-1_0-UDisks-2_0 typelib-1_0-Notify-0_7 ' \
-                   'typelib-1_0-Gst-1_0 typelib-1_0-GUdev-1_0'
+        packages = 'zeromq-devel exiv2 exiftool python3-devel ' \
+                   'libgphoto2-devel libraw-devel gcc-c++ rpm-build intltool '
+
+        if not venv:
+            base_python_packages = 'girepository-1_0 python3-gobject ' \
+                                   'python3-psutil python3-tornado ' \
+                                   'typelib-1_0-GExiv2-0_10 typelib-1_0-UDisks-2_0 ' \
+                                   'typelib-1_0-Notify-0_7 ' \
+                                   'typelib-1_0-Gst-1_0 typelib-1_0-GUdev-1_0'
+
+            packages = '{} {}'.format(packages, base_python_packages)
+
+            if not pypi_pyqt5_capable():
+                packages = 'python3-qt5 libqt5-qtimageformats {}'.format(packages)
+
+            if not have_requests:
+                packages = 'python3-requests {}'.format(packages)
+
+        else:
+            build_source_packages = 'gobject-introspection-devel python3-cairo-devel openssl zlib git'
+            packages = '{} {}'.format(packages, build_source_packages)
 
         if opensuse_known_packages('libmediainfo0'):
             packages = '{} {}'.format(packages, 'libmediainfo0')
-
-        if not pypi_pyqt5_capable():
-            packages = 'python3-qt5 libqt5-qtimageformats {}'.format(packages)
-
-        if not have_requests:
-            packages = 'python3-requests {}'.format(packages)
 
         print(
             _(
@@ -1199,7 +1640,7 @@ def install_required_distro_packages(distro: Distro,
             if e.returncode != 104:
                 sys.stderr.write(_("Command failed") + "\n")
                 sys.stderr.write(_("Exiting") + "\n")
-                clean_locale_tmpdir()
+                cleanup_on_exit(installer_to_delete_on_error=installer_to_delete_on_error)
                 sys.exit(1)
         else:
             if missing_packages:
@@ -1212,13 +1653,29 @@ def install_required_distro_packages(distro: Distro,
                 run_cmd(
                     make_distro_packager_commmand(
                         distro_family, ' '.join(missing_packages), interactive
-                    ), interactive=interactive
+                    ),
+                    interactive=interactive,
+                    installer_to_delete_on_error=installer_to_delete_on_error
+                )
+
+            if venv:
+                run_cmd(
+                    'sudo zypper install -y --type pattern devel_basis',
+                    interactive=interactive,
+                    installer_to_delete_on_error=installer_to_delete_on_error
                 )
     elif distro_family == Distro.centos:
 
         packages = 'gstreamer1-plugins-good gobject-introspection libgphoto2-devel zeromq-devel ' \
                    'exiv2 perl-Image-ExifTool LibRaw-devel gcc-c++ rpm-build ' \
                    'gobject-introspection-devel cairo-gobject-devel python36u-devel libmediainfo'
+
+        if venv:
+            build_source_packages = 'gcc zlib-devel bzip2 bzip2-devel readline-devel '\
+                                    'sqlite sqlite-devel openssl-devel tk-devel git ' \
+
+            packages = '{} {}'.format(packages, build_source_packages)
+
         print(
             _(
                 "Querying yum to see if any required packages are already installed (this may "
@@ -1230,7 +1687,7 @@ def install_required_distro_packages(distro: Distro,
         except subprocess.CalledProcessError as e:
             sys.stderr.write(_("Command failed") + "\n")
             sys.stderr.write(_("Exiting") + "\n")
-            clean_locale_tmpdir()
+            cleanup_on_exit(installer_to_delete_on_error=installer_to_delete_on_error)
             sys.exit(1)
         else:
             if missing_packages:
@@ -1243,11 +1700,13 @@ def install_required_distro_packages(distro: Distro,
                 run_cmd(
                     make_distro_packager_commmand(
                         distro_family, ' '.join(missing_packages), interactive
-                    ), interactive=interactive
+                    ),
+                    interactive=interactive,
+                    installer_to_delete_on_error=installer_to_delete_on_error
                 )
 
     else:
-        check_packages_on_other_systems()
+        check_packages_on_other_systems(installer_to_delete_on_error=installer_to_delete_on_error)
 
 
 def parser_options(formatter_class=argparse.HelpFormatter) -> argparse.ArgumentParser:
@@ -1351,6 +1810,14 @@ def parser_options(formatter_class=argparse.HelpFormatter) -> argparse.ArgumentP
     parser.add_argument(
         '--uninstall-including-pip-dependencies', action='store_true', dest='uninstall_with_deps',
         help=msg2
+    )
+
+    parser.add_argument(
+        virtual_env_cmd_line_arg, action='store_true', dest='virtual_env',
+        help=_(
+            "Install in current Python virtual environment. Virtual environments created with "
+            "the --system-site-packages option are not supported."
+        )
     )
 
     return parser
@@ -1621,6 +2088,20 @@ def run_latest_install(installer: str, delete_installer: bool) -> None:
         os.execl(sys.executable, sys.executable, *new_args)
 
 
+def check_install_status(i: int,
+                         installer_to_delete_on_error: str,
+                         is_requirements: bool) -> None:
+    if i != 0:
+        cleanup_on_exit(installer_to_delete_on_error)
+        sys.stderr.write(_("Received error code") + " " + str(i) + "\n")
+        if is_requirements:
+            msg = _("Failed to install application requirements: exiting")
+        else:
+            msg = _("Failed to install application: exiting...")
+        sys.stderr.write(msg + "\n")
+        sys.exit(1)
+
+
 def do_install(installer: str,
                distro: Distro,
                distro_family: Distro,
@@ -1629,7 +2110,8 @@ def do_install(installer: str,
                devel: bool,
                delete_install_script: bool,
                delete_tar_and_dir: bool,
-               force_this_version: bool) -> None:
+               force_this_version: bool,
+               venv: bool) -> None:
     """
     :param installer: the tar.gz installer archive (optional)
     :param distro: specific Linux distribution
@@ -1644,6 +2126,7 @@ def do_install(installer: str,
      tar.gz installer archive and its containing directory, which is assumed to be
      a temporary directory
     :param force_this_version: do not attempt to run a newer version of this script
+    :param venv: installing into a virtual environment
     """
 
     if installer is None:
@@ -1657,22 +2140,39 @@ def do_install(installer: str,
     if not force_this_version:
         run_latest_install(installer, delete_installer)
 
-    uninstall_old_version(distro_family=distro_family, distro=distro, interactive=interactive)
+    if delete_installer:
+        installer_to_delete_on_error = installer
+    else:
+        installer_to_delete_on_error = ''
 
-    install_required_distro_packages(distro, distro_family, distro_version, interactive)
+    if not venv:
+        system_uninstall = uninstall_old_version(
+            distro_family=distro_family, interactive=interactive,
+            installer_to_delete_on_error=installer_to_delete_on_error
+        )
+        local_man_dir = os.path.join(os.path.expanduser('~'), '.local/share/man/man1')
+        if not os.path.isdir(local_man_dir):
+            try:
+                os.makedirs(local_man_dir)
+            except Exception:
+                sys.stderr.write(
+                    "Sorry, the man page directory could not be created: {}\n"
+                    "Exiting...\n".format(local_man_dir)
+                )
+                cleanup_on_exit(installer_to_delete_on_error='')
+                sys.exit(1)
+    else:
+        system_uninstall = False
+        local_man_dir = None
+
+    install_required_distro_packages(
+        distro, distro_family, distro_version, interactive, system_uninstall, venv,
+        installer_to_delete_on_error
+    )
 
     with tarfile.open(installer) as tar:
         with tar.extractfile(tarfile_content_name(installer, 'requirements.txt')) as requirements:
             reqbytes = requirements.read()
-            if pypi_pyqt5_capable():
-
-                # Possibily remove an incompatible version of PyQt installed via pip
-                uninstall_incompatible_pyqt5()
-
-                reqbytes = reqbytes.rstrip() + b'\n' + pypi_pyqt5_version()
-
-            if distro == Distro.centos:
-                reqbytes = reqbytes.rstrip() + b'\nPyGobject'
 
             with tempfile.NamedTemporaryFile(delete=False) as temp_requirements:
                 temp_requirements.write(reqbytes)
@@ -1682,57 +2182,77 @@ def do_install(installer: str,
 
     # Don't call pip directly - there is no API, and its developers say not to
     cmd = make_pip_command(
-        'install --user --disable-pip-version-check -r {}'.format(temp_requirements.name)
+        'install {} --disable-pip-version-check -r {}'.format(pip_user, temp_requirements.name)
     )
-    with Popen(cmd, stdout=PIPE, stderr=PIPE, bufsize=1, universal_newlines=True) as p:
-        for line in p.stdout:
-            print(line, end='')
-        p.wait()
-        i = p.returncode
+    i =  popen_capture_output(cmd)
     os.remove(temp_requirements_name)
-    if i != 0:
-        if delete_installer:
-            delete_installer_and_its_temp_dir(installer)
-        clean_locale_tmpdir()
-        sys.stderr.write(_("Received error code") + " " + str(i) + "\n")
-        sys.stderr.write(_("Failed to install application requirements: exiting") + "\n")
-        sys.exit(1)
+    check_install_status(
+        i=i, installer_to_delete_on_error=installer_to_delete_on_error, is_requirements=True
+    )
 
-    match_pyqt5_and_sip()
+    if distro == Distro.centos or venv:
+        i = install_pygobject_from_pip()
+        check_install_status(
+            i=i, installer_to_delete_on_error=installer_to_delete_on_error, is_requirements=True
+        )
+
+    # Update PyQt5 and PyQt5_sip separately. Sometimes it's possible for PyQt5 and PyQt5_sip
+    # to get out of sync
+    i = update_pyqt5_and_sip(venv=venv)
+    check_install_status(
+        i=i, installer_to_delete_on_error=installer_to_delete_on_error, is_requirements=True
+    )
 
     print("\n" + _("Installing application...") +"\n")
     cmd = make_pip_command(
-        'install --user --disable-pip-version-check --no-deps "{}"'.format(installer)
+        'install {} --disable-pip-version-check --no-deps "{}"'.format(pip_user, installer)
     )
-    with Popen(cmd, stdout=PIPE, stderr=PIPE, bufsize=1, universal_newlines=True) as p:
-        for line in p.stdout:
-            print(line, end='')
-        p.wait()
-        i = p.returncode
-    if i != 0:
-        if delete_installer:
-            delete_installer_and_its_temp_dir(installer)
-        clean_locale_tmpdir()
-        sys.stderr.write(_("Failed to install application: exiting...") + "\n")
-        sys.exit(1)
+    i =  popen_capture_output(cmd)
+    check_install_status(
+        i=i, installer_to_delete_on_error=installer_to_delete_on_error, is_requirements=False
+    )
 
     path = os.getenv('PATH')
-    install_path = os.path.join(os.path.expanduser('~'), site.getuserbase(), 'bin')
+    if venv:
+        install_path = os.path.join(sys.prefix, 'bin')
+    else:
+        install_path = os.path.join(os.path.expanduser('~'), site.getuserbase(), 'bin')
 
-    if install_path not in path.split(':'):
-        if distro in debian_like or distro == Distro.opensuse:
+    if install_path not in path.split(':') or venv:
+        if not venv and (distro in debian_like or distro == Distro.opensuse):
             bin_dir = os.path.join(os.path.expanduser('~'), 'bin')
             if not os.path.isdir(bin_dir):
                 created_bin_dir = True
                 os.mkdir(bin_dir)
             else:
                 created_bin_dir = False
+
             for executable in ('rapid-photo-downloader', 'analyze-pv-structure'):
                 symlink = os.path.join(bin_dir, executable)
-                if not os.path.exists(symlink):
+
+                # Catch broken symlinks
+                if not (os.path.exists(symlink) or os.path.islink(symlink)):
                     print('Creating symlink', symlink)
                     print("If you uninstall the application, remove this symlink yourself.")
                     os.symlink(os.path.join(install_path, executable), symlink)
+                else:
+                    if os.path.islink(symlink):
+                        if os.readlink(symlink) == os.path.join(install_path, executable):
+                            print('Correct symlink already exists:', symlink)
+                        else:
+                            msg = 'Symlink "{}" already exists, but points to "{}" instead of "{}"'
+                            print(
+                                msg.format(
+                                    symlink, os.readlink(symlink),
+                                    os.path.join(install_path, executable)
+                                )
+                            )
+                            answer = input("Should the symlink be replaced?")
+                            if get_yes_no(answer):
+                                os.unlink(symlink)
+                                os.symlink(os.path.join(install_path, executable), symlink)
+                    else:
+                        print('There is another file at targeted symlink location:', symlink)
 
             if created_bin_dir:
                 print(
@@ -1745,45 +2265,58 @@ def do_install(installer: str,
             sys.stderr.write("\nThe application was installed in {}\n".format(install_path))
             sys.stderr.write("Add {} to your PATH to be able to launch it.\n".format(install_path))
 
-    man_dir = '/usr/local/share/man/man1'
+    system_man_dir = '/usr/local/share/man/man1'
 
     if interactive:
         print("\n" + _("Do you want to install the application's man pages?"))
-        print(_("They will be installed into {}").format(man_dir))
+        print(_("They will be installed into {}").format(system_man_dir))
         print(_("If you uninstall the application, remove these manpages yourself."))
         print(_("sudo may prompt you for the sudo password."))
         answer = input(_('Do want to install the man pages?') + '  [Y/n] ')
+    elif venv:
+        # Keep man pages in install location only
+
+        # Translators: do not translate {}/share/man/man1
+        print("\n" + _("Man pages can be found in {}/share/man/man1").format(sys.prefix))
+        answer = 'n'
     else:
-        print("\n" + _("Installing man pages into {}").format(man_dir))
+        print("\n" + _("Installing man pages into {}").format(system_man_dir))
         print(_("If you uninstall the application, remove these manpages yourself."))
         print(_("sudo may prompt you for the sudo password.") + "\n")
         answer = 'y'
 
-    if get_yes_no(answer):
-        if not os.path.isdir(man_dir):
+    if get_yes_no(answer) and local_man_dir is not None:
+        install_man_page = True
+        if not os.path.isdir(system_man_dir):
             cmd = shutil.which('mkdir')
-            command_line = 'sudo {} -p {}'.format(cmd, man_dir)
+            command_line = 'sudo {} -p {}'.format(cmd, system_man_dir)
             print(command_line)
             args = shlex.split(command_line)
             try:
                 subprocess.check_call(args)
             except subprocess.CalledProcessError:
-                if delete_installer:
-                    delete_installer_and_its_temp_dir(installer)
-                clean_locale_tmpdir()
                 sys.stderr.write(_("Failed to create man page directory: exiting") + "\n")
-                sys.exit(1)
-        cmd = shutil.which('cp')
-        for manpage in ('rapid-photo-downloader.1', 'analyze-pv-structure.1'):
-            source = os.path.join(os.path.expanduser('~'), '.local/share/man/man1', manpage)
-            dest = os.path.join(man_dir, manpage)
-            command_line = 'sudo {} {} {}'.format(cmd, source, dest)
-            print(command_line)
-            args = shlex.split(command_line)
-            try:
-                subprocess.check_call(args)
-            except subprocess.CalledProcessError:
-                sys.stderr.write(_("Failed to copy man page."))
+                install_man_page = False
+
+        if install_man_page:
+            cmd = shutil.which('cp')
+            for manpage in ('rapid-photo-downloader.1', 'analyze-pv-structure.1'):
+                source = os.path.join(local_man_dir, manpage)
+                if not os.path.exists(source):
+                    sys.stderr.write(
+                        "Man page {} cannot be copied because it does not exist\n".format(
+                            source
+                        )
+                    )
+                    break
+                dest = os.path.join(system_man_dir, manpage)
+                command_line = 'sudo {} {} {}'.format(cmd, source, dest)
+                print(command_line)
+                args = shlex.split(command_line)
+                try:
+                    subprocess.check_call(args)
+                except subprocess.CalledProcessError:
+                    sys.stderr.write(_("Failed to copy man page.") + "\n")
 
     if delete_installer:
         delete_installer_and_its_temp_dir(installer)
@@ -1792,6 +2325,20 @@ def do_install(installer: str,
         delete_installer_and_its_temp_dir(sys.argv[0])
 
     clean_locale_tmpdir()
+
+    if venv:
+        # Show path to start script in virtual environment
+        print()
+        # Translators: don't translate {}/bin/rapid-photo-downloader
+        msg = _(
+            "Rapid Photo Downloader can be started without activating the virtual environment by "
+            "running {}/bin/rapid-photo-downloader"
+        ).format(sys.prefix)
+
+        print('{}{}{}'.format(bcolors.BOLD, msg, bcolors.ENDC))
+
+    if display_gstreamer_message:
+        print(gstreamer_message)
 
     print("\n" + _("(If a segmentation fault occurs at exit, you can ignore it...)"))
 
@@ -1820,6 +2367,8 @@ def main():
     Setup repositories if needed.
     Then call main install logic.
     """
+
+    global pip_user
 
     parser = parser_options()
 
@@ -1854,6 +2403,41 @@ def main():
         clean_locale_tmpdir()
         sys.exit(1)
 
+    venv = args.virtual_env
+
+    if is_venv() and not venv:
+        answer = input(
+            _("Do you want to install Rapid Photo Downloader into the current virtual environment?")
+            +  '  [Y/n] '
+        )
+        venv = get_yes_no(answer)
+        if venv:
+            sys.argv.append(virtual_env_cmd_line_arg)
+
+    if venv:
+        if not pypi_pyqt5_capable():
+            sys.stderr.write(
+                _(
+                    "Sorry, installing Rapid Photo Downloader into a Python virtual environment "
+                    "requires Python 3.5 or newer on an Intel or AMD 64 bit platform."
+                ) + "\n"
+            )
+            cleanup_on_exit(installer_to_delete_on_error='')
+            sys.exit(1)
+
+        if not is_venv():
+            sys.stderr.write(
+                _(
+                    "To install Rapid Photo Downloader into a Python virtual environment, create "
+                    "and activate the virtual environment before starting this script."
+                ) + "\n"
+            )
+            cleanup_on_exit(installer_to_delete_on_error='')
+            sys.exit(1)
+        # install Python packages in active virtual environment
+        pip_user = ''
+        print(_("Using virtual environment for installation using pip."))
+
     if args.uninstall_with_deps:
         if len(sys.argv) > 2:
             sys.stderr.write(
@@ -1865,7 +2449,7 @@ def main():
         if not have_pip:
             pip_needed_to_uninstall()
         uninstall_with_deps()
-        clean_locale_tmpdir()
+        cleanup_on_exit(installer_to_delete_on_error='')
         sys.exit(0)
 
     if args.uninstall:
@@ -1878,10 +2462,10 @@ def main():
         if not have_pip:
             pip_needed_to_uninstall()
         uninstall_pip_package('rapid-photo-downloader', no_deps_only=False)
-        clean_locale_tmpdir()
+        cleanup_on_exit(installer_to_delete_on_error='')
         sys.exit(0)
 
-    if custom_python():
+    if custom_python() and not venv:
         excecutable = valid_system_python()
         if excecutable is None:
             sys.stderr.write(
@@ -1890,6 +2474,7 @@ def main():
                     "Exiting..."
                 ) + "\n"
             )
+            cleanup_on_exit(installer_to_delete_on_error='')
             sys.exit(1)
         else:
             print(_("Restarting script using system python...") + "\n")
@@ -1898,6 +2483,7 @@ def main():
     local_folder_permissions(interactive=args.interactive)
 
     distro = get_distro()
+
     if distro != Distro.unknown:
         distro_version = get_distro_version(distro)
     else:
@@ -1917,13 +2503,13 @@ def main():
             clean_locale_tmpdir()
             sys.exit(1)
 
-    elif distro in fedora_like and unknown_version > distro_version <= LooseVersion('24'):
-        sys.stderr.write("Sorry, Fedora 24 is no longer supported by Rapid Photo Downloader.\n")
+    elif distro in fedora_like and unknown_version > distro_version <= LooseVersion('25'):
+        sys.stderr.write("Sorry, Fedora 25 is no longer supported by Rapid Photo Downloader.\n")
         sys.exit(1)
     elif distro in arch_like:
         print(
-            'Users of Arch Linux or its derivatives should try the AUR package: '
-            'https://aur.archlinux.org/packages/rapid-photo-downloader-bzr/'
+            'Users of Arch Linux or its derivatives should use the Arch community package, '
+            'or the AUR package.'
         )
         print(_("Exiting..."))
         clean_locale_tmpdir()
@@ -1971,6 +2557,7 @@ def main():
                 ) + "\n"
             )
             sys.stderr.write(packages + '\n')
+            cleanup_on_exit(installer_to_delete_on_error='')
             sys.exit(1)
 
         print(
@@ -1989,7 +2576,7 @@ def main():
             packages = 'wheel'
 
         if local_pip or distro == Distro.centos:
-            command_line = make_pip_command('install --user ' + packages, split=False)
+            command_line = make_pip_command('install {} {}'.format(pip_user, packages), split=False)
             run_cmd(command_line, restart=True, interactive=args.interactive)
 
     # Can now assume that both pip, setuptools and wheel have been installed
@@ -2006,6 +2593,7 @@ def main():
 
         run_cmd(command_line, restart=True, interactive=args.interactive)
 
+
     installer = args.tarfile
 
     if installer is None:
@@ -2013,7 +2601,7 @@ def main():
             # Translators: do not translate the term python or requests
             print(_("Installing python requests"))
             command_line = make_pip_command(
-                'install --user requests', split=False
+                'install {} requests'.format(pip_user), split=False
             )
             run_cmd(command_line, restart=True, interactive=args.interactive)
     elif not os.path.exists(installer):
@@ -2028,7 +2616,8 @@ def main():
         installer=installer, distro=distro, distro_family=distro_family,
         distro_version=distro_version, interactive=args.interactive, devel=args.devel,
         delete_install_script=args.delete_install_script,
-        delete_tar_and_dir=args.delete_tar_and_dir, force_this_version=args.force_this_version
+        delete_tar_and_dir=args.delete_tar_and_dir, force_this_version=args.force_this_version,
+        venv=venv
     )
 
 # Base 85 encoded zip of locale data, to be extracted to a temporary directory and used for
