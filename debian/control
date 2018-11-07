@@ -36,15 +36,12 @@ Depends:
  libmediainfo0v5,
  python3-colour,
  python3-dbus,
- python3-exif,
  python3-gi,
  python3-gphoto2,
- python3-pyqt5 (>= 5.4),
+ python3-pyqt5,
  python3-requests,
  qt5-image-formats-plugins,
 Recommends:
- python3-kaa-metadata,
- python3-hachoir-metadata,
  ffmpegthumbnailer
 Description: Photo downloader (importer) from cameras, memory cards, other devices
  Rapid Photo Downloader can be used by both professional and amateur
