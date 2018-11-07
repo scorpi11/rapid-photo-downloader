@@ -1,3 +1,14 @@
+rapid-photo-downloader (0.9.13-1) unstable; urgency=medium
+
+  * New upstream version 0.9.13
+  * Remove unneeded dependencies. (Closes: #910259)
+  * Remove patch for python3-sip module, applied upstream. (Closes: #911418)
+  * Run wrap-and-sort
+  * Add new manpage
+  * Update d/copyright. (Closes: #910259)
+
+ -- Dr. Tobias Quathamer <toddy@debian.org>  Wed, 07 Nov 2018 23:09:04 +0100
+
 rapid-photo-downloader (0.9.12-2) unstable; urgency=medium
 
   * Use python3-sip module, not the bundled copy of PyQt5.
