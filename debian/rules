@@ -9,6 +9,7 @@ include /usr/share/dpkg/pkg-info.mk
 
 override_dh_auto_configure:
 	pod2man --section=1 --release=$(DEB_SOURCE) --center "" doc/rapid-photo-downloader.1.pod > rapid-photo-downloader.1
+	pod2man --section=1 --release=$(DEB_SOURCE) --center "" doc/analyze-pv-structure.1.pod > analyze-pv-structure.1
 
 override_dh_auto_install:
 	dh_auto_install
@@ -18,6 +19,7 @@ override_dh_auto_install:
 
 override_dh_auto_clean:
 	-rm -f rapid-photo-downloader.1
+	-rm -f analyze-pv-structure.1
 	-rm -rf build/
 	dh_auto_clean
 
