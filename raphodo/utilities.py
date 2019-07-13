@@ -1,4 +1,4 @@
-# Copyright (C) 2007-2018 Damon Lynch <damonlynch@gmail.com>
+# Copyright (C) 2007-2019 Damon Lynch <damonlynch@gmail.com>
 
 # This file is part of Rapid Photo Downloader.
 #
@@ -18,7 +18,7 @@
 # see <http://www.gnu.org/licenses/>.
 
 __author__ = 'Damon Lynch'
-__copyright__ = "Copyright 2007-2018, Damon Lynch"
+__copyright__ = "Copyright 2007-2019, Damon Lynch"
 
 import contextlib
 import locale
@@ -311,7 +311,8 @@ def create_temp_dir(folder: Optional[str]=None,
         msg = "Failed to create temporary directory in %s: %s %s" % (
                       folder,
                       inst.errno,
-                      inst.strerror)
+                      inst.strerror
+        )
         logging.critical(msg)
         temp_dir = None
     return temp_dir
@@ -943,3 +944,12 @@ def image_large_enough_fdo(size: QSize) -> bool:
     """
 
     return size.width() >= 256 or size.height() >= 256
+
+
+def is_venv():
+    """
+    :return: True if the python interpreter is running in venv or virtualenv
+    """
+
+    return hasattr(sys, 'real_prefix') or \
+           (hasattr(sys, 'base_prefix') and sys.base_prefix != sys.prefix)

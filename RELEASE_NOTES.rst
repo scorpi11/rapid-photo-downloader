@@ -1,4 +1,4 @@
-Release Notes for Rapid Photo Downloader 0.9.13
+Release Notes for Rapid Photo Downloader 0.9.15
 ===============================================
 
  - Most photo thumbnails are generated using exiv2. Very rarely, exiv2 can
@@ -10,8 +10,8 @@ Release Notes for Rapid Photo Downloader 0.9.13
    that demonstrates the problem.
 
  - Canon's latest RAW file format CR3 is supported on systems that have
-   ExifTool 10.87 or newer. Most Linux distributions ship an older version
-   of ExifTool. If you need to, fortunately it is easy to install ExifTool
+   ExifTool 10.87 or newer. Many Linux distributions ship an older version
+   of ExifTool. If you need to, it is fortunately easy to install ExifTool
    yourself. See:
 
    https://www.sno.phy.queensu.ca/~phil/exiftool/install.html
@@ -23,7 +23,7 @@ Release Notes for Rapid Photo Downloader 0.9.13
 
  - If you installed Rapid Photo Downloader using the install script, you can
    update it one of two ways: using the install script again, or using the
-   built-in update procedure. The built-in update procedure is very
+   in-program update procedure. The in-program update procedure is very
    convenient, but faces limitations in terms of updating some of the software
    the program needs. If you use the install script to update the program, it
    can update more supporting packages, which can sometimes prove helpful.
@@ -36,9 +36,9 @@ Release Notes for Rapid Photo Downloader 0.9.13
    Fedora users can enable the rpmfusion.org free repository to be able to
    install gstreamer1-libav.
 
- - The Python library rawkit 0.6.0 may not work with libraw 0.19 or newer.
-   Rawkit and libraw are used to generate thumbnails for RAW files from which
-   a thumbnail cannot be extracted.
+ - The Python library rawkit may not work with very recent versions of libraw.
+   Rawkit uses libraw to generate thumbnails for RAW files from which a
+   thumbnail cannot be extracted.
 
  - For systems running Python 3.6 or newer, the recommended pyzmq version is
    now 16.0.2 or newer. If xterm or lxterminal are installed on systems with

@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 
-# Copyright (C) 2015-2018 Damon Lynch <damonlynch@gmail.com>
+# Copyright (C) 2015-2019 Damon Lynch <damonlynch@gmail.com>
 # Copyright (C) 2012-2015 Jim Easterbrook <jim@jim-easterbrook.me.uk>
 
 # This file is part of Rapid Photo Downloader.
@@ -20,7 +20,7 @@
 # see <http://www.gnu.org/licenses/>.
 
 __author__ = 'Damon Lynch'
-__copyright__ = "Copyright 2015-2018, Damon Lynch. Copyright 2012-2015 Jim Easterbrook."
+__copyright__ = "Copyright 2015-2019, Damon Lynch. Copyright 2012-2015 Jim Easterbrook."
 
 import logging
 import os
@@ -170,13 +170,16 @@ class Camera:
             self.camera_initialized = True
         except gp.GPhoto2Error as e:
             if e.code == gp.GP_ERROR_IO_USB_CLAIM:
+                error_code = CameraErrorCode.inaccessible
                 logging.error("{} is already mounted".format(model))
             elif e.code == gp.GP_ERROR:
                 logging.error("An error occurred initializing the camera using libgphoto2")
+                error_code = CameraErrorCode.inaccessible
             else:
                 logging.error("Unable to access camera: %s", gphoto2_named_error(e.code))
+                error_code = CameraErrorCode.locked
             if raise_errors:
-                raise CameraProblemEx(CameraErrorCode.inaccessible, gp_exception=e)
+                raise CameraProblemEx(error_code, gp_exception=e)
             return
 
         concise_model_name = self._concise_model_name()
@@ -684,7 +687,21 @@ class Camera:
          if not found.
         """
         if self.camera_config is None:
-            self.camera_config = self.camera.get_config(self.context)
+            try:
+                self.camera_config = self.camera.get_config(self.context)
+            except gp.GPhoto2Error as e:
+                if e.code == gp.GP_ERROR_NOT_SUPPORTED:
+                    logging.error(
+                        "Getting camera configuration not supported for %s",
+                        self.display_name
+                    )
+                else:
+                    logging.error(
+                        "Unknown error getting camera configuration for %s",
+                        self.display_name
+                    )
+                return ''
+
         # Here we really see the difference between C and python!
         child_count = self.camera_config.count_children()
         for i in range(child_count):

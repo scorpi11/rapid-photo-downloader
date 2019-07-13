@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 
-# Copyright (C) 2011-2018 Damon Lynch <damonlynch@gmail.com>
+# Copyright (C) 2011-2019 Damon Lynch <damonlynch@gmail.com>
 
 # This file is part of Rapid Photo Downloader.
 #
@@ -29,7 +29,7 @@ Project line length: 100 characters (i.e. word wrap at 99)
 """
 
 __author__ = 'Damon Lynch'
-__copyright__ = "Copyright 2011-2018, Damon Lynch"
+__copyright__ = "Copyright 2011-2019, Damon Lynch"
 
 import sys
 import logging
@@ -71,6 +71,7 @@ except (ImportError, ValueError):
 
 import zmq
 import psutil
+import arrow
 import gphoto2 as gp
 from PyQt5 import QtCore
 from PyQt5.QtCore import (
@@ -101,7 +102,7 @@ from raphodo.storage import (
     has_one_or_more_folders, mountPaths, get_desktop_environment, get_desktop,
     gvfs_controls_mounts, get_default_file_manager, validate_download_folder,
     validate_source_folder, get_fdo_cache_thumb_base_directory, WatchDownloadDirs, get_media_dir,
-    StorageSpace, gvfs_gphoto2_path
+    StorageSpace, gvfs_gphoto2_path, get_uri
 )
 from raphodo.interprocess import (
     ScanArguments, CopyFilesArguments, RenameAndMoveFileData, BackupArguments,
@@ -344,7 +345,7 @@ class FolderPreviewManager(QObject):
                 self._change_subfolder_structure()
         else:
             logging.debug(
-                "Not removing or moving provisional download folders becausea download is running"
+                "Not removing or moving provisional download folders because a download is running"
             )
 
         if dirty:
@@ -919,7 +920,7 @@ class RapidWindow(QMainWindow):
         logging.debug("Have GIO module: %s", have_gio)
         self.gvfsControlsMounts = gvfs_controls_mounts() and have_gio
         if have_gio:
-            logging.debug("Using GIO: %s", self.gvfsControlsMounts)
+            logging.debug("GVFS (GIO) controls mounts: %s", self.gvfsControlsMounts)
 
         if not self.gvfsControlsMounts:
             # Monitor when the user adds or removes a camera
@@ -1373,13 +1374,14 @@ class RapidWindow(QMainWindow):
         delegate = self.thumbnailView.itemDelegate()  # type: ThumbnailDelegate
         delegate.applyJobCode(job_code=job_code)
 
-    @pyqtSlot(bool, version_details, version_details, str, bool, bool)
+    @pyqtSlot(bool, version_details, version_details, str, bool, bool, bool)
     def newVersionCheckMade(self, success: bool,
                             stable_version: version_details,
                             dev_version: version_details,
                             download_page: str,
                             no_upgrade: bool,
-                            pip_install: bool) -> None:
+                            pip_install: bool,
+                            is_venv: bool) -> None:
         """
         Respond to a version check, either initiated at program startup, or from the
         application's main menu.
@@ -1395,6 +1397,8 @@ class RapidWindow(QMainWindow):
         :param no_upgrade: if True, don't offer to do an inplace upgrade
         :param pip_install: whether pip was used to install this
          program version
+        :param is_venv: whether the program is running in a python virtual
+         environment
         """
 
         if success:
@@ -1425,7 +1429,13 @@ class RapidWindow(QMainWindow):
 
                 if pip_install:
                     logging.debug("Installation performed via pip")
-                    if no_upgrade:
+                    if is_venv:
+                        logging.info(
+                            "Cannot use in-program update to upgrade program from within virtual "
+                            "environment"
+                        )
+                        state = CheckNewVersionDialogState.open_website
+                    elif no_upgrade:
                         logging.info("Cannot perform in-place upgrade to this version")
                         state = CheckNewVersionDialogState.open_website
                     else:
@@ -2559,16 +2569,29 @@ class RapidWindow(QMainWindow):
             self.tip.activate()
 
     def makeProblemReportDialog(self, header: str, title: Optional[str]=None) -> None:
+        """
+        Create the dialog window to guide the user in reporting a bug
+        :param header: text at the top of the dialog window
+        :param title: optional title
+        """
+
         log_path, log_file = os.path.split(iplogging.full_log_file_path())
-        log_uri = pathname2url(log_path)
+        log_uri = get_uri(log_path)
+        config_path, config_file = os.path.split(self.prefs.settings_path())
+        config_uri = get_uri(path=config_path)
 
         body = _(
             r"""Please report the problem at <a href="{website}">{website}</a>.<br><br>
-            Attach the log file <i>{log_file}</i> to your report (click
-            <a href="{log_path}">here</a> to open the log directory).
+            Include in your bug report the program's log files. The bug report must include 
+            <i>{log_file}</i>, but attaching the other log files is often helpful.<br><br> 
+            If possible, please also include the program's configuration file
+            <i>{config_file}</i>.<br><br> 
+            Click <a href="{log_path}">here</a> to open the log directory, and 
+            <a href="{config_path}">here</a> to open the configuration directory.
             """
         ).format(
-            website='https://bugs.launchpad.net/rapid', log_path=log_uri, log_file=log_file
+            website='https://bugs.launchpad.net/rapid', log_path=log_uri, log_file=log_file,
+            config_path=config_uri, config_file = config_file
         )
 
         message = '{header}<br><br>{body}'.format(header=header, body=body)
@@ -4306,21 +4329,34 @@ Do you want to proceed with the download?
             title =_('Rapid Photo Downloader')
             message = _(
                 '<b>All files on the %(camera)s are inaccessible</b>.<br><br>It '
-                'may be locked or not configured for file transfers using MTP. '
+                'may be locked or not configured for file transfers using USB. '
                 'You can unlock it and try again.<br><br>On some models you also '
-                'need to change the setting <i>USB for charging</i> to <i>USB for '
-                'file transfers</i>.<br><br>Alternatively, you can ignore this '
-                'device.'
+                'need to change the setting to allow the use of USB for '
+                '<i>File Transfer</i>.<br><br>'
+                'Learn more about '
+                '<a href="https://damonlynch.net/rapid/documentation/#downloadingfromcameras">'
+                'downloading from cameras</a> and '
+                '<a href="https://damonlynch.net/rapid/documentation/#downloadingfromphones">'
+                'enabling downloading from phones</a>. <br><br>'
+                'Alternatively, you can ignore the %(camera)s.'
             ) % {'camera': camera_model}
         else:
             assert error_code == CameraErrorCode.inaccessible
             title = _('Rapid Photo Downloader')
             message = _(
                 '<b>The %(camera)s appears to be in use by another '
-                'application.</b><br><br>You can close any other application (such as a file '
-                'browser) that is using it and try again. If that does not work, unplug the '
-                '%(camera)s from the computer and plug it in again.<br><br>Alternatively, you '
-                'can ignore this device.'
+                'application.</b><br><br>Rapid Photo Downloader cannnot access a phone or camera '
+                'that is being used by another program like a file manager.<br><br>'
+                'If the device is mounted in your file manager, you must first &quot;eject&quot; '
+                'it from the other program while keeping the %(camera)s plugged in.<br><br>'
+                'If that does not work, unplug the '
+                '%(camera)s from the computer and plug it in again.<br><br>'
+                'Learn more about '
+                '<a href="https://damonlynch.net/rapid/documentation/#downloadingfromcameras">'
+                'downloading from cameras</a> and '
+                '<a href="https://damonlynch.net/rapid/documentation/#downloadingfromphones">'
+                'enabling downloading from phones</a>. <br><br>'
+                'Alternatively, you can ignore the %(camera)s.'
             ) % {'camera':camera_model}
 
         msgBox = QMessageBox(
@@ -4750,9 +4786,14 @@ Do you want to proceed with the download?
 
         if self.gvfsControlsMounts:
             self.devices.cameras_to_gvfs_unmount_for_scan[port] = model
-            if self.gvolumeMonitor.unmountCamera(model=model, port=port, on_startup=on_startup):
+            unmounted = self.gvolumeMonitor.unmountCamera(
+                model=model, port=port, on_startup=on_startup
+            )
+            if unmounted:
+                logging.debug("Successfully unmounted %s", model)
                 return True
             else:
+                logging.debug("%s was not already mounted", model)
                 del self.devices.cameras_to_gvfs_unmount_for_scan[port]
         return False
 
@@ -4888,6 +4929,7 @@ Do you want to proceed with the download?
         :param on_startup: if True, the scan is occurring during
          the program's startup phase
         """
+
 
         scan_id = self.devices.add_device(device=device, on_startup=on_startup)
         logging.debug("Assigning scan id %s to %s", scan_id, device.name())
@@ -5665,9 +5707,9 @@ class QtSingleApplication(QApplication):
         self._outSocket.connectToServer(self._id)
         self._isRunning = self._outSocket.waitForConnected() # type: bool
 
-        self._outStream = None # type: QTextStream
+        self._outStream = None  # type: QTextStream
         self._inSocket  = None
-        self._inStream  = None # type: QTextStream
+        self._inStream  = None  # type: QTextStream
         self._server    = None
 
         if self._isRunning:
@@ -5781,6 +5823,10 @@ def get_versions() -> List[str]:
     try:
         versions.append('{}: {}'.format(*platform.libc_ver()))
     except:
+        pass
+    try:
+        versions.append('Arrow: {}'.format(arrow.__version__))
+    except AttributeError:
         pass
     try:
         import tornado
