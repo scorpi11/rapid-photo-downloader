@@ -21,25 +21,27 @@ Vcs-Browser: https://salsa.debian.org/debian/rapid-photo-downloader
 Package: rapid-photo-downloader
 Architecture: all
 Depends: gir1.2-gexiv2-0.10,
+         gir1.2-glib-2.0,
          gir1.2-gstreamer-1.0,
          gir1.2-gudev-1.0,
          gir1.2-notify-0.7,
          gir1.2-udisks-2.0,
          gstreamer1.0-libav,
          gstreamer1.0-plugins-good,
+         libgphoto2-6,
          libimage-exiftool-perl,
          libmediainfo0v5,
+         libraw-bin,
          python3-colour,
-         python3-dbus,
          python3-gi,
          python3-gphoto2,
          python3-pyqt5,
          python3-requests,
+         python3-tenacity,
          qt5-image-formats-plugins,
          ${misc:Depends},
          ${python3:Depends},
          ${shlibs:Depends}
-Recommends: ffmpegthumbnailer
 Description: Photo downloader (importer) from cameras, memory cards, other devices
  Rapid Photo Downloader can be used by both professional and amateur
  photographers to download photos and videos from multiple cameras,
