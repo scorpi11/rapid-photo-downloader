@@ -1,3 +1,13 @@
+rapid-photo-downloader (0.9.15-1) unstable; urgency=medium
+
+  * New upstream version 0.9.15 (Closes: #931742)
+    - Update dependencies of new upstream version
+  * Use wrap-and-sort
+  * Update Standards-Version to 4.4.0, no changes needed
+  * Update d/copyright
+
+ -- Dr. Tobias Quathamer <toddy@debian.org>  Sat, 13 Jul 2019 15:28:27 +0200
+
 rapid-photo-downloader (0.9.13-1) unstable; urgency=medium
 
   * New upstream version 0.9.13
