@@ -1,6 +1,6 @@
 Metadata-Version: 2.1
 Name: rapid-photo-downloader
-Version: 0.9.13
+Version: 0.9.15
 Summary: Downloads, renames and backs up photos and videos from cameras, phones, memory cards and other devices
 Home-page: http://www.damonlynch.net/rapid
 Author: Damon Lynch
@@ -86,8 +86,8 @@ Description: Rapid Photo Downloader
          - Ubuntu 16.04 or newer
          - LinuxMint 18 or newer
          - Debian 9, unstable or testing
-         - Fedora 25 or newer
-         - openSUSE Leap 42.2 or newer
+         - Fedora 28 or newer
+         - openSUSE Leap 42.3 or newer
          - CentOS 7.5
          - Any distribution meeting the software requirements below
         
@@ -128,6 +128,7 @@ Description: Rapid Photo Downloader
            files from Android phones or working with old RAW formats.
          - `Qt5 plugin for reading TIFF images`_
          - Requests_
+         - Tenacity_
          - intltool_
          - If using Python 3.4, these additional modules:
             - typing_
@@ -214,7 +215,7 @@ Description: Rapid Photo Downloader
         To install Rapid Photo Downloader into a Python virtual environment, create the
         virtual environment (naming it whatever you like):
         
-        ``python3 -m env myenv``
+        ``python3 -m venv myenv``
         
         Activate the virtual environment:
         
@@ -271,6 +272,7 @@ Description: Rapid Photo Downloader
         .. _SortedContainers: http://www.grantjenks.com/docs/sortedcontainers/
         .. _Requests: http://docs.python-requests.org/
         .. _tornado: http://www.tornadoweb.org/
+        .. _Tenacity: https://github.com/jd/tenacity
 Keywords: photo,video,download,ingest,import,camera,phone,backup,rename,photography,photographer,transfer,copy,raw,cr2,nef,arw
 Platform: UNKNOWN
 Classifier: Development Status :: 5 - Production/Stable

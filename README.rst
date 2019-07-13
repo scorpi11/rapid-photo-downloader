@@ -78,8 +78,8 @@ Supported Linux Versions
  - Ubuntu 16.04 or newer
  - LinuxMint 18 or newer
  - Debian 9, unstable or testing
- - Fedora 25 or newer
- - openSUSE Leap 42.2 or newer
+ - Fedora 28 or newer
+ - openSUSE Leap 42.3 or newer
  - CentOS 7.5
  - Any distribution meeting the software requirements below
 
@@ -120,6 +120,7 @@ Rapid Photo Downloader requires:
    files from Android phones or working with old RAW formats.
  - `Qt5 plugin for reading TIFF images`_
  - Requests_
+ - Tenacity_
  - intltool_
  - If using Python 3.4, these additional modules:
     - typing_
@@ -206,7 +207,7 @@ platform.
 To install Rapid Photo Downloader into a Python virtual environment, create the
 virtual environment (naming it whatever you like):
 
-``python3 -m env myenv``
+``python3 -m venv myenv``
 
 Activate the virtual environment:
 
@@ -263,3 +264,4 @@ environment's directory.
 .. _SortedContainers: http://www.grantjenks.com/docs/sortedcontainers/
 .. _Requests: http://docs.python-requests.org/
 .. _tornado: http://www.tornadoweb.org/
+.. _Tenacity: https://github.com/jd/tenacity

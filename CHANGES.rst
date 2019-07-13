@@ -1,6 +1,64 @@
 Changelog for Rapid Photo Downloader
 ====================================
 
+0.9.15 (2019-07-09)
+-------------------
+
+ - Updated Brazilian Portuguese, Czech, Dutch, French, Hungarian, Japanese,
+   Kabyle, Norwegian Nynorsk, Russian and Spanish translations.
+
+0.9.15b1 (2019-06-25)
+---------------------
+
+ - Fixed bug #1829145 where Rapid Photo Downloader could no longer access
+   cameras, phones and tablets because other applications using had gained
+   exclusive access over them. Most file managers, including Gnome Files, use
+   GIO to gain control over cameras and phones as soon as they are plugged in.
+   Rapid Photo Downloader therefore must instruct them to relinquish control
+   before it can access the device. GIO / Glib changed the way paths were
+   generated for cameras and phones in a way that was incompatible with
+   libgphoto2's port nomenclature.
+
+ - Fix bug #1818280: sqlite3 database is locked while adding thumbnails.
+
+ - Fix bug where thumbnails were not being displayed for jpeg images on cameras.
+
+ - Fixed bug where scan process was failing to extract sample metadata from
+   photos, which is needed to determine the time zone of the device being
+   downloaded from.
+
+ - Fixed bug where installing into a virtual environment on Ubuntu 19.04 would
+   fail due to not mandating the installation of GObject introspection runtimes.
+
+ - New Python package requirement: tenacity.
+
+ - Removed restriction on Python package Tornado's version limit.
+
+ - Improved "Report a Problem" dialog window to include more details.
+
+ - Updated Italian translation.
+
+0.9.14 (2019-03-30)
+-------------------
+
+ - Fix bug #1821917: Error generating Timeline with Arrow 0.13.1.
+
+ - Fix bug #1817481: Error deleting sample file at program exit.
+
+ - Fix bug #1810572: Error getting camera configuration on certain cameras.
+
+ - Again fix bug #1801504: PyQt5_sip not installed or upgraded for local user
+   when system copy already installed (bug seen on Fedora 29). The fix in
+   0.9.13 did not always work.
+
+ - When installing using the install.py script, upgrade pip if its version is
+   less than 9.0.
+
+ - Disable the program's built-in upgrade procedure when running from within a
+   python virtual environment.
+
+ - Updated Czech, Dutch, Italian, Portuguese, and Spanish translations.
+
 0.9.13 (2018-11-06)
 -------------------
 
@@ -20,7 +78,6 @@ Changelog for Rapid Photo Downloader
 
  - Import sip regardless of whether it is the private sip bundled with PyQt5
    or a separate sip installation.
-
 
 0.9.12 (2018-09-28)
 -------------------

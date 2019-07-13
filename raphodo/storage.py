@@ -1,4 +1,4 @@
-# Copyright (C) 2015-2018 Damon Lynch <damonlynch@gmail.com>
+# Copyright (C) 2015-2019 Damon Lynch <damonlynch@gmail.com>
 # Copyright (C) 2008-2015 Canonical Ltd.
 # Copyright (C) 2013 Bernard Baeyens
 
@@ -43,7 +43,7 @@ regarding mount points and XDG related functionality.
 """
 
 __author__ = 'Damon Lynch'
-__copyright__ = "Copyright 2011-2018, Damon Lynch. Copyright 2008-2015 Canonical Ltd. Copyright" \
+__copyright__ = "Copyright 2011-2019, Damon Lynch. Copyright 2008-2015 Canonical Ltd. Copyright" \
                 " 2013 Bernard Baeyens."
 
 import logging
@@ -56,7 +56,7 @@ import shlex
 import pwd
 import shutil
 from collections import namedtuple
-from typing import Optional, Tuple, List, Dict, Any
+from typing import Optional, Tuple, List, Dict
 from urllib.request import pathname2url, quote
 from tempfile import NamedTemporaryFile
 
@@ -425,7 +425,8 @@ def gvfs_controls_mounts() -> bool:
 
     desktop = get_desktop()
     if desktop in (Desktop.gnome, Desktop.unity, Desktop.cinnamon, Desktop.xfce,
-                   Desktop.mate, Desktop.lxde):
+                   Desktop.mate, Desktop.lxde, Desktop.ubuntugnome,
+                   Desktop.popgnome, Desktop.gnome, Desktop.lxqt):
         return True
     elif desktop == Desktop.kde:
         return False
@@ -811,8 +812,10 @@ def validate_download_folder(path: Optional[str],
                 # the path is in fact writeable -- can happen with NFS
                 valid = True
         except Exception:
-            logging.warning('While validating download / backup folder, failed to write a '
-                            'temporary file to %s', path)
+            logging.warning(
+                'While validating download / backup folder, failed to write a temporary file to '
+                '%s', path
+            )
 
     return ValidatedFolder(valid, absolute_path)
 
@@ -1289,6 +1292,13 @@ if have_gio:
             self.scsiPortSearch = re.compile(r'usbscsi:(.+)')
             self.validMounts = validMounts
 
+        def mountMightBeCamera(self, mount: Gio.Mount) -> bool:
+            """
+            :param mount: the mount to check
+            :return: True if the mount needs to be checked if it is a camera
+            """
+            return not mount.is_shadowed() and mount.get_volume() is not None
+
         def ptpCameraMountPoint(self, model: str, port: str) -> Optional[Gio.Mount]:
             """
             :return: the mount point of the PTP / MTP camera, if it is mounted,
@@ -1300,7 +1310,8 @@ if have_gio:
             if p is not None:
                 p1 = p.group(1)
                 p2 = p.group(2)
-                pattern = re.compile(r'%\S\Susb%\S\S{}%\S\S{}%\S\S'.format(p1, p2))
+                device_path = '/dev/bus/usb/{}/{}'.format(p1, p2)
+                #pattern = re.compile(r'%\S\Susb%\S\S{}%\S\S{}%\S\S'.format(p1, p2))
             else:
                 p = self.scsiPortSearch.match(port)
                 if p is None:
@@ -1310,9 +1321,13 @@ if have_gio:
             to_unmount = None
 
             for mount in self.vm.get_mounts():
-                folder_extract = self.mountIsCamera(mount)
-                if folder_extract is not None:
-                    if pattern.match(folder_extract):
+                if self.mountMightBeCamera(mount):
+                    # According to GTK docs, Gio.VOLUME_IDENTIFIER_KIND_UNIX_DEVICE is
+                    # deprecated, but what should replace it?
+                    identifier = mount.get_volume().get_identifier(
+                        Gio.VOLUME_IDENTIFIER_KIND_UNIX_DEVICE
+                    )
+                    if device_path == identifier:
                         to_unmount = mount
                         break
             return to_unmount
@@ -1445,28 +1460,33 @@ if have_gio:
                 logging.error('Exception occurred unmounting %s', path)
                 logging.exception('Traceback:')
 
+        def mountIsCamera(self, mount: Gio.Mount) -> bool:
+            """
+            Determine if the mount refers to a camera by checking the
+            path to see if gphoto2 or mtp is in the last folder in the
+            root path
 
-        def mountIsCamera(self, mount: Gio.Mount) -> Optional[str]:
+            :param mount: mount to check
+            :return: True if mount refers to a camera, else False
             """
-            Determine if the mount point is that of a camera
-            :param mount: the mount to examine
-            :return: None if not a camera, or the component of the
-            folder name that indicates on which port it is mounted
-            """
-            root = mount.get_root()
-            if root is None:
-                logging.warning('Unable to get mount root')
-            else:
-                path = root.get_path()
-                if path:
+
+            if self.mountMightBeCamera(mount):
+                root = mount.get_root()
+                if root is None:
+                    logging.warning('Unable to get mount root')
+                else:
+                    path = root.get_path()
                     logging.debug("GIO: Looking for camera at mount {}".format(path))
-                    folder_name = os.path.split(path)[1]
-                    for s in ('gphoto2:host=', 'mtp:host='):
-                        if folder_name.startswith(s):
-                            return folder_name[len(s):]
-                if path is not None:
-                    logging.debug("GIO: camera not found at {}".format(path))
-            return None
+                    if path:
+                    # check last two levels of the path name, as it might be in a format like
+                    # /run/..../gvfs/gphoto2:host=Canon_Inc._Canon_Digital_Camera/store_00010001
+                        for i in (1, 2):
+                            path, folder_name = os.path.split(path)
+                            if folder_name:
+                                for s in ('gphoto2:host=', 'mtp:host='):
+                                    if folder_name.startswith(s):
+                                        return True
+            return False
 
         def mountIsPartition(self, mount: Gio.Mount) -> bool:
             """
