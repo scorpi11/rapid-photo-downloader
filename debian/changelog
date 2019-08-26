@@ -1,3 +1,9 @@
+rapid-photo-downloader (0.9.17-1) unstable; urgency=medium
+
+  * New upstream version 0.9.17
+
+ -- Dr. Tobias Quathamer <toddy@debian.org>  Mon, 26 Aug 2019 17:04:30 +0200
+
 rapid-photo-downloader (0.9.16-1) unstable; urgency=medium
 
   * New upstream version 0.9.16. (Closes: #934364)
