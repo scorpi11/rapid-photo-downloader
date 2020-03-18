@@ -1,4 +1,4 @@
-# Copyright (C) 2015-2017 Damon Lynch <damonlynch@gmail.com>
+# Copyright (C) 2015-2020 Damon Lynch <damonlynch@gmail.com>
 
 # This file is part of Rapid Photo Downloader.
 #
@@ -17,10 +17,11 @@
 # see <http://www.gnu.org/licenses/>.
 
 __author__ = 'Damon Lynch'
-__copyright__ = "Copyright 2015-2017, Damon Lynch"
+__copyright__ = "Copyright 2015-2020, Damon Lynch"
 
-from typing import List, Dict
+from typing import List, Dict, Tuple, Optional
 from collections import namedtuple
+from distutils.version import LooseVersion
 
 from gettext import gettext as _
 
@@ -28,8 +29,10 @@ from PyQt5.QtWidgets import (
     QStyleOptionFrame, QStyle, QStylePainter, QWidget, QLabel, QListWidget, QProxyStyle,
     QStyleOption, QDialogButtonBox
 )
-from PyQt5.QtGui import QFontMetrics, QFont, QPainter
-from PyQt5.QtCore import QSize, Qt
+from PyQt5.QtGui import QFontMetrics, QFont, QPainter, QPixmap, QIcon
+from PyQt5.QtCore import QSize, Qt, QT_VERSION_STR, QPoint
+
+QT5_VERSION = LooseVersion(QT_VERSION_STR)
 
 
 class RowTracker:
@@ -250,3 +253,100 @@ def translateButtons(buttonBox: QDialogButtonBox) -> None:
         button = buttonBox.button(role)
         if button:
             button.setText(text)
+
+
+def qt5_screen_scale_environment_variable() -> str:
+    """
+    Get application scaling environment variable applicable to version of Qt 5
+    See https://doc.qt.io/qt-5/highdpi.html#high-dpi-support-in-qt
+
+    Assumes Qt >= 5.4
+
+    :return: correct variable
+    """
+
+    if QT5_VERSION < LooseVersion('5.14.0'):
+        return 'QT_AUTO_SCREEN_SCALE_FACTOR'
+    else:
+        return 'QT_ENABLE_HIGHDPI_SCALING'
+
+
+def validateWindowSizeLimit(available: QSize, desired: QSize) -> Tuple[bool, QSize]:
+    """"
+    Validate the window size to ensure it fits within the available screen size.
+
+    Important if scaling makes the saved values invalid.
+
+    :param available: screen geometry available for use by applications
+    :param desired: size as requested by Rapid Photo Downloader
+    :return: bool indicating whether size was valid, and the (possibly
+     corrected) size
+    """
+
+    width_valid = desired.width() <= available.width()
+    height_valid = desired.height() <= available.height()
+    if width_valid and height_valid:
+        return True, desired
+    else:
+        return False, QSize(
+            min(desired.width(), available.width()), min(desired.height(), available.height())
+        )
+
+
+def validateWindowPosition(pos: QPoint, available: QSize, size: QSize) -> Tuple[bool, QPoint]:
+    """
+    Validate the window position to ensure it will be displayed in the screen.
+
+    Important if scaling makes the saved values invalid.
+
+    :param pos: saved position
+    :param available: screen geometry available for use by applications
+    :param size: main window size
+    :return: bool indicating whether the position was valid, and the
+     (possibly corrected) position
+    """
+
+    x_valid = available.width() - size.width() >= pos.x()
+    y_valid = available.height() - size.height() >= pos.y()
+    if x_valid and y_valid:
+        return True, pos
+    else:
+        return False, QPoint(
+            available.width() - size.width(), available.height() - size.height()
+        )
+
+
+def scaledPixmap(path: str, scale: float) -> QPixmap:
+    pixmap = QPixmap(path)
+    if scale > 1.0:
+        pixmap = pixmap.scaledToWidth(pixmap.width() * scale, Qt.SmoothTransformation)
+        pixmap.setDevicePixelRatio(scale)
+    return pixmap
+
+
+def standard_font_size(shrink_on_odd: bool=True) -> int:
+    h = QFontMetrics(QFont()).height()
+    if h % 2 == 1:
+        if shrink_on_odd:
+            h -= 1
+        else:
+            h += 1
+    return h
+
+
+def scaledIcon(path: str, size: Optional[QSize]=None) -> QIcon:
+    """
+    Create a QIcon that scales well
+    Uses .addFile()
+
+    :param path:
+    :param scale:
+    :param size:
+    :return:
+    """
+    i = QIcon()
+    if size is None:
+        s = standard_font_size()
+        size = QSize(s, s)
+    i.addFile(path, size)
+    return i

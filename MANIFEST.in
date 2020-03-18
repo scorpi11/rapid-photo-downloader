@@ -7,7 +7,6 @@ include upgrade.py
 recursive-include data *.in
 recursive-include data *.png
 recursive-include data *.svg
-recursive-include data *.xpm
 recursive-include doc *.pod
 recursive-include po *.in
 recursive-include po *.po
@@ -19,6 +18,7 @@ global-exclude *~ *.pyc *~1~ *~2~ *bak
 exclude raphodo/test.py
 exclude raphodo/test2.py
 prune tasks
+prune tools
 prune raphodo/tests
-prune debian
 prune images
+prune sourceimages

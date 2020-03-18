@@ -1,4 +1,4 @@
-# Copyright (C) 2015-2018 Damon Lynch <damonlynch@gmail.com>
+# Copyright (C) 2015-2020 Damon Lynch <damonlynch@gmail.com>
 
 # This file is part of Rapid Photo Downloader.
 #
@@ -17,7 +17,7 @@
 # see <http://www.gnu.org/licenses/>.
 
 __author__ = 'Damon Lynch'
-__copyright__ = "Copyright 2015-2018, Damon Lynch"
+__copyright__ = "Copyright 2015-2020, Damon Lynch"
 
 import pickle
 import os
@@ -31,6 +31,7 @@ import logging
 from timeit import timeit
 from typing import Optional, Dict, List, Set, Tuple, Sequence
 import locale
+import pkg_resources as pkgr
 
 from gettext import gettext as _
 
@@ -39,16 +40,17 @@ from dateutil.tz import tzlocal
 from colour import Color
 
 from PyQt5.QtCore import (
-    QAbstractListModel, QModelIndex, Qt, pyqtSignal, QSize, QRect, QEvent, QPoint,
-    QItemSelectionModel, QAbstractItemModel, pyqtSlot, QItemSelection, QTimeLine,
+    QAbstractListModel, QModelIndex, Qt, pyqtSignal, QSizeF, QSize, QRect, QRectF, QEvent, QPoint,
+    QItemSelectionModel, QAbstractItemModel, pyqtSlot, QItemSelection, QTimeLine, QPointF,
+    QT_VERSION_STR
 )
 from PyQt5.QtWidgets import (
     QListView, QStyledItemDelegate, QStyleOptionViewItem, QApplication, QStyle, QStyleOptionButton,
     QMenu, QWidget, QAbstractItemView,
 )
 from PyQt5.QtGui import (
-    QPixmap, QImage, QPainter, QColor, QBrush, QFontMetrics, QGuiApplication, QPen, QMouseEvent,
-    QFont,
+    QPixmap, QImage, QPainter, QColor, QBrush, QFontMetricsF, QGuiApplication, QPen, QMouseEvent,
+    QFont, QKeyEvent
 )
 
 from raphodo.rpdfile import RPDFile, FileTypeCounter
@@ -68,7 +70,7 @@ from raphodo.utilities import (
 )
 from raphodo.thumbnailer import Thumbnailer
 from raphodo.rpdsql import ThumbnailRowsSQL, ThumbnailRow
-from raphodo.viewutils import ThumbnailDataForProximity
+from raphodo.viewutils import ThumbnailDataForProximity, scaledIcon
 from raphodo.proximity import TemporalProximityState
 from raphodo.rpdsql import DownloadedSQL
 
@@ -156,8 +158,10 @@ class ThumbnailListModel(QAbstractListModel):
         self.initialize()
 
         no_workers = parent.prefs.max_cpu_cores
-        self.thumbnailer = Thumbnailer(parent=parent, no_workers=no_workers,
-                                       logging_port=logging_port, log_gphoto2=log_gphoto2)
+        self.thumbnailer = Thumbnailer(
+            parent=parent, no_workers=no_workers,
+            logging_port=logging_port, log_gphoto2=log_gphoto2
+        )
         self.thumbnailer.frontend_port.connect(self.rapidApp.initStage4)
         self.thumbnailer.thumbnailReceived.connect(self.thumbnailReceived)
         self.thumbnailer.cacheDirs.connect(self.cacheDirsReceived)
@@ -165,8 +169,8 @@ class ThumbnailListModel(QAbstractListModel):
         # Connect to the signal that is emitted when a thumbnailing operation is
         # terminated by us, not merely finished
         self.thumbnailer.workerStopped.connect(self.thumbnailWorkerStopped)
-        self.arrow_locale = arrow_locale()
-        logging.debug("Setting arrow locale to %s", self.arrow_locale)
+        self.arrow_locale_for_humanize = arrow_locale()
+        logging.debug("Setting arrow locale to %s", self.arrow_locale_for_humanize)
 
     def initialize(self) -> None:
         # uid: QPixmap
@@ -198,8 +202,9 @@ class ThumbnailListModel(QAbstractListModel):
         # {uid: row}
         self.uid_to_row = {}  # type: Dict[bytes, int]
 
-        self.photo_icon = QPixmap(':/photo.png')
-        self.video_icon = QPixmap(':/video.png')
+        size = QSize(106, 106)
+        self.photo_icon = scaledIcon(':/thumbnail/photo.svg').pixmap(size)
+        self.video_icon = scaledIcon(':/thumbnail/video.svg').pixmap(size)
 
         self.total_thumbs_to_generate = 0
         self.thumbnails_generated = 0
@@ -436,29 +441,60 @@ class ThumbnailListModel(QAbstractListModel):
             size = format_size_for_user(rpd_file.size)
             mtime = arrow.get(rpd_file.modification_time)
 
+            try:
+                mtime_h = mtime.humanize(locale=self.arrow_locale_for_humanize)
+            except Exception:
+                mtime_h = mtime.humanize()
+                logging.debug(
+                    "Failed to humanize modification time %s with locale %s, reverting to English",
+                    mtime_h, self.arrow_locale_for_humanize
+                )
+
             if rpd_file.ctime_mtime_differ():
                 ctime = arrow.get(rpd_file.ctime)
 
+                # Sadly, arrow raises an exception if it's locale is not translated when using
+                # humanize. So attempt conversion using user's locale, and if that fails, use
+                # English.
+
+                try:
+                    ctime_h = ctime.humanize(locale=self.arrow_locale_for_humanize)
+                except Exception:
+                    ctime_h = ctime.humanize()
+                    logging.debug(
+                        "Failed to humanize taken on time %s with locale %s, reverting to English",
+                        ctime_h, self.arrow_locale_for_humanize
+                    )
+
+                # Translators: %(variable)s represents Python code, not a plural of the term
+                # variable. You must keep the %(variable)s untranslated, or the program will
+                # crash.
                 humanized_ctime = _(
                     'Taken on %(date_time)s (%(human_readable)s)'
                 ) % dict(
                         date_time=ctime.to('local').naive.strftime('%c'),
-                        human_readable=ctime.humanize(locale=self.arrow_locale)
+                        human_readable=ctime_h
                 )
 
+                # Translators: %(variable)s represents Python code, not a plural of the term
+                # variable. You must keep the %(variable)s untranslated, or the program will
+                # crash.
                 humanized_mtime = _(
                     'Modified on %(date_time)s (%(human_readable)s)'
                 ) % dict(
                     date_time=mtime.to('local').naive.strftime('%c'),
-                    human_readable=mtime.humanize(locale=self.arrow_locale)
+                    human_readable=mtime_h
                 )
                 humanized_file_time = '{}<br>{}'.format(humanized_ctime, humanized_mtime)
             else:
+                # Translators: %(variable)s represents Python code, not a plural of the term
+                # variable. You must keep the %(variable)s untranslated, or the program will
+                # crash.
                 humanized_file_time = _(
                     '%(date_time)s (%(human_readable)s)'
                 ) % dict(
                     date_time=mtime.to('local').naive.strftime('%c'),
-                    human_readable=mtime.humanize(locale=self.arrow_locale)
+                    human_readable=mtime_h
                 )
 
             humanized_file_time = humanized_file_time.replace(' ', '&nbsp;')
@@ -482,6 +518,11 @@ class ThumbnailListModel(QAbstractListModel):
             if rpd_file.status in Downloaded:
                 path = rpd_file.download_path + os.sep
                 downloaded_as = _('Downloaded as:')
+                # Translators: %(variable)s represents Python code, not a plural of the term
+                # variable. You must keep the %(variable)s untranslated, or the program will
+                # crash.
+                # Translators: please do not change HTML codes like <br>, <i>, </i>, or <b>, </b>
+                # etc.
                 msg += '<br><br><i>%(downloaded_as)s</i><br>%(filename)s<br>%(path)s' % dict(
                     filename=rpd_file.download_name, path=path, downloaded_as=downloaded_as
                 )
@@ -489,18 +530,39 @@ class ThumbnailListModel(QAbstractListModel):
             if rpd_file.previously_downloaded:
 
                 prev_datetime = arrow.get(rpd_file.prev_datetime, tzlocal())
+                try:
+                    prev_dt_h = prev_datetime.humanize(locale=self.arrow_locale_for_humanize)
+                except Exception:
+                    prev_dt_h = prev_datetime.humanize()
+                    logging.debug(
+                        "Failed to humanize taken on time %s with locale %s, reverting to English",
+                        prev_dt_h, self.arrow_locale_for_humanize
+                    )
+                # Translators: %(variable)s represents Python code, not a plural of the term
+                # variable. You must keep the %(variable)s untranslated, or the program will
+                # crash.
                 prev_date = _('%(date_time)s (%(human_readable)s)') % dict(
                     date_time=prev_datetime.naive.strftime('%c'),
-                    human_readable=prev_datetime.humanize(locale=self.arrow_locale)
+                    human_readable=prev_dt_h
                 )
 
                 if rpd_file.prev_full_name != manually_marked_previously_downloaded:
                     path, prev_file_name = os.path.split(rpd_file.prev_full_name)
                     path += os.sep
+                    # Translators: %(variable)s represents Python code, not a plural of the term
+                    # variable. You must keep the %(variable)s untranslated, or the program will
+                    # crash.
+                    # Translators: please do not change HTML codes like <br>, <i>, </i>, or <b>,
+                    # </b> etc.
                     msg += _(
                         '<br><br>Previous download:<br>%(filename)s<br>%(path)s<br>%(date)s'
                     ) % dict(date=prev_date, filename=prev_file_name, path=path)
                 else:
+                    # Translators: %(variable)s represents Python code, not a plural of the term
+                    # variable. You must keep the %(variable)s untranslated, or the program will
+                    # crash.
+                    # Translators: please do not change HTML codes like <br>, <i>, </i>, or <b>,
+                    # </b> etc.
                     msg += _(
                         '<br><br><i>Manually set as previously downloaded on %(date)s</i>'
                     ) % dict(date=prev_date)
@@ -798,8 +860,8 @@ class ThumbnailListModel(QAbstractListModel):
         self.rapidApp.temporalProximity.setState(TemporalProximityState.ctime_rebuild)
         if not self.rapidApp.downloadIsRunning():
             self.rapidApp.folder_preview_manager.remove_folders_for_device(
-                scan_id=scan_id)
-            self.rapidApp.notifyFoldersProximityRebuild(scan_id)
+                scan_id=scan_id
+            )
 
     def processCtimeDisparity(self, scan_id: int) -> None:
         """
@@ -1609,6 +1671,7 @@ class ThumbnailListModel(QAbstractListModel):
 
 
 class ThumbnailView(QListView):
+
     def __init__(self, parent: QWidget) -> None:
         style = """QAbstractScrollArea { background-color: %s;}""" % ThumbnailBackgroundName
         super().__init__(parent)
@@ -1619,6 +1682,8 @@ class ThumbnailView(QListView):
         self.setUniformItemSizes(True)
         self.setSpacing(8)
         self.setSelectionMode(QAbstractItemView.ExtendedSelection)
+
+        self.possiblyPreserveSelectionPostClick = False
 
     def setScrollTogether(self, on: bool) -> None:
         """
@@ -1646,6 +1711,24 @@ class ThumbnailView(QListView):
         temporalProximity.scrollToUid(uid=uid)
         temporalProximity.setScrollTogether(True)
 
+    def selectionChanged(self, selected: QItemSelection, deselected: QItemSelection) -> None:
+        """
+        Reselect items if the user clicked a checkmark within an existing selection
+        :param selected: new selection
+        :param deselected: previous selection
+        """
+
+        super().selectionChanged(deselected, selected)
+
+        if self.possiblyPreserveSelectionPostClick:
+            # Must set this to False before adjusting the selection!
+            self.possiblyPreserveSelectionPostClick = False
+
+            current = self.currentIndex()
+            if not(len(selected.indexes()) == 1 and selected.indexes()[0] == current):
+                deselected.merge(self.selectionModel().selection(), QItemSelectionModel.Select)
+                self.selectionModel().select(deselected, QItemSelectionModel.Select)
+
     @pyqtSlot(QMouseEvent)
     def mousePressEvent(self, event: QMouseEvent) -> None:
         """
@@ -1657,27 +1740,34 @@ class ThumbnailView(QListView):
         know about our checkboxes. Therefore if the user is in fact
         clicking on a checkbox, we need to filter that event.
 
-        Note that no matter what we do here, the delegate's editorEvent
-        will still be triggered.
+        On some versions of Qt 5 (to be determined), no matter what we do here,
+        the delegate's editorEvent will still be triggered.
 
         :param event: the mouse click event
         """
 
-        checkbox_clicked = False
-        index = self.indexAt(event.pos())
-        row = index.row()
-        if row >= 0:
-            rect = self.visualRect(index)  # type: QRect
-            delegate = self.itemDelegate(index)  # type: ThumbnailDelegate
-            checkboxRect = delegate.getCheckBoxRect(rect)
-            checkbox_clicked = checkboxRect.contains(event.pos())
-            if checkbox_clicked:
-                status = index.data(Roles.download_status)  # type: DownloadStatus
-                checkbox_clicked = status not in Downloaded
+        right_button_pressed = event.button() == Qt.RightButton
+        if right_button_pressed:
+            super().mousePressEvent(event)
 
-        if not checkbox_clicked:
-            if self.rapidApp.prefs.auto_scroll and row >= 0:
-                self._scrollTemporalProximity(row=row)
+        else:
+            index = self.indexAt(event.pos())
+            clicked_row = index.row()
+
+            if clicked_row >= 0:
+                rect = self.visualRect(index)  # type: QRect
+                delegate = self.itemDelegate(index)  # type: ThumbnailDelegate
+                checkboxRect = delegate.getCheckBoxRect(rect)
+                checkbox_clicked = checkboxRect.contains(event.pos())
+                if checkbox_clicked:
+                    status = index.data(Roles.download_status)  # type: DownloadStatus
+                    checkbox_clicked = status not in Downloaded
+
+                if not checkbox_clicked:
+                    if self.rapidApp.prefs.auto_scroll and clicked_row >= 0:
+                        self._scrollTemporalProximity(row=clicked_row)
+                else:
+                    self.possiblyPreserveSelectionPostClick = True
             super().mousePressEvent(event)
 
     @pyqtSlot(int)
@@ -1737,43 +1827,71 @@ class ThumbnailDelegate(QStyledItemDelegate):
     Render thumbnail cells
     """
 
+    # markedWithMouse = pyqtSignal()
+
     def __init__(self, rapidApp, parent=None) -> None:
         super().__init__(parent)
         self.rapidApp = rapidApp
+        try:
+            # Works on Qt 5.6 and above
+            self.device_pixel_ratio = rapidApp.devicePixelRatioF()
+            self.devicePixelF = True
+        except AttributeError:
+            self.device_pixel_ratio = rapidApp.devicePixelRatio()
+            self.devicePixelF = False
 
         self.checkboxStyleOption = QStyleOptionButton()
-        self.checkboxRect = QApplication.style().subElementRect(
-            QStyle.SE_CheckBoxIndicator, self.checkboxStyleOption, None)
-        self.checkbox_size = self.checkboxRect.size().height()
+        self.checkboxRect = QRectF(
+            QApplication.style().subElementRect(
+                QStyle.SE_CheckBoxIndicator, self.checkboxStyleOption, None
+            )
+        )
+        self.checkbox_size = self.checkboxRect.height()
 
-        self.downloadPendingIcon = QPixmap(':/download-pending.png')
-        self.downloadedPixmap = QPixmap(':/downloaded.png')
-        self.downloadedWarningPixmap = QPixmap(':/downloaded-with-warning.png')
-        self.downloadedErrorPixmap = QPixmap(':/downloaded-with-error.png')
-        self.audioIcon = QPixmap(':/audio.png')
+        size16 = QSize(16, 16)
+        size24 = QSize(24, 24)
+        self.downloadPendingPixmap = scaledIcon(':/thumbnail/download-pending.svg').pixmap(size16)
+        self.downloadedPixmap = scaledIcon(':/thumbnail/downloaded.svg').pixmap(size16)
+        self.downloadedWarningPixmap = scaledIcon(
+            ':/thumbnail/downloaded-with-warning.svg'
+        ).pixmap(size16)
+        self.downloadedErrorPixmap = scaledIcon(
+            ':/thumbnail/downloaded-with-error.svg'
+        ).pixmap(size16)
+        self.audioIcon = scaledIcon(':/thumbnail/audio.svg', size24).pixmap(size24)
+
+        # Determine pixel scaling for SVG files
+        # Applies to all SVG files delegate will load
+        if self.devicePixelF:
+            self.pixmap_ratio = self.downloadPendingPixmap.devicePixelRatioF()
+        else:
+            self.pixmap_ratio = self.downloadedErrorPixmap.devicePixelRatio()
 
         self.dimmed_opacity = 0.5
 
-        self.image_width = max(ThumbnailSize.width, ThumbnailSize.height)
+        self.image_width = float(max(ThumbnailSize.width, ThumbnailSize.height))
         self.image_height = self.image_width
-        self.horizontal_margin = thumbnail_margin
-        self.vertical_margin = thumbnail_margin
-        self.image_footer = self.checkbox_size
-        self.footer_padding = 5
+        self.horizontal_margin = float(thumbnail_margin)
+        self.vertical_margin = float(thumbnail_margin)
+        self.image_footer = float(self.checkbox_size)
+        self.footer_padding = 5.0
 
         # Position of first memory card indicator
-        self.card_x = max(self.checkboxRect.size().width(),
-                          self.downloadPendingIcon.width(),
-                          self.downloadedPixmap.width()) + \
-                      self.horizontal_margin + self.footer_padding
+        self.card_x = float(
+            max(
+                self.checkboxRect.width(),
+                self.downloadPendingPixmap.width() / self.pixmap_ratio,
+                self.downloadedPixmap.width() / self.pixmap_ratio
+            ) + self.horizontal_margin + self.footer_padding
+        )
 
-        self.shadow_size = 2
+        self.shadow_size = 2.0
         self.width = self.image_width + self.horizontal_margin * 2
         self.height = self.image_height + self.footer_padding \
                       + self.image_footer + self.vertical_margin * 2
 
         # Thumbnail is located in a 160px square...
-        self.image_area_size = max(ThumbnailSize.width, ThumbnailSize.height)
+        self.image_area_size = float(max(ThumbnailSize.width, ThumbnailSize.height))
         self.image_frame_bottom = self.vertical_margin + self.image_area_size
 
         self.contextMenu = QMenu()
@@ -1790,7 +1908,7 @@ class ThumbnailDelegate(QStyledItemDelegate):
         self.markFilesDownloadedAct = self.contextMenu.addAction(_('Mark Files as Downloaded'))
         self.markFilesDownloadedAct.triggered.connect(self.doMarkFileDownloadedAct)
         # store the index in which the user right clicked
-        self.clickedIndex = None  # type: QModelIndex
+        self.clickedIndex = None  # type: Optional[QModelIndex]
 
         self.color3 = QColor(CustomColors.color3.value)
 
@@ -1800,7 +1918,7 @@ class ThumbnailDelegate(QStyledItemDelegate):
         palette = QGuiApplication.palette()
         self.highlight = palette.highlight().color()  # type: QColor
         self.highlight_size = 3
-        self.highlight_offset = 1
+        self.highlight_offset = self.highlight_size / 2
         self.highlightPen = QPen()
         self.highlightPen.setColor(self.highlight)
         self.highlightPen.setWidth(self.highlight_size)
@@ -1809,30 +1927,32 @@ class ThumbnailDelegate(QStyledItemDelegate):
 
         self.emblemFont = QFont()
         self.emblemFont.setPointSize(self.emblemFont.pointSize() - 3)
-        metrics = QFontMetrics(self.emblemFont)
+        metrics = QFontMetricsF(self.emblemFont)
+
         # Determine the actual height of the largest extension, and the actual
-        # width of all extenstions.
+        # width of all extensions.
         # For our purposes, this is more accurate than the generic metrics.height()
         self.emblem_width = {}  # type: Dict[str, int]
         height = 0
         # Include the emblems for which memory card on a camera the file came from
         for ext in ALL_USER_VISIBLE_EXTENSIONS + ['1', '2']:
             ext = ext.upper()
-            tbr = metrics.tightBoundingRect(ext)  # QRect
+            tbr = metrics.tightBoundingRect(ext)  # type: QRectF
             self.emblem_width[ext] = tbr.width()
             height = max(height, tbr.height())
 
         # Set and calculate the padding to go around each emblem
-        self.emblem_pad = height // 2
+        self.emblem_pad = height / 3
         self.emblem_height = height + self.emblem_pad * 2
-        for ext in self.emblem_width:
-            self.emblem_width[ext] = self.emblem_width[ext] + self.emblem_pad * 2
+        self.emblem_width = {
+            emblem: width + self.emblem_pad * 2 for emblem, width in self.emblem_width.items()
+        }
 
         self.jobCodeFont = QFont()
         self.jobCodeFont.setPointSize(self.jobCodeFont.pointSize() - 2)
-        self.jobCodeMetrics = QFontMetrics(self.jobCodeFont)
+        self.jobCodeMetrics = QFontMetricsF(self.jobCodeFont)
         height = self.jobCodeMetrics.height()
-        self.job_code_pad = height // 4
+        self.job_code_pad = height / 4
         self.job_code_height = height + self.job_code_pad * 2
         self.job_code_width = self.image_width
         self.job_code_text_width = self.job_code_width - self.job_code_pad * 2
@@ -1903,9 +2023,8 @@ class ThumbnailDelegate(QStyledItemDelegate):
         y = option.rect.y()
 
         # Draw rectangle in which the individual items will be placed
-        boxRect = QRect(x, y, self.width, self.height)
-        shadowRect = QRect(x + self.shadow_size, y + self.shadow_size,
-                           self.width, self.height)
+        boxRect = QRectF(x, y, self.width, self.height)
+        shadowRect = QRectF(x + self.shadow_size, y + self.shadow_size, self.width, self.height)
 
         painter.setRenderHint(QPainter.Antialiasing, True)
         painter.setPen(self.darkGray)
@@ -1918,7 +2037,7 @@ class ThumbnailDelegate(QStyledItemDelegate):
             painter.fillRect(boxRect, self.paleGray)
 
         if is_selected:
-            hightlightRect = QRect(
+            hightlightRect = QRectF(
                 boxRect.left() + self.highlight_offset,
                 boxRect.top() + self.highlight_offset,
                 boxRect.width() - self.highlight_size,
@@ -1927,10 +2046,19 @@ class ThumbnailDelegate(QStyledItemDelegate):
             painter.setPen(self.highlightPen)
             painter.drawRect(hightlightRect)
 
-        thumbnail = index.model().data(index, Qt.DecorationRole)
-        if (previously_downloaded and not checked and
-                download_status == DownloadStatus.not_downloaded):
+        thumbnail = index.model().data(index, Qt.DecorationRole)  # type: QPixmap
+
+        # If on high DPI screen, scale the thumbnail using a smooth transform
+        if self.device_pixel_ratio > 1.0:
+            painter.setRenderHint(QPainter.SmoothPixmapTransform, True)
+
+        if previously_downloaded and not checked and \
+                download_status == DownloadStatus.not_downloaded:
             disabled = QPixmap(thumbnail.size())
+            if self.devicePixelF:
+                disabled.setDevicePixelRatio(thumbnail.devicePixelRatioF())
+            else:
+                disabled.setDevicePixelRatio(thumbnail.devicePixelRatio())
             disabled.fill(Qt.transparent)
             p = QPainter(disabled)
             p.setBackgroundMode(Qt.TransparentMode)
@@ -1943,15 +2071,21 @@ class ThumbnailDelegate(QStyledItemDelegate):
 
         thumbnail_width = thumbnail.size().width()
         thumbnail_height = thumbnail.size().height()
+        if self.devicePixelF:
+            ratio = thumbnail.devicePixelRatioF()
+        else:
+            ratio = thumbnail.devicePixelRatio()
 
-        thumbnailX = self.horizontal_margin + (self.image_area_size -
-                                               thumbnail_width) // 2 + x
-        thumbnailY = self.vertical_margin + (self.image_area_size -
-                                               thumbnail_height) // 2 + y
+        thumbnailX = self.horizontal_margin + \
+                     (self.image_area_size - thumbnail_width / ratio) / 2 + x
+        thumbnailY = self.vertical_margin + \
+                     (self.image_area_size - thumbnail_height / ratio) / 2 + y
 
-        target = QRect(thumbnailX, thumbnailY, thumbnail_width,
-                       thumbnail_height)
-        source = QRect(0, 0, thumbnail_width, thumbnail_height)
+        target = QRectF(
+            thumbnailX, thumbnailY,
+            thumbnail_width / ratio, thumbnail_height / ratio
+        )
+        source = QRectF(0, 0, thumbnail_width, thumbnail_height)
         painter.drawPixmap(target, thumbnail, source)
 
         dimmed = previously_downloaded and not checked
@@ -1968,16 +2102,19 @@ class ThumbnailDelegate(QStyledItemDelegate):
                 else:
                     painter.setOpacity(self.dimmed_opacity)
 
-            jobCodeRect = QRect(x + self.horizontal_margin, y + self.vertical_margin,
-                                self.job_code_width, self.job_code_height)
+            jobCodeRect = QRectF(
+                x + self.horizontal_margin, y + self.vertical_margin,
+                self.job_code_width, self.job_code_height
+            )
             painter.fillRect(jobCodeRect, color)
             painter.setFont(self.jobCodeFont)
             painter.setPen(QColor(Qt.white))
             if job_code in self.job_code_lru:
                 text = self.job_code_lru[job_code]
             else:
-                text = self.jobCodeMetrics.elidedText(job_code, Qt.ElideRight,
-                                                      self.job_code_text_width)
+                text = self.jobCodeMetrics.elidedText(
+                    job_code, Qt.ElideRight, self.job_code_text_width
+                )
                 self.job_code_lru[job_code] = text
             if not dimmed:
                 painter.setOpacity(1.0)
@@ -1992,9 +2129,10 @@ class ThumbnailDelegate(QStyledItemDelegate):
         # painter.drawText(x + 2, y + 15, str(index.row()))
 
         if has_audio:
-            audio_x = self.width // 2 - self.audioIcon.width() // 2 + x
-            audio_y = self.image_frame_bottom + self.footer_padding + y
-            painter.drawPixmap(audio_x, audio_y, self.audioIcon)
+            audio_x = self.width / 2 - \
+                      self.audioIcon.width() / self.pixmap_ratio / 2 + x
+            audio_y = self.image_frame_bottom + self.footer_padding + y - 1
+            painter.drawPixmap(QPointF(audio_x, audio_y), self.audioIcon)
 
         # Draw a small coloured box containing the file extension in the
         #  bottom right corner
@@ -2004,10 +2142,11 @@ class ThumbnailDelegate(QStyledItemDelegate):
         # em_width = self.emblemFontMetrics.width(extension)
         emblem_width = self.emblem_width[extension]
         emblem_rect_x = self.width - self.horizontal_margin - emblem_width + x
-        emblem_rect_y = self.image_frame_bottom + self.footer_padding + y
+        emblem_rect_y = self.image_frame_bottom + self.footer_padding + y - 1
 
-        emblemRect = QRect(emblem_rect_x, emblem_rect_y,
-                           emblem_width, self.emblem_height)  # type: QRect
+        emblemRect = QRectF(
+            emblem_rect_x, emblem_rect_y, emblem_width, self.emblem_height
+        )  # type: QRectF
 
         color = extensionColor(ext_type=ext_type)
 
@@ -2026,8 +2165,7 @@ class ThumbnailDelegate(QStyledItemDelegate):
             sec_width = self.emblem_width[secondary_attribute]
             sec_rect_x = emblem_rect_x - self.footer_padding - sec_width
             color = QColor(self.color3)
-            secRect = QRect(sec_rect_x, emblem_rect_y,
-                            sec_width, self.emblem_height)
+            secRect = QRectF(sec_rect_x, emblem_rect_y, sec_width, self.emblem_height)
             painter.fillRect(secRect, color)
             painter.drawText(secRect, Qt.AlignCenter, secondary_attribute)
 
@@ -2040,8 +2178,7 @@ class ThumbnailDelegate(QStyledItemDelegate):
                 card = str(card)
                 card_width = self.emblem_width[card]
                 color = QColor(70, 70, 70)
-                cardRect = QRect(text_x, emblem_rect_y,
-                             card_width, self.emblem_height)
+                cardRect = QRectF(text_x, emblem_rect_y, card_width, self.emblem_height)
                 painter.fillRect(cardRect, color)
                 painter.drawText(cardRect, Qt.AlignCenter, card)
                 text_x = text_x + card_width + self.footer_padding
@@ -2060,20 +2197,21 @@ class ThumbnailDelegate(QStyledItemDelegate):
             QApplication.style().drawControl(QStyle.CE_CheckBox, checkboxStyleOption, painter)
         else:
             if download_status == DownloadStatus.download_pending:
-                pixmap = self.downloadPendingIcon
+                pixmap = self.downloadPendingPixmap
             elif download_status == DownloadStatus.downloaded:
                 pixmap = self.downloadedPixmap
-            elif (download_status == DownloadStatus.downloaded_with_warning or
-                  download_status == DownloadStatus.backup_problem):
+            elif download_status == DownloadStatus.downloaded_with_warning or \
+                  download_status == DownloadStatus.backup_problem:
                 pixmap = self.downloadedWarningPixmap
-            elif (download_status == DownloadStatus.download_failed or
-                  download_status == DownloadStatus.download_and_backup_failed):
+            elif download_status == DownloadStatus.download_failed or \
+                  download_status == DownloadStatus.download_and_backup_failed:
                 pixmap = self.downloadedErrorPixmap
             else:
                 pixmap = None
             if pixmap is not None:
-                painter.drawPixmap(option.rect.x() + self.horizontal_margin, emblem_rect_y,
-                                   pixmap)
+                painter.drawPixmap(
+                    option.rect.x() + self.horizontal_margin, emblem_rect_y, pixmap
+                )
 
         painter.restore()
 
@@ -2086,9 +2224,9 @@ class ThumbnailDelegate(QStyledItemDelegate):
         i = 0
         selectedIndexes = self.selectedIndexes()
         if selectedIndexes is None:
-            noSelected = 0
+            no_selected = 0
         else:
-            noSelected = len(selectedIndexes)
+            no_selected = len(selectedIndexes)
             for index in selectedIndexes:
                 if not index.data(Roles.previously_downloaded):
                     i += 1
@@ -2096,11 +2234,11 @@ class ThumbnailDelegate(QStyledItemDelegate):
                         break
 
         if i == 0:
-            return noSelected, Plural.zero
+            return no_selected, Plural.zero
         elif i == 1:
-            return noSelected, Plural.two_form_single
+            return no_selected, Plural.two_form_single
         else:
-            return noSelected, Plural.two_form_plural
+            return no_selected, Plural.two_form_plural
 
     def editorEvent(self, event: QEvent,
                     model: QAbstractItemModel,
@@ -2110,12 +2248,15 @@ class ThumbnailDelegate(QStyledItemDelegate):
         Change the data in the model and the state of the checkbox
         if the user presses the left mouse button or presses
         Key_Space or Key_Select and this cell is editable. Otherwise do nothing.
+
+        Handle right click too.
         """
 
         download_status = index.data(Roles.download_status)
 
-        if (event.type() == QEvent.MouseButtonRelease or event.type() ==
-            QEvent.MouseButtonDblClick):
+        if event.type() == QEvent.MouseButtonRelease or \
+                event.type() == QEvent.MouseButtonDblClick:
+
             if event.button() == Qt.RightButton:
                 self.clickedIndex = index
 
@@ -2165,8 +2306,8 @@ class ThumbnailDelegate(QStyledItemDelegate):
                 )
                 self.contextMenu.popup(globalPos)
                 return False
-            if event.button() != Qt.LeftButton or not self.getCheckBoxRect(
-                    option.rect).contains(event.pos()):
+            if event.button() != Qt.LeftButton or \
+                    not self.getCheckBoxRect(option.rect).contains(event.pos()):
                 return False
             if event.type() == QEvent.MouseButtonDblClick:
                 return True
@@ -2181,6 +2322,8 @@ class ThumbnailDelegate(QStyledItemDelegate):
 
         # Change the checkbox-state
         self.setModelData(None, model, index)
+        # print("Changed the checkbox-state")
+        # print("these are the selected items", [index.row() for index in self.rapidApp.thumbnailView.selectionModel().selectedIndexes()])
         return True
 
     def setModelData (self, editor: QWidget,
@@ -2208,11 +2351,13 @@ class ThumbnailDelegate(QStyledItemDelegate):
         thumbnailModel.updateDisplayPostDataChange()
 
     def getLeftPoint(self, rect: QRect) -> QPoint:
-        return QPoint(rect.x() + self.horizontal_margin,
-                      rect.y() + self.image_frame_bottom + self.footer_padding - 1)
+        return QPoint(
+            rect.x() + self.horizontal_margin,
+            rect.y() + self.image_frame_bottom + self.footer_padding - 1
+        )
 
     def getCheckBoxRect(self, rect: QRect) -> QRect:
-        return QRect(self.getLeftPoint(rect), self.checkboxRect.size())
+        return QRect(self.getLeftPoint(rect), self.checkboxRect.toRect().size())
 
     def applyJobCode(self, job_code: str) -> None:
         thumbnailModel = self.rapidApp.thumbnailModel  # type: ThumbnailListModel

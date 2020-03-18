@@ -1,4 +1,4 @@
-# Copyright (C) 2015-2018 Damon Lynch <damonlynch@gmail.com>
+# Copyright (C) 2015-2020 Damon Lynch <damonlynch@gmail.com>
 
 # This file is part of Rapid Photo Downloader.
 #
@@ -26,7 +26,7 @@ context:
 """
 
 __author__ = 'Damon Lynch'
-__copyright__ = "Copyright 2015-2018, Damon Lynch"
+__copyright__ = "Copyright 2015-2020, Damon Lynch"
 
 import sys
 import shutil
@@ -52,17 +52,17 @@ from raphodo.storage import (
     StorageSpace, udev_attributes, UdevAttr, get_path_display_name, validate_download_folder,
     ValidatedFolder, CameraDetails, get_uri, fs_device_details
 )
-from raphodo.camera import generate_devname
+from raphodo.camera import generate_devname, autodetect_cameras
 from raphodo.utilities import (
     number, make_internationalized_list, stdchannel_redirected, same_device
 )
 import raphodo.exiftool as exiftool
 from raphodo.problemnotification import FsMetadataWriteProblem
+from raphodo.viewutils import scaledIcon
 
 display_devices = (DeviceType.volume, DeviceType.camera)
 sample_file_complete = namedtuple('sample_file_complete', 'full_file_name, file_type')
 device_name_uri = namedtuple('device_name_uri', 'name uri')
-
 
 
 class Device:
@@ -85,8 +85,8 @@ class Device:
     >>> d.camera_port
 
     >>> import gphoto2 as gp
-    >>> gp_context = gp.Context()
-    >>> cameras = gp_context.camera_autodetect()
+    >>> context = gp.Context()
+    >>> cameras = autodetect_cameras(context)
     >>> c = Device()
     >>> for model, port in cameras:
     ...     c.set_download_from_camera(model, port)
@@ -295,8 +295,9 @@ class Device:
     def get_icon(self) -> QIcon:
         """Return icon for the device."""
 
+        # TODO consider scaledIcon() here
         if self.device_type == DeviceType.volume:
-            return QIcon(':icons/drive-removable-media.svg')
+            return QIcon(':/icons/drive-removable-media.svg')
         elif self.device_type == DeviceType.path:
             return QIcon(':/icons/folder.svg')
         else:
@@ -305,12 +306,16 @@ class Device:
                 if self.camera_model.lower().find('tablet') >= 0:
                     #TODO use tablet icon
                     pass
-                return QIcon(':icons/smartphone.svg')
+                return QIcon(':/icons/smartphone.svg')
             return QIcon(':/icons/camera.svg')
 
-    def get_pixmap(self, size: QSize=QSize(30, 30)) -> QPixmap:
+    def get_pixmap(self, size: QSize=QSize(30, 30),
+                   device_pixel_ratio: Optional[float]=None) -> QPixmap:
         icon = self.get_icon()
-        return icon.pixmap(size)
+        pixmap = icon.pixmap(size)
+        if device_pixel_ratio is not None:
+            pixmap.setDevicePixelRatio(device_pixel_ratio)
+        return pixmap
 
     def _delete_cache_dir(self, cache_dir) -> None:
         if cache_dir:
@@ -801,6 +806,9 @@ class DeviceCollection:
         """
 
         display_names = [self.devices[scan_id].display_name for scan_id in self.downloading]
+        # Translators: %(variable)s represents Python code, not a plural of the term
+        # variable. You must keep the %(variable)s untranslated, or the program will
+        # crash.
         return _('Downloading from %(device_names)s') % dict(
             device_names=make_internationalized_list(display_names))
 
@@ -861,6 +869,9 @@ class DeviceCollection:
         except KeyError:
             text_number = len(self.volumes_and_cameras)
         # Translators: e.g. Three Devices
+        # Translators: %(variable)s represents Python code, not a plural of the term
+        # variable. You must keep the %(variable)s untranslated, or the program will
+        # crash.
         return _('%(no_devices)s %(device_type)s') % dict(
             no_devices=text_number, device_type=device_type_text)
 
@@ -1024,6 +1035,12 @@ class DeviceCollection:
                     assert len(self.volumes_and_cameras) > 1
                     device_display_name = self._mixed_devices(device_type_text)
 
+                # Translators: this text shows the devices being downloaded from, and is shown at
+                # the top of the window. The plus sign is used instead of 'and' to leave as much
+                # room as possible for the device names.
+                # Translators: %(variable)s represents Python code, not a plural of the term
+                # variable. You must keep the %(variable)s untranslated, or the program will
+                # crash.
                 text = _('%(device1)s + %(device2)s') % {'device1': device_display_name,
                                                                 'device2': computer_display_name}
                 return text, icon
@@ -1035,6 +1052,12 @@ class DeviceCollection:
                 if len(device_types) == 1:
                     if len(self) == 2:
                         devices = non_pc_devices
+                        # Translators: this text shows the devices being downloaded from, and is
+                        # shown at the top of the window. The plus sign is used instead of 'and' to
+                        # leave as much room as possible for the device names.
+                        # Translators: %(variable)s represents Python code, not a plural of the term
+                        # variable. You must keep the %(variable)s untranslated, or the program will
+                        # crash.
                         text = _('%(device1)s + %(device2)s') % {'device1': devices[0].display_name,
                                                                 'device2': devices[1].display_name}
                         if device_type == DeviceType.camera and len(mtp_devices) != 2:
@@ -1045,12 +1068,18 @@ class DeviceCollection:
                     except KeyError:
                         text_number = len(self.volumes_and_cameras)
                     if device_type == DeviceType.camera:
-                        # Number of cameras e.g. 3 Cameras
+                        # Translators: Number of cameras e.g. 3 Cameras
+                        # Translators: %(variable)s represents Python code, not a plural of the term
+                        # variable. You must keep the %(variable)s untranslated, or the program will
+                        # crash.
                         text = _('%(no_cameras)s Cameras') % {'no_cameras': text_number}
                         if len(mtp_devices) == len(self.volumes_and_cameras):
                             return text, non_pc_devices[0].get_icon()
                         return text, QIcon(':/icons/camera.svg')
                     elif device_type == DeviceType.volume:
+                        # Translators: %(variable)s represents Python code, not a plural of the term
+                        # variable. You must keep the %(variable)s untranslated, or the program will
+                        # crash.
                         text = _('%(no_devices)s Devices') % dict(no_devices=text_number)
                         return text, QIcon(':/icons/drive-removable-media.svg')
                 else:

@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-# Copyright (C) 2016-2018 Damon Lynch <damonlynch@gmail.com>
+# Copyright (C) 2016-2020 Damon Lynch <damonlynch@gmail.com>
 
 # This file is part of Rapid Photo Downloader.
 #
@@ -22,7 +22,7 @@ Dialog for editing download subfolder structure and file renaming
 """
 
 __author__ = 'Damon Lynch'
-__copyright__ = "Copyright 2016-2018, Damon Lynch"
+__copyright__ = "Copyright 2016-2020, Damon Lynch"
 
 from typing import Dict, Optional, List, Union, Tuple, Sequence
 import webbrowser
@@ -422,6 +422,11 @@ def make_subfolder_menu_entry(prefs: Tuple[str]) -> str:
 
     desc = prefs[0]
     elements = prefs[1:]
+    # Translators: this text appears in menus and combo boxes. It displays the
+    # description of an item, and its elements.
+    # Translators: %(variable)s represents Python code, not a plural of the term
+    # variable. You must keep the %(variable)s untranslated, or the program will
+    # crash.
     return _("%(description)s - %(elements)s") % dict(
         description=desc, elements=os.sep.join(elements)
     )
@@ -437,6 +442,11 @@ def make_rename_menu_entry(prefs: Tuple[str]) -> str:
 
     desc = prefs[0]
     elements = prefs[1]
+    # Translators: this text appears in menus and combo boxes. It displays the
+    # description of an item, and its elements.
+    # Translators: %(variable)s represents Python code, not a plural of the term
+    # variable. You must keep the %(variable)s untranslated, or the program will
+    # crash.
     return _("%(description)s - %(elements)s") % dict(description=desc, elements=elements)
 
 
@@ -867,12 +877,18 @@ class PrefDialog(QDialog):
             # Translators: please do not modify, change the order of or leave out html formatting
             # tags like <i> and <b>. These are used to format the text the users sees.
             # In this case, the </i> really is supposed to come before the <i>.
+            # Translators: %(variable)s represents Python code, not a plural of the term
+            # variable. You must keep the %(variable)s untranslated, or the program will
+            # crash.
             subfolder_msg = _(
                 "The character</i> %(separator)s <i>creates a new subfolder level."
             ) % dict(separator=os.sep)
             # Translators: please do not modify, change the order of or leave out html formatting
             # tags like <i> and <b>. These are used to format the text the users sees
             # In this case, the </i> really is supposed to come before the <i>.
+            # Translators: %(variable)s represents Python code, not a plural of the term
+            # variable. You must keep the %(variable)s untranslated, or the program will
+            # crash.
             subfolder_first_char_msg = _(
                 "There is no need start or end with the folder separator </i> %(separator)s<i>, "
                 "because it is added automatically."
@@ -900,18 +916,26 @@ class PrefDialog(QDialog):
         self.example = QLabel()
 
         # Combobox with built-in and user defined presets
-        self.preset = PresetComboBox(prefs=prefs, preset_names=self.preset_names,
-                                     preset_type=self.preset_type, edit_mode=True)
+        self.preset = PresetComboBox(
+            prefs=prefs, preset_names=self.preset_names, preset_type=self.preset_type,
+            edit_mode=True
+        )
         self.preset.activated.connect(self.presetComboItemActivated)
 
-        flayout = QFormLayout()
-        flayout.addRow(_('Preset:'), self.preset)
-        flayout.addRow(_('Example:'), self.example)
+        glayout = QGridLayout()
+        presetLabel = QLabel(_('Preset:'))
+        exampleLabel = QLabel(_('Example:'))
+
+        glayout.addWidget(presetLabel, 0, 0)
+        glayout.addWidget(self.preset, 0, 1)
+        glayout.addWidget(exampleLabel, 1, 0)
+        glayout.addWidget(self.example, 1, 1)
+        glayout.setColumnStretch(1, 10)
 
         layout = QVBoxLayout()
         self.setLayout(layout)
 
-        layout.addLayout(flayout)
+        layout.addLayout(glayout)
         layout.addSpacing(int(QFontMetrics(QFont()).height() / 2))
         layout.addWidget(self.editor)
         layout.addWidget(self.messageWidget)

@@ -1,4 +1,4 @@
-# Copyright (C) 2007-2018 Damon Lynch <damonlynch@gmail.com>
+# Copyright (C) 2007-2020 Damon Lynch <damonlynch@gmail.com>
 
 # This file is part of Rapid Photo Downloader.
 #
@@ -18,7 +18,7 @@
 # see <http://www.gnu.org/licenses/>.
 
 __author__ = 'Damon Lynch'
-__copyright__ = "Copyright 2007-2018, Damon Lynch"
+__copyright__ = "Copyright 2007-2020, Damon Lynch"
 
 from enum import (Enum, IntEnum)
 from PyQt5.QtCore import Qt
@@ -213,10 +213,11 @@ class FileType(IntEnum):
 class FileExtension(Enum):
     raw = 1
     jpeg = 2
-    other_photo = 3
-    video = 4
-    audio = 5
-    unknown = 6
+    heif = 3
+    other_photo = 4
+    video = 5
+    audio = 6
+    unknown = 7
 
 
 class FileSortPriority(IntEnum):
@@ -313,6 +314,8 @@ class ExtractionTask(Enum):
     extract_from_file = 9
     extract_from_file_and_load_metadata = 10
     load_from_exif_buffer = 11
+    load_heif_directly = 12
+    load_heif_and_exif_directly = 13
 
 
 class ExtractionProcessing(Enum):
@@ -376,7 +379,8 @@ ExtensionColorDict = {
     FileExtension.raw: CustomColors.color1,
     FileExtension.video: CustomColors.color2,
     FileExtension.jpeg: CustomColors.color4,
-    FileExtension.other_photo: CustomColors.color5,
+    FileExtension.heif: CustomColors.color5,
+    FileExtension.other_photo: CustomColors.color5
 }
 
 

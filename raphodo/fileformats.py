@@ -1,4 +1,4 @@
-# Copyright (C) 2011-2018 Damon Lynch <damonlynch@gmail.com>
+# Copyright (C) 2011-2020 Damon Lynch <damonlynch@gmail.com>
 
 # This file is part of Rapid Photo Downloader.
 #
@@ -15,48 +15,55 @@
 # You should have received a copy of the GNU General Public License
 # along with Rapid Photo Downloader.  If not,
 # see <http://www.gnu.org/licenses/>.
+
+__author__ = 'Damon Lynch'
+__copyright__ = "Copyright 2011-2020, Damon Lynch"
+
+
 import logging
 from distutils.version import LooseVersion
-from typing import Optional
+from typing import Optional, Tuple
 import os
 
 import raphodo.programversions as programversions
 from raphodo.constants import thumbnail_offset, FileType, FileExtension
 
-__author__ = 'Damon Lynch'
-__copyright__ = "Copyright 2011-2018, Damon Lynch"
 
-
-def exiftool_cr3() -> bool:
+def exiftool_capabilities() -> Tuple[bool, bool]:
     """
-    Determine if ExifTool can be used to read cr3 files
+    Determine if ExifTool can be used to read cr3 and heif/heic files
     """
 
     v = 'unknown'
     try:
-        v = programversions.exiftool_version_info()
-        return LooseVersion(v) >= LooseVersion('10.87')
+        v = LooseVersion(programversions.exiftool_version_info())
+        cr3 = v >= LooseVersion('10.87')
+        heif = v >= LooseVersion('10.63')
+        return cr3, heif
     except:
         logging.error('Unable to compare ExifTool version number: %s', v)
-        return False
+        return False, False
 
 
-_exiftool_cr3 = exiftool_cr3()
+_exiftool_cr3, _exiftool_heif = exiftool_capabilities()
 
 
 def exiv2_cr3() -> bool:
     """
-    Determine if exiv2 can be used to read cr3 files
+    Determine if exiv2 can be used to read cr3 files.
+    Unknown if 0.28 will definitely support CR3.
     """
 
-    v = 'unknown'
-    try:
-        v = programversions.exiv2_version()
-        if v:
-            return LooseVersion(v) >= LooseVersion('0.28')
-    except:
-        logging.error('Unable to compare Exiv2 version number: %s', v)
     return False
+
+    # v = 'unknown'
+    # try:
+    #     v = programversions.exiv2_version()
+    #     if v:
+    #         return LooseVersion(v) >= LooseVersion('0.28')
+    # except:
+    #     logging.error('Unable to compare Exiv2 version number: %s', v)
+    # return False
 
 
 _exiv2_cr3 = exiv2_cr3()
@@ -68,27 +75,35 @@ def cr3_capable() -> bool:
     """
     return _exiftool_cr3 or _exiv2_cr3
 
+def heif_capable() -> bool:
+    return _exiftool_heif
+
 
 RAW_EXTENSIONS = [
     '3fr', 'arw', 'dcr', 'cr2', 'crw',  'dng', 'fff', 'iiq', 'mos', 'mef', 'mrw', 'nef',
     'nrw', 'orf', 'pef', 'raf', 'raw', 'rw2', 'sr2', 'srw', 'x3f'
 ]
 
+HEIF_EXTENTIONS = ['heif', 'heic', 'hif']
+
 if cr3_capable():
     RAW_EXTENSIONS.append('cr3')
 
 RAW_EXTENSIONS.sort()
 
-EXIFTOOL_ONLY_EXTENSIONS = ['mos', 'mrw', 'x3f']
+EXIFTOOL_ONLY_EXTENSIONS_STRINGS_AND_PREVIEWS = ['mos', 'mrw', 'x3f']
 
 if not _exiv2_cr3 and _exiftool_cr3:
-    EXIFTOOL_ONLY_EXTENSIONS.append('cr3')
+    EXIFTOOL_ONLY_EXTENSIONS_STRINGS_AND_PREVIEWS.append('cr3')
 
 JPEG_EXTENSIONS = ['jpg', 'jpe', 'jpeg']
 
 JPEG_TYPE_EXTENSIONS = ['jpg', 'jpe', 'jpeg', 'mpo']
 
 OTHER_PHOTO_EXTENSIONS = ['tif', 'tiff', 'mpo']
+
+if heif_capable():
+    OTHER_PHOTO_EXTENSIONS.extend(HEIF_EXTENTIONS)
 
 NON_RAW_IMAGE_EXTENSIONS = JPEG_EXTENSIONS + OTHER_PHOTO_EXTENSIONS
 
@@ -115,13 +130,21 @@ ALL_KNOWN_EXTENSIONS = ALL_USER_VISIBLE_EXTENSIONS + AUDIO_EXTENSIONS + VIDEO_TH
 MUST_CACHE_VIDEOS = [video for video in VIDEO_EXTENSIONS if thumbnail_offset.get(video) is None]
 
 
-def use_exiftool_on_photo(extension: str) -> bool:
+def use_exiftool_on_photo(extension: str, preview_extraction_irrelevant: bool) -> bool:
     """
-    Determine if the file extension indicates it must be analyzed using ExifTool and not Exiv2
+    Determine if the file extension indicates its exif information
+    must be extracted using ExifTool and not Exiv2
     :param extension: lower case, no leading period
+    :param preview_extraction_irrelevant: if True, return True only taking into
+     account the exif string data, not the exif preview data
     """
 
-    return extension in EXIFTOOL_ONLY_EXTENSIONS
+    if extension in HEIF_EXTENTIONS:
+        # Until ExifTool supports thumbnail extraction from HEIF files, we need to load HEIF / HEIC
+        # files directly
+        return preview_extraction_irrelevant
+
+    return extension in EXIFTOOL_ONLY_EXTENSIONS_STRINGS_AND_PREVIEWS
 
 
 def extract_extension(file_name) -> Optional[str]:
@@ -160,6 +183,8 @@ def file_type(file_extension: str) -> Optional[FileType]:
     None
     >>> print(file_type('.cr2'))
     None
+    >>> print(file_type('heif'))
+    FileType.photo
     """
 
     if file_extension in PHOTO_EXTENSIONS_SCAN:
@@ -214,6 +239,8 @@ def extension_type(file_extension: str) -> FileExtension:
         return FileExtension.raw
     elif file_extension in JPEG_EXTENSIONS:
         return FileExtension.jpeg
+    elif file_extension in HEIF_EXTENTIONS:
+        return FileExtension.heif
     elif file_extension in OTHER_PHOTO_EXTENSIONS:
         return FileExtension.other_photo
     elif file_extension in VIDEO_EXTENSIONS:

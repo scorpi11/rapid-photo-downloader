@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 
-# Copyright (C) 2011-2019 Damon Lynch <damonlynch@gmail.com>
+# Copyright (C) 2011-2020 Damon Lynch <damonlynch@gmail.com>
 
 # This file is part of Rapid Photo Downloader.
 #
@@ -43,7 +43,7 @@ A sample photo or video for (1) can be used for (2)
 
 """
 __author__ = 'Damon Lynch'
-__copyright__ = "Copyright 2011-2019, Damon Lynch"
+__copyright__ = "Copyright 2011-2020, Damon Lynch"
 
 import os
 import sys
@@ -73,7 +73,9 @@ from raphodo.preferences import ScanPreferences, Preferences
 from raphodo.interprocess import (
     WorkerInPublishPullPipeline, ScanResults, ScanArguments
 )
-from raphodo.camera import Camera, CameraError, CameraProblemEx
+from raphodo.camera import (
+    Camera, CameraError, CameraProblemEx, gphoto2_python_logging
+)
 import raphodo.rpdfile as rpdfile
 from raphodo.constants import (
     DeviceType, FileType, DeviceTimestampTZ, CameraErrorCode, FileExtension,
@@ -195,7 +197,7 @@ class ScanWorker(WorkerInPublishPullPipeline):
 
         scan_arguments = pickle.loads(self.content)  # type: ScanArguments
         if scan_arguments.log_gphoto2:
-            gp.use_python_logging()
+            self.gphoto2_logging = gphoto2_python_logging()
 
         if scan_arguments.ignore_other_types:
             fileformats.PHOTO_EXTENSIONS_SCAN = fileformats.PHOTO_EXTENSIONS_WITHOUT_OTHER
@@ -473,6 +475,8 @@ class ScanWorker(WorkerInPublishPullPipeline):
         For duplicate files, we record both directories the file is
         stored on.
 
+        We ignore all folders that contain a file .nomedia
+
         :param path: the path on the camera to analyze for files and
          folders
         :param folder_identifier: if not None, then indicates (1) the
@@ -495,6 +499,10 @@ class ScanWorker(WorkerInPublishPullPipeline):
         if files_in_folder:
             # Distinguish the file type for every file in the folder
             names = [name for name, value in files_in_folder]
+            if '.nomedia' in names:
+                # do nothing with this folder
+                logging.debug("Ignoring %s because it contains a .nomedia file", path)
+                return
             split_names = [os.path.splitext(name) for name in names]
             # Remove the period from the extension
             exts = [ext[1:] for name, ext in split_names]
@@ -622,16 +630,21 @@ class ScanWorker(WorkerInPublishPullPipeline):
             files.sort(key=operator.attrgetter('size'))
 
         # When determining how a camera reports modification time, extraction order
-        # of preference is (1) jpeg, (2) RAW, and finally least preferred is (3) video
-        # However, if ignore_mdatatime_for_mtp_dng is set, ignore the RAW files
+        # of preference is (1) heif, (2) jpeg, (3) RAW, and finally least preferred
+        # is (4) video. However, if ignore_mdatatime_for_mtp_dng is set, ignore the RAW files
 
         if not self.ignore_mdatatime_for_mtp_dng:
-            order = (FileExtension.jpeg, FileExtension.raw, FileExtension.video)
+            order = (FileExtension.heif, FileExtension.jpeg, FileExtension.raw, FileExtension.video)
         else:
-            order = (FileExtension.jpeg, FileExtension.video, FileExtension.raw)
+            order = (FileExtension.heif, FileExtension.jpeg, FileExtension.video, FileExtension.raw)
+
+        if not fileformats.heif_capable():
+            order = order[1:]
 
         have_photos = len(self._camera_photos_videos_by_type[FileExtension.raw]) > 0 or \
                       len(self._camera_photos_videos_by_type[FileExtension.jpeg]) > 0
+        if not have_photos and fileformats.heif_capable():
+            have_photos = len(self._camera_photos_videos_by_type[FileExtension.heif]) > 0
         have_videos = len(self._camera_photos_videos_by_type[FileExtension.video]) > 0
 
         max_attempts = 5
@@ -1061,10 +1074,19 @@ class ScanWorker(WorkerInPublishPullPipeline):
         elif ext_type == FileExtension.raw:
             determined_by = 'RAW'
             exif_extract = True
-            use_exiftool = fileformats.use_exiftool_on_photo(extension)
+            use_exiftool = fileformats.use_exiftool_on_photo(
+                extension, preview_extraction_irrelevant=True
+            )
             save_chunk = use_exiftool
         elif ext_type == FileExtension.video:
             determined_by = 'video'
+            save_chunk = True
+        elif ext_type == FileExtension.heif:
+            determined_by = 'HEIF / HEIC'
+            exif_extract = True
+            use_exiftool = fileformats.use_exiftool_on_photo(
+                extension, preview_extraction_irrelevant=True
+            )
             save_chunk = True
 
         if use_app1:
@@ -1146,7 +1168,6 @@ class ScanWorker(WorkerInPublishPullPipeline):
                 file_type=FileType.video
             )
 
-
         if dt is None:
             logging.warning(
                 "Scanner failed to extract date time metadata from %s on %s",
@@ -1181,6 +1202,8 @@ class ScanWorker(WorkerInPublishPullPipeline):
             determined_by = 'RAW'
         elif ext_type == FileExtension.video:
             determined_by = 'video'
+        elif ext_type == FileExtension.heif:
+            determined_by = 'HEIF / HEIC'
 
         if ext_type == FileExtension.video:
             metadata = metadatavideo.MetaData(
@@ -1190,7 +1213,7 @@ class ScanWorker(WorkerInPublishPullPipeline):
             dt = metadata.date_time(missing=None)
         else:
             # photo - we don't care if jpeg or RAW
-            if fileformats.use_exiftool_on_photo(extension):
+            if fileformats.use_exiftool_on_photo(extension, preview_extraction_irrelevant=True):
                 metadata = metadataexiftool.MetadataExiftool(
                     full_file_name=full_file_name, et_process=self.et_process,
                     file_type=file_type
@@ -1264,12 +1287,13 @@ class ScanWorker(WorkerInPublishPullPipeline):
         Attempt to determine the device's approach to timezones when it
         store timestamps.
         When determining how this device reports modification time, file
-        preference is (1) RAW, (2)jpeg, and finally least preferred is (3)
-        video -- a RAW is the least likely to be modified.
+        preference is (1) RAW, (2) jpeg, (3) heif / heic, and finally least
+        preferred is (4) video -- a RAW is the least likely to be modified.
 
         NOTE: this creates a sample file for one type of file (RAW if present,
-        if not, then jpeg, if jpeg also not present, then video). However if
-        a raw / jpeg is found, then still need to create sample file for video.
+        if not, then jpeg, if jpeg also not present, then heif / heic, if that
+        not present, then video). However if a photo is found, then still need
+        to create a sample file for video.
         """
 
         logging.debug("Distinguishing approach to timestamp time zones on %s", self.display_name)
@@ -1278,13 +1302,22 @@ class ScanWorker(WorkerInPublishPullPipeline):
 
         max_attempts = 10
         raw_attempts = 0
-        jpegs_and_videos = defaultdict(deque)
+        jpegs_heifs_and_videos = defaultdict(deque)
+
+        # Only use HEIF files if we can read their metadata
+        if fileformats.heif_capable():
+            extensions = (
+                FileExtension.raw, FileExtension.jpeg, FileExtension.heif, FileExtension.video
+            )
+        else:
+            extensions = (FileExtension.raw, FileExtension.jpeg, FileExtension.video)
+        non_raw_extensions = extensions[1:]
 
         for dir_name, name in self.walk_file_system(path):
             full_file_name = os.path.join(dir_name, name)
             extension = fileformats.extract_extension(full_file_name)
             ext_type = fileformats.extension_type(extension)
-            if ext_type in (FileExtension.raw, FileExtension.jpeg, FileExtension.video):
+            if ext_type in extensions:
                 file_type = fileformats.file_type(extension)
                 if ext_type == FileExtension.raw and raw_attempts < max_attempts:
                     # examine right away
@@ -1294,17 +1327,17 @@ class ScanWorker(WorkerInPublishPullPipeline):
                             ext_type=ext_type, extension=extension, file_type=file_type):
                         return
                 else:
-                    if len(jpegs_and_videos[ext_type]) < max_attempts:
-                        jpegs_and_videos[ext_type].append(
+                    if len(jpegs_heifs_and_videos[ext_type]) < max_attempts:
+                        jpegs_heifs_and_videos[ext_type].append(
                             (dir_name, name, full_file_name, extension)
                         )
 
-                    if len(jpegs_and_videos[FileExtension.jpeg]) == max_attempts:
+                    if len(jpegs_heifs_and_videos[FileExtension.jpeg]) == max_attempts:
                         break
 
         # Couldn't locate sample raw file. Are left with up to max_attempts jpeg and video files
-        for ext_type in (FileExtension.jpeg, FileExtension.video):
-            for dir_name, name, full_file_name, extension in jpegs_and_videos[ext_type]:
+        for ext_type in non_raw_extensions:
+            for dir_name, name, full_file_name, extension in jpegs_heifs_and_videos[ext_type]:
                 file_type = fileformats.file_type(extension)
                 if self.examine_sample_non_camera_file(
                         dirname=dir_name, name=name, full_file_name=full_file_name,

@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 
-# Copyright (C) 2011-2019 Damon Lynch <damonlynch@gmail.com>
+# Copyright (C) 2011-2020 Damon Lynch <damonlynch@gmail.com>
 
 # This file is part of Rapid Photo Downloader.
 #
@@ -29,7 +29,7 @@ Project line length: 100 characters (i.e. word wrap at 99)
 """
 
 __author__ = 'Damon Lynch'
-__copyright__ = "Copyright 2011-2019, Damon Lynch"
+__copyright__ = "Copyright 2011-2020, Damon Lynch"
 
 import sys
 import logging
@@ -39,21 +39,18 @@ import datetime
 import locale
 # Use the default locale as defined by the LANG variable
 locale.setlocale(locale.LC_ALL, '')
-import pickle
 from collections import namedtuple, defaultdict
 import platform
 import argparse
 from typing import Optional, Tuple, List, Sequence, Dict, Set, Any, DefaultDict
 import faulthandler
-import pkg_resources
+import pkg_resources as pkgr
 import webbrowser
 import time
 import shlex
 import subprocess
 from urllib.request import pathname2url
-import tarfile
 import inspect
-from distutils.version import LooseVersion
 
 from gettext import gettext as _
 
@@ -76,7 +73,7 @@ import gphoto2 as gp
 from PyQt5 import QtCore
 from PyQt5.QtCore import (
     QThread, Qt, QStorageInfo, QSettings, QPoint, QSize, QTimer, QTextStream, QModelIndex,
-    pyqtSlot, QRect, pyqtSignal, QObject
+    pyqtSlot, QRect, pyqtSignal, QObject, QEvent
 )
 from PyQt5.QtGui import (
     QIcon, QPixmap, QImage, QColor, QPalette, QFontMetrics, QFont, QPainter, QMoveEvent, QBrush,
@@ -142,7 +139,10 @@ import raphodo.downloadtracker as downloadtracker
 from raphodo.cache import ThumbnailCacheSql
 from raphodo.programversions import gexiv2_version, exiv2_version, EXIFTOOL_VERSION
 from raphodo.metadatavideo import pymedia_version_info, libmediainfo_missing
-from raphodo.camera import gphoto2_version, python_gphoto2_version, dump_camera_details
+from raphodo.camera import (
+    gphoto2_version, python_gphoto2_version, dump_camera_details, gphoto2_python_logging,
+    autodetect_cameras
+)
 from raphodo.rpdsql import DownloadedSQL
 from raphodo.generatenameconfig import *
 from raphodo.rotatedpushbutton import RotatedButton, FlatButton
@@ -175,9 +175,13 @@ from raphodo.errorlog import ErrorReport, SpeechBubble
 from raphodo.problemnotification import (
     FsMetadataWriteProblem, Problem, Problems, CopyingProblems, RenamingProblems, BackingUpProblems
 )
-from raphodo.viewutils import standardIconSize
+from raphodo.viewutils import (
+    standardIconSize, qt5_screen_scale_environment_variable, QT5_VERSION, validateWindowSizeLimit,
+    validateWindowPosition, scaledIcon
+)
 import raphodo.didyouknow as didyouknow
 from raphodo.thumbnailextractor import gst_version, libraw_version, rawkit_version
+from raphodo.heif import have_heif_module, pyheif_version, libheif_version
 
 
 # Avoid segfaults at exit:
@@ -449,6 +453,8 @@ class RapidWindow(QMainWindow):
     udisks2Unmount = pyqtSignal(str)
 
     def __init__(self, splash: 'SplashScreen',
+                 fractional_scaling: str,
+                 scaling_set: str,
                  photo_rename: Optional[bool]=None,
                  video_rename: Optional[bool]=None,
                  auto_detect: Optional[bool]=None,
@@ -475,11 +481,14 @@ class RapidWindow(QMainWindow):
         else:
             self.screen = None
 
+        self.fractional_scaling_message = fractional_scaling
+        self.scaling_set_message = scaling_set
+
         # Process Qt events - in this case, possible closing of splash screen
         app.processEvents()
 
         # Three values to handle window position quirks under X11:
-        self.window_show_requested_time = None  # type: datetime.datetime
+        self.window_show_requested_time = None  # type: Optional[datetime.datetime]
         self.window_move_triggered_count = 0
         self.windowPositionDelta = QPoint(0, 0)
 
@@ -653,8 +662,8 @@ class RapidWindow(QMainWindow):
             if not len(previous_version):
                 logging.debug("Initial program run detected")
             else:
-                pv = pkg_resources.parse_version(previous_version)
-                rv = pkg_resources.parse_version(__about__.__version__)
+                pv = pkgr.parse_version(previous_version)
+                rv = pkgr.parse_version(__about__.__version__)
                 if pv < rv:
                     logging.info(
                         "Version upgrade detected, from %s to %s",
@@ -666,7 +675,7 @@ class RapidWindow(QMainWindow):
                         "Version downgrade detected, from %s to %s",
                         __about__.__version__, previous_version
                     )
-                if pv < pkg_resources.parse_version('0.9.7b1'):
+                if pv < pkgr.parse_version('0.9.7b1'):
                     # Remove any duplicate subfolder generation or file renaming custom presets
                     self.prefs.filter_duplicate_generation_prefs()
 
@@ -848,9 +857,7 @@ class RapidWindow(QMainWindow):
 
         # Setup notification system
         try:
-            self.have_libnotify = Notify.init('rapid-photo-downloader')
-            self.ctime_update_notification = None  # type: Optional[Notify.Notification]
-            self.ctime_notification_issued = False
+            self.have_libnotify = Notify.init(_('Rapid Photo Downloader'))
         except:
             logging.error("Notification intialization problem")
             self.have_libnotify = False
@@ -890,7 +897,6 @@ class RapidWindow(QMainWindow):
             else:
                 # Unity auto-generated desktop files use underscores, it seems
                 launchers = (
-                    'net.damonlynch.rapid-photo-downloader.desktop',
                     'net.damonlynch.rapid_photo_downloader.desktop',
                 )
                 for launcher in launchers:
@@ -1151,12 +1157,16 @@ class RapidWindow(QMainWindow):
                 button = self.rightSideButtonMapper[index]
             button.setChecked(True)
             self.setRightPanelsAndButtons(RightSideButton(index))
+        else:
+            # For some unknown reason, under some sessions need to explicitly set this to False,
+            # or else it shows and no button is pressed.
+            self.rightPanels.setVisible(False)
+
         settings.endGroup()
 
         prefs_valid, msg = self.prefs.check_prefs_for_validity()
 
         self.setupErrorLogWindow(settings=settings)
-
 
         self.setDownloadCapabilities()
         self.searchForCameras(on_startup=True)
@@ -1168,7 +1178,7 @@ class RapidWindow(QMainWindow):
 
         self.showMainWindow()
 
-        if EXIFTOOL_VERSION is None and self.prefs.warn_broken_or_missing_libraries:
+        if not EXIFTOOL_VERSION and self.prefs.warn_broken_or_missing_libraries:
             message = _(
                 '<b>ExifTool has a problem</b><br><br> '
                 'Rapid Photo Downloader uses ExifTool to get metadata from videos and photos. '
@@ -1180,7 +1190,7 @@ class RapidWindow(QMainWindow):
                 remember=RememberThisMessage.do_not_warn_again_about_missing_libraries,
                 parent=self,
                 buttons=RememberThisButtons.ok,
-                title=_('Problem with libmediainfo')
+                title=_('Problem with ExifTool')
             )
 
             warning.exec_()
@@ -1224,6 +1234,8 @@ class RapidWindow(QMainWindow):
 
             self.window_show_requested_time = datetime.datetime.now()
             self.show()
+            if self.deferred_resize_and_move_until_after_show:
+                self.resizeAndMoveMainWindow()
 
             self.errorLog.setVisible(self.errorLogAct.isChecked())
 
@@ -1270,34 +1282,86 @@ class RapidWindow(QMainWindow):
         self.errorLog.dialogActivated.connect(self.errorsPending.reset)
         self.errorsPending.clicked.connect(self.errorLog.activate)
 
-    def readWindowSettings(self, app: 'QtSingleApplication'):
-        settings = QSettings()
-        settings.beginGroup("MainWindow")
+    def resizeAndMoveMainWindow(self) -> None:
+        """
+        Load window settings from last application run, after validating they
+        will fit on the screen
+        """
 
-        # Calculate window sizes
-        if self.screen is None:
-            # Failsafe: should have got screen from the splash window
-            desktop = app.desktop()  # type: QDesktopWidget
-            primaryScreen = desktop.primaryScreen()
-            available = desktop.availableGeometry(primaryScreen)  # type: QRect
-            display = desktop.screenGeometry(primaryScreen)  # type: QRect
-        else:
-            available = self.screen.availableGeometry()  # type: QRect
-            display = self.screen.size()  # type: QSize
+        if self.deferred_resize_and_move_until_after_show:
+            logging.debug("Resizing and moving main window after it was deferred")
+
+            assert self.isVisible()
+
+            self.screen = self.windowHandle().screen()  # type: QScreen
+
+        assert self.screen is not None
+
+        available = self.screen.availableGeometry()  # type: QRect
+        display = self.screen.size()  # type: QSize
+
         default_width = max(960, available.width() // 2)
         default_width = min(default_width, available.width())
         default_x = display.width() - default_width
-        default_height = available.height()
+        default_height = int(available.height() * .85)
         default_y = display.height() - default_height
+
+        logging.debug(
+            "Available screen geometry: %sx%s on %sx%s display. Default window size: %sx%s.",
+            available.width(), available.height(), display.width(), display.height(),
+            default_width, default_height
+        )
+
+        settings = QSettings()
+        settings.beginGroup("MainWindow")
+
+        try:
+            scaling = self.devicePixelRatioF()
+        except AttributeError:
+            scaling = self.devicePixelRatio()
+
+        logging.info("%s", self.scaling_set_message)
+        logging.info('Desktop scaling set to %s', scaling)
+        logging.debug("%s", self.fractional_scaling_message)
+
+        maximized = settings.value("maximized", False, type=bool)
+        logging.debug("Window maximized when last run: %s", maximized)
+
+        # Even if window is maximized, must restore saved window size and position for when the user
+        # unmaximizes the window
+
         pos = settings.value("windowPosition", QPoint(default_x, default_y))
         size = settings.value("windowSize", QSize(default_width, default_height))
         settings.endGroup()
-        self.resize(size)
-        self.move(pos)
+
+        was_valid, validatedSize = validateWindowSizeLimit(available.size(), size)
+        if not was_valid:
+            logging.debug(
+                "Windows size %sx%s was invalid. Value was reset to %sx%s.",
+                size.width(), size.height(), validatedSize.width(), validatedSize.height()
+            )
         logging.debug(
-            "Avaiable screen geometry: %sx%s on %sx%s display",
-            available.width(), available.height(), display.width(), display.height()
+            "Window size: %sx%s", validatedSize.width(), validatedSize.height()
         )
+        was_valid, validatedPos = validateWindowPosition(pos, available.size(), validatedSize)
+        if not was_valid:
+            logging.debug("Window position %s,%s was invalid", pos.x(), pos.y())
+
+        self.resize(validatedSize)
+        self.move(validatedPos)
+
+        if maximized:
+            logging.debug("Setting window to maximized state")
+            self.setWindowState(Qt.WindowMaximized)
+
+    def readWindowSettings(self, app: 'QtSingleApplication'):
+        self.deferred_resize_and_move_until_after_show = False
+
+        # Calculate window sizes
+        if self.screen is None:
+            self.deferred_resize_and_move_until_after_show = True
+        else:
+            self.resizeAndMoveMainWindow()
 
     def writeWindowSettings(self):
         logging.debug("Writing window settings")
@@ -1310,6 +1374,11 @@ class RapidWindow(QMainWindow):
             windowPos.setY(0)
         settings.setValue("windowPosition", windowPos)
         settings.setValue("windowSize", self.size())
+        # Alternative to position and size:
+        # settings.setValue("geometry", self.saveGeometry())
+        state = self.windowState()
+        maximized = bool(state & Qt.WindowMaximized)
+        settings.setValue("maximized", maximized)
         settings.setValue("centerSplitterSizes", self.centerSplitter.saveState())
         settings.setValue("sourceButtonPressed", self.sourceButton.isChecked())
         settings.setValue("rightButtonPressed", self.rightSideButtonPressed())
@@ -1347,7 +1416,7 @@ class RapidWindow(QMainWindow):
                 logging.debug("Window position quirk delta: %s", self.windowPositionDelta)
             self.window_show_requested_time = None
 
-    def setupWindow(self):
+    def setupWindow(self) -> None:
         status = self.statusBar()
         status.setStyleSheet("QStatusBar::item { border: 0px solid black }; ")
         self.downloadProgressBar = QProgressBar()
@@ -1403,7 +1472,7 @@ class RapidWindow(QMainWindow):
 
         if success:
             self.latest_version = None
-            current_version = pkg_resources.parse_version(__about__.__version__)
+            current_version = pkgr.parse_version(__about__.__version__)
 
             check_dev_version = (current_version.is_prerelease or
                                  self.prefs.include_development_release)
@@ -2465,6 +2534,9 @@ class RapidWindow(QMainWindow):
             if files_marked:
                 marked = self.thumbnailModel.getNoFilesAndTypesMarkedForDownload()
                 files = marked.file_types_present_details()
+                # Translators: %(variable)s represents Python code, not a plural of the term
+                # variable. You must keep the %(variable)s untranslated, or the program will
+                # crash.
                 text = _("Download %(files)s") % dict(files=files)  # type: str
                 self.downloadButton.setText(text)
             else:
@@ -2508,7 +2580,7 @@ class RapidWindow(QMainWindow):
         self.menu.addAction(self.aboutAct)
         self.menu.addAction(self.quitAct)
 
-        self.menuButton = MenuButton(icon=QIcon(':/menu.svg'), menu=self.menu)
+        self.menuButton = MenuButton(icon=':/icons/menu.svg', menu=self.menu)
 
     def doCheckForNewVersion(self) -> None:
         """Check online for a new program version"""
@@ -2712,6 +2784,10 @@ class RapidWindow(QMainWindow):
         path = self.fileSystemModel.filePath(index.model().mapToSource(index))
 
         if self.downloadIsRunning() and self.prefs.this_computer_path:
+            # Translators: %(variable)s represents Python code, not a plural of the term
+            # variable. You must keep the %(variable)s untranslated, or the program will
+            # crash.
+            # Translators: please do not change HTML codes like <br>, <i>, </i>, or <b>, </b> etc.
             message = _(
                 "<b>Changing This Computer source path</b><br><br>Do you really want to "
                 "change the source path to %(new_path)s?<br><br>You are currently "
@@ -3025,6 +3101,9 @@ Do you want to proceed with the download?
 
         if invalid_dirs:
             if len(invalid_dirs) > 1:
+                # Translators: %(variable)s represents Python code, not a plural of the term
+                # variable. You must keep the %(variable)s untranslated, or the program will
+                # crash.
                 msg = _(
                     "These download folders are invalid:\n%(folder1)s\n%(folder2)s"
                 ) % {'folder1': invalid_dirs[0], 'folder2': invalid_dirs[1]}
@@ -3057,6 +3136,9 @@ Do you want to proceed with the download?
                     elif missing_destinations == BackupFailureType.photos:
                         logging.warning("No backup device exists for backing up photos")
                         # Translators: filetype will be replaced with 'photos' or 'videos'
+                        # Translators: %(variable)s represents Python code, not a plural of the term
+                        # variable. You must keep the %(variable)s untranslated, or the program will
+                        # crash.
                         msg = _(
                             "No backup device exists for backing up %(filetype)s. Do you "
                             "still want to start the download?"
@@ -3067,6 +3149,9 @@ Do you want to proceed with the download?
                             "No backup device contains a valid folder for backing up videos"
                         )
                         # Translators: filetype will be replaced with 'photos' or 'videos'
+                        # Translators: %(variable)s represents Python code, not a plural of the term
+                        # variable. You must keep the %(variable)s untranslated, or the program will
+                        # crash.
                         msg = _(
                             "No backup device exists for backing up %(filetype)s. Do you "
                             "still want to start the download?"
@@ -3077,6 +3162,8 @@ Do you want to proceed with the download?
                             "The manually specified photo and videos backup paths do "
                             "not exist or are not writable"
                         )
+                        # Translators: please do not change HTML codes like <br>, <i>, </i>, or
+                        # <b>, </b> etc.
                         msg = _(
                             "<b>The photo and video backup destinations do not exist or cannot "
                             "be written to.</b><br><br>Do you still want to start the download?"
@@ -3087,6 +3174,11 @@ Do you want to proceed with the download?
                             "or is not writable"
                         )
                         # Translators: filetype will be replaced by either 'photo' or 'video'
+                        # Translators: %(variable)s represents Python code, not a plural of the term
+                        # variable. You must keep the %(variable)s untranslated, or the program will
+                        # crash.
+                        # Translators: please do not change HTML codes like <br>, <i>, </i>, or
+                        # <b>, </b> etc.
                         msg = _(
                             "<b>The %(filetype)s backup destination does not exist or cannot be "
                                 "written to.</b><br><br>Do you still want to start the download?"
@@ -3096,6 +3188,12 @@ Do you want to proceed with the download?
                             "The manually specified video backup path does not exist "
                             "or is not writable"
                         )
+                        # Translators: filetype will be replaced by either 'photo' or 'video'
+                        # Translators: %(variable)s represents Python code, not a plural of the term
+                        # variable. You must keep the %(variable)s untranslated, or the program will
+                        # crash.
+                        # Translators: please do not change HTML codes like <br>, <i>, </i>, or
+                        # <b>, </b> etc.
                         msg = _(
                             "<b>The %(filetype)s backup destination does not exist or cannot be "
                                 "written to.</b><br><br>Do you still want to start the download?"
@@ -3114,10 +3212,6 @@ Do you want to proceed with the download?
                         self.prefs.warn_backup_problem = False
                     if not do_download:
                         return
-
-            # Suppress showing a notification message about any timeline
-            # and provisional folders rebuild - download takes priority
-            self.ctime_notification_issued = False
 
             # Set time download is starting if it is not already set
             # it is unset when all downloads are completed
@@ -3851,6 +3945,9 @@ Do you want to proceed with the download?
             else:
                 # Translators - in the middle is a unicode em dash - please retain it
                 # This string is displayed in the status bar when the download is running
+                # Translators: %(variable)s represents Python code, not a plural of the term
+                # variable. You must keep the %(variable)s untranslated, or the program will
+                # crash.
                 message = _(
                     '%(downloading_from)s — %(time_left)s left (%(speed)s)'
                 ) % dict(
@@ -3923,6 +4020,9 @@ Do you want to proceed with the download?
         file_types = file_types_by_number(no_photos_downloaded, no_videos_downloaded)
         file_types_failed = file_types_by_number(no_photos_failed, no_videos_failed)
         # Translators: e.g. 23 photos downloaded
+        # Translators: %(variable)s represents Python code, not a plural of the term
+        # variable. You must keep the %(variable)s untranslated, or the program will
+        # crash.
         message = _(
             "%(noFiles)s %(filetypes)s downloaded"
         ) % {
@@ -3931,6 +4031,9 @@ Do you want to proceed with the download?
 
         if no_files_failed:
             # Translators: e.g. 2 videos failed to download
+            # Translators: %(variable)s represents Python code, not a plural of the term
+            # variable. You must keep the %(variable)s untranslated, or the program will
+            # crash.
             message += "\n" + _(
                 "%(noFiles)s %(filetypes)s failed to download"
             ) % {
@@ -3976,10 +4079,16 @@ Do you want to proceed with the download?
         if photo_downloads and show_notification:
             filetype = file_types_by_number(photo_downloads, 0)
             # Translators: e.g. 23 photos downloaded
+            # Translators: %(variable)s represents Python code, not a plural of the term
+            # variable. You must keep the %(variable)s untranslated, or the program will
+            # crash.
             n_message += "\n" + _(
                 "%(number)s %(numberdownloaded)s"
             ) % dict(
                 number=thousands(photo_downloads),
+                # Translators: %(variable)s represents Python code, not a plural of the term
+                # variable. You must keep the %(variable)s untranslated, or the program will
+                # crash.
                 numberdownloaded=_("%(filetype)s downloaded") % dict(filetype=filetype)
             )
 
@@ -3987,10 +4096,16 @@ Do you want to proceed with the download?
         photo_failures = self.download_tracker.total_photo_failures
         if photo_failures and show_notification:
             filetype = file_types_by_number(photo_failures, 0)
+            # Translators: %(variable)s represents Python code, not a plural of the term
+            # variable. You must keep the %(variable)s untranslated, or the program will
+            # crash.
             n_message += "\n" + _(
                 "%(number)s %(numberdownloaded)s"
             ) % dict(
                 number=thousands(photo_failures),
+                # Translators: %(variable)s represents Python code, not a plural of the term
+                # variable. You must keep the %(variable)s untranslated, or the program will
+                # crash.
                 numberdownloaded=_("%(filetype)s failed to download") % dict(filetype=filetype)
             )
 
@@ -3998,10 +4113,16 @@ Do you want to proceed with the download?
         video_downloads = self.download_tracker.total_videos_downloaded
         if video_downloads and show_notification:
             filetype = file_types_by_number(0, video_downloads)
+            # Translators: %(variable)s represents Python code, not a plural of the term
+            # variable. You must keep the %(variable)s untranslated, or the program will
+            # crash.
             n_message += "\n" + _(
                 "%(number)s %(numberdownloaded)s"
             ) % dict(
                 number=thousands(video_downloads),
+                # Translators: %(variable)s represents Python code, not a plural of the term
+                # variable. You must keep the %(variable)s untranslated, or the program will
+                # crash.
                 numberdownloaded=_("%(filetype)s downloaded") % dict(filetype=filetype)
             )
 
@@ -4009,16 +4130,25 @@ Do you want to proceed with the download?
         video_failures = self.download_tracker.total_video_failures
         if video_failures and show_notification:
             filetype = file_types_by_number(0, video_failures)
+            # Translators: %(variable)s represents Python code, not a plural of the term
+            # variable. You must keep the %(variable)s untranslated, or the program will
+            # crash.
             n_message += "\n" + _(
                 "%(number)s %(numberdownloaded)s"
             ) % dict(
                 number=thousands(video_failures),
+                # Translators: %(variable)s represents Python code, not a plural of the term
+                # variable. You must keep the %(variable)s untranslated, or the program will
+                # crash.
                 numberdownloaded=_("%(filetype)s failed to download") % dict(filetype=filetype)
             )
 
         # warnings
         warnings = self.download_tracker.total_warnings
         if warnings and show_notification:
+            # Translators: %(variable)s represents Python code, not a plural of the term
+            # variable. You must keep the %(variable)s untranslated, or the program will
+            # crash.
             n_message += "\n" + _(
                 "%(number)s %(numberdownloaded)s"
             ) % dict(
@@ -4076,139 +4206,29 @@ Do you want to proceed with the download?
             no_files_and_types = ftc.file_types_present_details().lower()
 
             if not fw:
+                # Translators: %(variable)s represents Python code, not a plural of the term
+                # variable. You must keep the %(variable)s untranslated, or the program will
+                # crash.
                 downloaded = _(
                     'Downloaded %(no_files_and_types)s from %(devices)s'
                 ) % dict(no_files_and_types=no_files_and_types, devices=devices)
             else:
+                # Translators: %(variable)s represents Python code, not a plural of the term
+                # variable. You must keep the %(variable)s untranslated, or the program will
+                # crash.
                 downloaded = _(
                     'Downloaded %(no_files_and_types)s from %(devices)s — %(failures)s'
                 ) % dict(no_files_and_types=no_files_and_types, devices=devices, failures=fw)
         else:
             if fw:
+                # Translators: %(variable)s represents Python code, not a plural of the term
+                # variable. You must keep the %(variable)s untranslated, or the program will
+                # crash.
                 downloaded = _('No files downloaded — %(failures)s') % dict(failures=fw)
             else:
                 downloaded = _('No files downloaded')
         logging.info('%s', downloaded)
         self.statusBar().showMessage(downloaded)
-
-    def notifyFoldersProximityRebuild(self, scan_id) -> None:
-        """
-        Inform the user that a timeline rebuild and folder preview update is pending,
-        taking into account they may have already been notified.
-        """
-
-        if self.have_libnotify:
-            device = self.devices[scan_id]
-            notification_devices = self.thumbnailModel.ctimes_differ
-
-            logging.info(
-                "Need to rebuild timeline and subfolder previews for %s", device.display_name
-            )
-
-            simple_message = len(notification_devices) == 1
-
-            this_computer = len(
-                [
-                    scan_id for scan_id in notification_devices
-                    if self.devices[scan_id].device_type == DeviceType.path
-                ]
-            ) > 0
-
-            if simple_message:
-                if device.device_type == DeviceType.camera:
-                    message = _(
-                        "The Destination subfolders and Timeline will be rebuilt after "
-                        "all thumbnails have been generated for the %(camera)s"
-                    ) % dict(camera=device.display_name)
-                elif this_computer:
-                    message = _(
-                        "The Destination subfolders and Timeline will be rebuilt after "
-                        "all thumbnails have been generated for this computer"
-                    )
-                else:
-                    message = _(
-                        "The Destination subfolders and Timeline will be rebuilt after "
-                        "all thumbnails have been generated for %(device)s"
-                    ) % dict(device=device.display_name)
-            else:
-                no_devices = len(notification_devices)
-                if this_computer:
-                    no_devices -= 1
-                    if no_devices > 1:
-                        message = _("The Destination subfolders and Timeline will be rebuilt "
-                                    "after all thumbnails have been generated for "
-                                    "%(number_devices)s devices and this computer"
-                                    ) % dict(number_devices=no_devices)
-                    else:
-                        assert no_devices == 1
-                        if device.device_type != DeviceType.path:
-                            other_device = device
-                        else:
-                            # the other device must be the first one
-                            other_device = self.devices[notification_devices[0]]
-                        name = other_device.display_name
-                        if other_device.device_type == DeviceType.camera:
-                            message = _("The Destination subfolders and Timeline will be rebuilt "
-                                        "after all thumbnails have been generated for the "
-                                        "%(camera)s and this computer") % dict(camera=name)
-                        else:
-                            message = _("The Destination subfolders and Timeline will be rebuilt "
-                                        "after all thumbnails have been generated for "
-                                        "%(device)s and this computer") % dict(device=name)
-                else:
-                        message = _("The Destination subfolders and Timeline will be rebuilt "
-                                    "after all thumbnails have been generated for "
-                                    "%(number_devices)s devices") % dict(number_devices=no_devices)
-
-            if self.ctime_update_notification is None:
-                notify = Notify.Notification.new(_('Rapid Photo Downloader'), message,
-                                                 'rapid-photo-downloader')
-            else:
-                notify = self.ctime_update_notification
-                notify.update(_('Rapid Photo Downloader'), message, 'rapid-photo-downloader')
-            try:
-                message_shown = notify.show()
-                if message_shown:
-                    self.ctime_notification_issued = True
-                notify.connect('closed', self.notificationFoldersProximityRefreshClosed)
-            except:
-                logging.error("Unable to display message using notification system")
-            self.ctime_update_notification = notify
-
-    def notifyFoldersProximityRebuilt(self) -> None:
-        """
-        Inform the user that the the refresh has occurred, updating the existing
-        message if need be.
-        """
-
-        if self.have_libnotify:
-            message = _(
-                "The Destination subfolders and Timeline have been rebuilt"
-            )
-
-            if self.ctime_update_notification is None:
-                notify = Notify.Notification.new(
-                    _('Rapid Photo Downloader'), message, 'rapid-photo-downloader'
-                )
-            else:
-                notify = self.ctime_update_notification
-                notify.update(_('Rapid Photo Downloader'), message, 'rapid-photo-downloader')
-            try:
-                message_shown = notify.show()
-            except:
-                logging.error("Unable to display message using notification system")
-
-            self.ctime_update_notification = None
-
-    def notificationFoldersProximityRefreshClosed(self, notify: Notify.Notification) -> None:
-        """
-        Delete our reference to the notification that was used to inform the user
-        that the timeline and preview folders will be. If it's not deleted, there will
-        be glib problems at program exit, when the reference is deleted.
-        :param notify: the notification itself
-        """
-
-        self.ctime_update_notification = None
 
     def invalidDownloadFolders(self, downloading: DownloadingFileTypes) -> List[str]:
         """
@@ -4241,6 +4261,10 @@ Do you want to proceed with the download?
 
         logging.error("Program preferences are invalid: %s", details)
         title = _("Program preferences are invalid")
+        # Translators: %(variable)s represents Python code, not a plural of the term
+        # variable. You must keep the %(variable)s untranslated, or the program will
+        # crash.
+        # Translators: please do not change HTML codes like <br>, <i>, </i>, or <b>, </b> etc.
         message = "<b>%(title)s</b><br><br>%(details)s" % dict(title=title, details=details)
         msgBox = self.standardMessageBox(message=message, rich_text=True)
         msgBox.exec()
@@ -4327,6 +4351,10 @@ Do you want to proceed with the download?
         camera_model = device.display_name
         if error_code == CameraErrorCode.locked:
             title =_('Rapid Photo Downloader')
+            # Translators: %(variable)s represents Python code, not a plural of the term
+            # variable. You must keep the %(variable)s untranslated, or the program will
+            # crash.
+            # Translators: please do not change HTML codes like <br>, <i>, </i>, or <b>, </b> etc.
             message = _(
                 '<b>All files on the %(camera)s are inaccessible</b>.<br><br>It '
                 'may be locked or not configured for file transfers using USB. '
@@ -4343,6 +4371,10 @@ Do you want to proceed with the download?
         else:
             assert error_code == CameraErrorCode.inaccessible
             title = _('Rapid Photo Downloader')
+            # Translators: %(variable)s represents Python code, not a plural of the term
+            # variable. You must keep the %(variable)s untranslated, or the program will
+            # crash.
+            # Translators: please do not change HTML codes like <br>, <i>, </i>, or <b>, </b> etc.
             message = _(
                 '<b>The %(camera)s appears to be in use by another '
                 'application.</b><br><br>Rapid Photo Downloader cannnot access a phone or camera '
@@ -4578,9 +4610,6 @@ Do you want to proceed with the download?
     def proximityGroupsGenerated(self, proximity_groups: TemporalProximityGroups) -> None:
         if self.temporalProximity.setGroups(proximity_groups=proximity_groups):
             self.thumbnailModel.assignProximityGroups(proximity_groups.col1_col2_uid)
-            if self.ctime_notification_issued:
-                self.notifyFoldersProximityRebuilt()
-                self.ctime_notification_issued = False
 
     def closeEvent(self, event) -> None:
         logging.debug("Close event activated")
@@ -4624,9 +4653,6 @@ Do you want to proceed with the download?
 
         logging.debug("Terminating main ExifTool process")
         self.exiftool_process.terminate()
-
-        if self.ctime_update_notification is not None:
-            self.ctime_update_notification = None
 
         self.sendStopToThread(self.offload_controller)
         self.offloadThread.quit()
@@ -4737,7 +4763,7 @@ Do you want to proceed with the download?
         libgphoto2
         """
 
-        sc = self.gp_context.camera_autodetect()
+        sc = autodetect_cameras(self.gp_context)
         system_cameras = ((model, port) for model, port in sc if not
                           port.startswith('disk:'))
         kc = self.devices.cameras.items()
@@ -4832,6 +4858,11 @@ Do you want to proceed with the download?
                     "Not scanning %s because it could not be unmounted", camera.display_name
                 )
 
+                # Translators: %(variable)s represents Python code, not a plural of the term
+                # variable. You must keep the %(variable)s untranslated, or the program will
+                # crash.
+                # Translators: please do not change HTML codes like <br>, <i>, </i>, or <b>, </b>
+                # etc.
                 message = _(
                     '<b>The %(camera)s cannot be scanned because it cannot be '
                     'unmounted.</b><br><br>You can close any other application (such as a '
@@ -4857,6 +4888,11 @@ Do you want to proceed with the download?
                 display_name = camera.display_name
 
                 title = _('Rapid Photo Downloader')
+                # Translators: %(variable)s represents Python code, not a plural of the term
+                # variable. You must keep the %(variable)s untranslated, or the program will
+                # crash.
+                # Translators: please do not change HTML codes like <br>, <i>, </i>, or <b>, </b>
+                # etc.
                 message = _(
                     '<b>The download cannot start because the %(camera)s cannot be '
                     'unmounted.</b><br><br>You '
@@ -4880,7 +4916,7 @@ Do you want to proceed with the download?
         """
 
         if self.prefs.device_autodetection:
-            cameras = self.gp_context.camera_autodetect()
+            cameras = autodetect_cameras(self.gp_context)
             for model, port in cameras:
                 if port in self.devices.cameras_to_gvfs_unmount_for_scan:
                     assert self.devices.cameras_to_gvfs_unmount_for_scan[port] == model
@@ -5607,10 +5643,13 @@ Do you want to proceed with the download?
                 '/media', '/run', os.path.expanduser('~'), '/', '/bin', '/boot', '/dev',
                 '/lib', '/lib32', '/lib64', '/mnt', '/opt', '/sbin', '/snap', '/sys', '/tmp',
                 '/usr', '/var', '/proc'):
+
+            # Translators: %(variable)s represents Python code, not a plural of the term
+            # variable. You must keep the %(variable)s untranslated, or the program will
+            # crash.
             message = "<b>" + _(
                 "Downloading from %(location)s on This Computer."
-            ) % dict(
-                location=make_html_path_non_breaking(path)
+            ) % dict(location=make_html_path_non_breaking(path)
             ) + "</b><br><br>" + _(
                 "Do you really want to download from here?<br><br>On some systems, scanning this "
                 "location can take a very long time."
@@ -5648,6 +5687,9 @@ Do you want to proceed with the download?
                 downloading = self.devices.downloading_from()
                 # Translators - in the middle is a unicode em dash - please retain it
                 # This string is displayed in the status bar when the download is paused
+                # Translators: %(variable)s represents Python code, not a plural of the term
+                # variable. You must keep the %(variable)s untranslated, or the program will
+                # crash.
                 msg = '%(downloading_from)s — download paused' % dict(downloading_from=downloading)
             else:
                 # status message updates while downloading are handled in another function
@@ -5667,6 +5709,9 @@ Do you want to proceed with the download?
                 files_hidden = self.thumbnailModel.getNoHiddenFiles()
 
                 if files_hidden:
+                    # Translators: %(variable)s represents Python code, not a plural of the term
+                    # variable. You must keep the %(variable)s untranslated, or the program will
+                    # crash.
                     files_checked = _(
                         '%(number)s of %(available files)s checked for download (%(hidden)s hidden)'
                     ) % {
@@ -5675,6 +5720,9 @@ Do you want to proceed with the download?
                         'hidden': files_hidden
                     }
                 else:
+                    # Translators: %(variable)s represents Python code, not a plural of the term
+                    # variable. You must keep the %(variable)s untranslated, or the program will
+                    # crash.
                     files_checked = _(
                         '%(number)s of %(available files)s checked for download'
                     ) % {
@@ -5833,6 +5881,20 @@ def get_versions() -> List[str]:
         versions.append('Tornado: {}'.format(tornado.version))
     except ImportError:
         pass
+    versions.append(
+        "Can read HEIF/HEIC metadata: {}".format('yes' if fileformats.heif_capable() else 'no')
+    )
+    if have_heif_module:
+        versions.append('Pyheif: {}'.format(pyheif_version()))
+        v = libheif_version()
+        if v:
+            versions.append('libheif: {}'.format(v))
+    for display in ('XDG_SESSION_TYPE', 'WAYLAND_DISPLAY'):
+        session = os.getenv(display, '')
+        if session:
+            break
+    if session:
+        versions.append('Session: {}'.format(session))
     return versions
 
 # def darkFusion(app: QApplication):
@@ -5865,7 +5927,11 @@ class SplashScreen(QSplashScreen):
     def __init__(self, pixmap: QPixmap, flags) -> None:
         super().__init__(pixmap, flags)
         self.progress = 0
-        self.image_width = pixmap.width()
+        try:
+            self.image_width = pixmap.width() / pixmap.devicePixelRatioF()
+        except AttributeError:
+            self.image_width = pixmap.width() / pixmap.devicePixelRatio()
+
         self.progressBarPen = QPen(QBrush(QColor(Qt.white)), 2.0)
 
     def drawContents(self, painter: QPainter):
@@ -5918,7 +5984,7 @@ def parser_options(formatter_class=argparse.HelpFormatter):
     )
     parser.add_argument(
         "--video-renaming", choices=['on','off'], dest="video_renaming",
-        help=_("turn on or off the the renaming of videos.")
+        help=_("Turn on or off the the renaming of videos.")
     )
     parser.add_argument(
         "-a", "--auto-detect", choices=['on','off'], dest="auto_detect",
@@ -6102,11 +6168,17 @@ def import_prefs() -> None:
     with raphodo.utilities.stdchannel_redirected(sys.stderr, os.devnull):
         value = run_cmd('program_version')
         if not value:
-            print(_("No prior program preferences detected: exiting"))
+            print(_("No prior program preferences detected: exiting."))
             return
         else:
-            print(_("Importing preferences from Rapid Photo Downloader %(version)s") % dict(
-                version=value))
+            print(
+                # Translators: %(variable)s represents Python code, not a plural of the term
+                # variable. You must keep the %(variable)s untranslated, or the program will
+                # crash.
+                _(
+                    "Importing preferences from Rapid Photo Downloader %(version)s"
+                ) % dict(version=value)
+            )
             print()
 
         for key_triplet in keys:
@@ -6189,6 +6261,38 @@ def critical_startup_error(message: str) -> None:
 
 
 def main():
+    # Set Qt 5 screen scaling if it is not already set in an environment variable
+    qt5_variable = qt5_screen_scale_environment_variable()
+    scaling_variables = {qt5_variable, 'QT_SCALE_FACTOR', 'QT_SCREEN_SCALE_FACTORS'}
+    if not scaling_variables & set(os.environ):
+        scaling_set = 'High DPI scaling automatically set to ON because one of the ' \
+                      'following environment variables not already ' \
+                      'set: {}'.format(', '.join(scaling_variables))
+        if pkgr.parse_version(QtCore.QT_VERSION_STR) >= pkgr.parse_version('5.6.0'):
+            QApplication.setAttribute(Qt.AA_EnableHighDpiScaling)
+        else:
+            os.environ[qt5_variable] = '1'
+    else:
+        scaling_set = 'High DPI scaling not automatically set to ON because environment ' \
+                      'variable(s) already ' \
+                      'set: {}'.format(', '.join(scaling_variables & set(os.environ)))
+
+    QApplication.setAttribute(Qt.AA_UseHighDpiPixmaps)
+
+    try:
+        # Enable fractional scaling support on Qt 5.14 or above
+        # Doesn't seem to be working on Gnome X11, however :-/
+        # Works on KDE Neon
+        if pkgr.parse_version(QtCore.QT_VERSION_STR) >= pkgr.parse_version('5.14.0'):
+            QApplication.setHighDpiScaleFactorRoundingPolicy(
+                Qt.HighDpiScaleFactorRoundingPolicy.PassThrough
+            )
+            fractional_scaling = 'Fractional scaling set to pass through'
+        else:
+            fractional_scaling = 'Fractional scaling unable to be set because Qt version is too old'
+    except Exception:
+        fractional_scaling = 'Error setting fractional scaling'
+        logging.warning(fractional_scaling)
 
     if sys.platform.startswith('linux') and os.getuid() == 0:
         sys.stderr.write("Never run this program as the sudo / root user.\n")
@@ -6392,7 +6496,7 @@ def main():
         auto_download_insertion=None
 
     if args.log_gphoto2:
-        gp.use_python_logging()
+        gphoto_logging = gphoto2_python_logging()
 
     if args.camera_info:
         dump_camera_details()
@@ -6425,7 +6529,7 @@ def main():
         d.update_table(reset=True)
         cache = ThumbnailCacheSql(create_table_if_not_exists=False)
         cache.purge_cache()
-        print(_("All settings and caches have been reset"))
+        print(_("All settings and caches have been reset."))
         logging.debug("Exiting immediately after full reset")
         sys.exit(0)
 
@@ -6433,13 +6537,13 @@ def main():
         if args.delete_thumb_cache:
             cache = ThumbnailCacheSql(create_table_if_not_exists=False)
             cache.purge_cache()
-            print(_("Thumbnail Cache has been reset"))
+            print(_("Thumbnail Cache has been reset."))
             logging.debug("Thumbnail Cache has been reset")
 
         if args.forget_files:
             d = DownloadedSQL()
             d.update_table(reset=True)
-            print(_("Remembered files have been forgotten"))
+            print(_("Remembered files have been forgotten."))
             logging.debug("Remembered files have been forgotten")
 
         if args.import_prefs:
@@ -6447,7 +6551,11 @@ def main():
         logging.debug("Exiting immediately after thumbnail cache / remembered files reset")
         sys.exit(0)
 
-    splash = SplashScreen(QPixmap(':/splashscreen.png'), Qt.WindowStaysOnTopHint)
+    # Use QIcon to render so we get the high DPI version automatically
+    size = QSize(600, 400)
+    pixmap = scaledIcon(':/splashscreen.png', size).pixmap(size)
+
+    splash = SplashScreen(pixmap, Qt.WindowStaysOnTopHint)
     splash.show()
     app.processEvents()
 
@@ -6470,13 +6578,16 @@ def main():
         auto_download_startup=auto_download_startup,
         auto_download_insertion=auto_download_insertion,
         log_gphoto2=args.log_gphoto2,
-        splash=splash
+        splash=splash,
+        fractional_scaling=fractional_scaling,
+        scaling_set=scaling_set
     )
 
     app.setActivationWindow(rw)
     code = app.exec_()
     logging.debug("Exiting")
     sys.exit(code)
+
 
 if __name__ == "__main__":
     main()

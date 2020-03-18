@@ -1,4 +1,4 @@
-# Copyright (C) 2016-2019 Damon Lynch <damonlynch@gmail.com>
+# Copyright (C) 2016-2020 Damon Lynch <damonlynch@gmail.com>
 
 # This file is part of Rapid Photo Downloader.
 #
@@ -21,12 +21,12 @@ Display an About window
 """
 
 __author__ = 'Damon Lynch'
-__copyright__ = "Copyright 2016-2019, Damon Lynch"
+__copyright__ = "Copyright 2016-2020, Damon Lynch"
 
 from gettext import gettext as _
 
-from PyQt5.QtCore import Qt, pyqtSlot
-from PyQt5.QtGui import QPixmap,  QFont
+from PyQt5.QtCore import Qt, pyqtSlot, QSize
+from PyQt5.QtGui import QPixmap, QFont
 
 from PyQt5.QtWidgets import (
     QDialog, QLabel, QVBoxLayout, QDialogButtonBox, QSizePolicy, QHBoxLayout, QStackedWidget,
@@ -51,7 +51,17 @@ class AboutDialog(QDialog):
         self.setObjectName('AboutDialog')
         self.setStyleSheet('QDialog#AboutDialog {background-image: url(:/splashscreen.png);}')
         pixmap = QPixmap(':/splashscreen.png')
-        self.setFixedSize(pixmap.size())
+        try:
+            ratio = pixmap.devicePixelRatioF()
+        except AttributeError:
+            ratio = pixmap.devicePixelRatio()
+
+        if ratio > 1.0:
+            size = QSize(pixmap.width() / ratio, pixmap.height() / ratio)
+        else:
+            size = pixmap.size()
+
+        self.setFixedSize(size)
 
         # These values are derived from the splash screen image contents.
         # If the image changes, so should these
@@ -63,7 +73,7 @@ class AboutDialog(QDialog):
 
         # Standard About view
 
-        msg = """Copyright &copy; 2007-2019 Damon Lynch.<br><br>
+        msg = """Copyright &copy; 2007-2020 Damon Lynch.<br><br>
         <a href="http://www.damonlynch.net/rapid" %(link_style)s>
         www.damonlynch.net/rapid</a><br><br>
         This program comes with absolutely no warranty.<br>
@@ -108,7 +118,7 @@ class AboutDialog(QDialog):
         # Credits view
 
         credits_text = """
-        Copyright © 2007-2019 Damon Lynch.
+        Copyright © 2007-2020 Damon Lynch.
         Portions copyright © 2008-2015 Canonical Ltd.
         Portions copyright © 2013 Bernard Baeyens.
         Portions copyright © 2012-2015 Jim Easterbrook.
@@ -121,9 +131,11 @@ class AboutDialog(QDialog):
         Speech bubble courtesy %(artlink4)s.
         Lightbulb icon courtesy %(artlink5)s.
         Unlink icon courtesy %(artlink6)s.
+        Clock icon courtesy %(artlink7)s.
 
         Translators:
 
+        Ilker Alp <ilkeryus@gmail.com>
         Anton Alyab'ev <subeditor@dolgopa.org>
         Lőrincz András <level.andrasnak@gmail.com>
         Michel Ange <michelange@wanadoo.fr>
@@ -188,7 +200,9 @@ class AboutDialog(QDialog):
             artlink4='<a href="http://www.iconsolid.com/" style="color: white;">Icons Solid</a>',
             artlink5='<a href="https://sellfy.com/designcoon" style="color: white;">Icon Coon</a>',
             artlink6='<a href="https://www.iconfinder.com/icons/1608708/unlink_icon" style="color: '
-                     'white;">Dave Gandy</a>'
+                     'white;">Dave Gandy</a>',
+            artlink7='<a href="https://www.flaticon.com/authors/pixel-perfect" style="color: '
+                     'white;">Pixel perfect</a>'
         )
 
         style_sheet = """QLabel {
