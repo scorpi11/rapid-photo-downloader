@@ -4,12 +4,10 @@ README.rst
 RELEASE_NOTES.rst
 install.py
 requirements.txt
-setup.cfg
 setup.py
 upgrade.py
-data/net.damonlynch.rapid-photo-downloader.appdata.xml.in
-data/net.damonlynch.rapid-photo-downloader.desktop.in
-data/icons/rapid-photo-downloader.xpm
+data/net.damonlynch.rapid_photo_downloader.desktop.in
+data/net.damonlynch.rapid_photo_downloader.metainfo.xml.in
 data/icons/128x128/apps/rapid-photo-downloader.png
 data/icons/16x16/apps/rapid-photo-downloader.png
 data/icons/22x22/apps/rapid-photo-downloader.png
@@ -19,7 +17,7 @@ data/icons/48x48/apps/rapid-photo-downloader.png
 data/icons/512x512/apps/rapid-photo-downloader.png
 data/icons/64x64/apps/rapid-photo-downloader.png
 data/icons/scalable/apps/rapid-photo-downloader.svg
-data/kde/net.damonlynch.rapid-photo-downloader.desktop.in
+data/kde/net.damonlynch.rapid_photo_downloader.desktop.in
 doc/analyze-pv-structure.1.pod
 doc/rapid-photo-downloader.1.pod
 po/LINGUAS
@@ -32,8 +30,6 @@ po/cs.po
 po/da.po
 po/de.po
 po/el.po
-po/en_AU.po
-po/en_GB.po
 po/es.po
 po/et.po
 po/fa.po
@@ -89,6 +85,7 @@ raphodo/foldercombo.py
 raphodo/folderspreview.py
 raphodo/generatename.py
 raphodo/generatenameconfig.py
+raphodo/heif.py
 raphodo/interprocess.py
 raphodo/iplogging.py
 raphodo/jobcodepanel.py

@@ -1,11 +1,13 @@
 Metadata-Version: 2.1
 Name: rapid-photo-downloader
-Version: 0.9.17
+Version: 0.9.19
 Summary: Downloads, renames and backs up photos and videos from cameras, phones, memory cards and other devices
 Home-page: http://www.damonlynch.net/rapid
 Author: Damon Lynch
 Author-email: damonlynch@gmail.com
-License: GPL
+License: GPL 3+
+Project-URL: Bug Reports, https://bugs.launchpad.net/rapid
+Project-URL: Source, https://code.launchpad.net/~dlynch3/rapid/zeromq_pyqt
 Description: Rapid Photo Downloader
         ======================
         
@@ -13,7 +15,7 @@ Description: Rapid Photo Downloader
         --------
         
         - `Description`_
-        - `Install on Ubuntu, openSUSE, Debian, and Fedora`_
+        - `Install on Ubuntu, openSUSE, Debian, Fedora, and CentOS 8`_
         - `Install on CentOS 7.5`_
         - `Supported Linux Versions`_
         - `Software Requirements and Program Installation on Other Systems`_
@@ -52,8 +54,8 @@ Description: Rapid Photo Downloader
         
         The program is licensed under the GPL3_ or later.
         
-        Install on Ubuntu, openSUSE, Debian, and Fedora
-        ===============================================
+        Install on Ubuntu, openSUSE, Debian, Fedora, and CentOS 8
+        =========================================================
         
         To install Rapid Photo Downloader, run as your regular user (i.e. *without*
         sudo):
@@ -86,7 +88,7 @@ Description: Rapid Photo Downloader
          - Ubuntu 16.04 or newer
          - LinuxMint 18 or newer
          - Debian 9, unstable or testing
-         - Fedora 28 or newer
+         - Fedora 30 or newer
          - openSUSE Leap 42.3 or newer
          - CentOS 7.5
          - Any distribution meeting the software requirements below
@@ -118,8 +120,8 @@ Description: Rapid Photo Downloader
          - Arrow_
          - dateutil_ 2.2 or newer
          - exiv2_
-         - ExifTool_ 0.97.4 or older (0.98 has a critical bug)
-         - EasyGUI_
+         - ExifTool_
+         - EasyGUI_ 0.97.4 or older (0.98 has a critical bug)
          - Colour_
          - pymediainfo_
          - SortedContainers_
@@ -140,6 +142,8 @@ Description: Rapid Photo Downloader
            Downloader from the terminal.
          - pyprind_: shows a progress bar on the command line while running the program
            ``analyze_pv_structure``.
+         - pyheif_: open HEIF / HEIC files (requires Python 3.6 or above)
+         - pillow_: work with HEIF / HEIC files
         
         Satisfying Software Requirements
         --------------------------------
@@ -273,10 +277,13 @@ Description: Rapid Photo Downloader
         .. _Requests: http://docs.python-requests.org/
         .. _tornado: http://www.tornadoweb.org/
         .. _Tenacity: https://github.com/jd/tenacity
-Keywords: photo,video,download,ingest,import,camera,phone,backup,rename,photography,photographer,transfer,copy,raw,cr2,nef,arw
+        .. _pyheif: https://github.com/david-poirier-csn/pyheif
+        .. _pillow: https://github.com/python-pillow/Pillow
+Keywords: photo video download ingest import camera phone backup rename photography photographer transfer copy raw cr2 cr3 nef arw dng
 Platform: UNKNOWN
 Classifier: Development Status :: 5 - Production/Stable
 Classifier: Environment :: X11 Applications :: Qt
+Classifier: Operating System :: POSIX :: Linux
 Classifier: Intended Audience :: End Users/Desktop
 Classifier: License :: OSI Approved :: GNU General Public License v3 or later (GPLv3+)
 Classifier: Operating System :: POSIX :: Linux
@@ -284,7 +291,9 @@ Classifier: Programming Language :: Python :: 3.4
 Classifier: Programming Language :: Python :: 3.5
 Classifier: Programming Language :: Python :: 3.6
 Classifier: Programming Language :: Python :: 3.7
+Classifier: Programming Language :: Python :: 3.8
 Classifier: Topic :: Multimedia :: Graphics
 Classifier: Topic :: Multimedia :: Video
+Requires-Python: >=3.4.*, <4
 Provides-Extra: color_ouput
 Provides-Extra: progress_bar

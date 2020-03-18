@@ -5,7 +5,7 @@ Contents
 --------
 
 - `Description`_
-- `Install on Ubuntu, openSUSE, Debian, and Fedora`_
+- `Install on Ubuntu, openSUSE, Debian, Fedora, and CentOS 8`_
 - `Install on CentOS 7.5`_
 - `Supported Linux Versions`_
 - `Software Requirements and Program Installation on Other Systems`_
@@ -44,8 +44,8 @@ download directly from cameras unless it used something else.
 
 The program is licensed under the GPL3_ or later.
 
-Install on Ubuntu, openSUSE, Debian, and Fedora
-===============================================
+Install on Ubuntu, openSUSE, Debian, Fedora, and CentOS 8
+=========================================================
 
 To install Rapid Photo Downloader, run as your regular user (i.e. *without*
 sudo):
@@ -78,7 +78,7 @@ Supported Linux Versions
  - Ubuntu 16.04 or newer
  - LinuxMint 18 or newer
  - Debian 9, unstable or testing
- - Fedora 28 or newer
+ - Fedora 30 or newer
  - openSUSE Leap 42.3 or newer
  - CentOS 7.5
  - Any distribution meeting the software requirements below
@@ -110,8 +110,8 @@ Rapid Photo Downloader requires:
  - Arrow_
  - dateutil_ 2.2 or newer
  - exiv2_
- - ExifTool_ 0.97.4 or older (0.98 has a critical bug)
- - EasyGUI_
+ - ExifTool_
+ - EasyGUI_ 0.97.4 or older (0.98 has a critical bug)
  - Colour_
  - pymediainfo_
  - SortedContainers_
@@ -132,6 +132,8 @@ Highly recommended, optional dependencies:
    Downloader from the terminal.
  - pyprind_: shows a progress bar on the command line while running the program
    ``analyze_pv_structure``.
+ - pyheif_: open HEIF / HEIC files (requires Python 3.6 or above)
+ - pillow_: work with HEIF / HEIC files
 
 Satisfying Software Requirements
 --------------------------------
@@ -265,3 +267,5 @@ environment's directory.
 .. _Requests: http://docs.python-requests.org/
 .. _tornado: http://www.tornadoweb.org/
 .. _Tenacity: https://github.com/jd/tenacity
+.. _pyheif: https://github.com/david-poirier-csn/pyheif
+.. _pillow: https://github.com/python-pillow/Pillow

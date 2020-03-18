@@ -1,4 +1,4 @@
-# Copyright (C) 2015-2018 Damon Lynch <damonlynch@gmail.com>
+# Copyright (C) 2015-2020 Damon Lynch <damonlynch@gmail.com>
 
 # This file is part of Rapid Photo Downloader.
 #
@@ -17,7 +17,7 @@
 # see <http://www.gnu.org/licenses/>.
 
 __author__ = 'Damon Lynch'
-__copyright__ = "Copyright 2015-2019, Damon Lynch"
+__copyright__ = "Copyright 2015-2020, Damon Lynch"
 
 from collections import (namedtuple, defaultdict, deque, Counter)
 from operator import attrgetter
@@ -27,7 +27,6 @@ import logging
 from itertools import groupby
 import pickle
 from pprint import pprint
-import math
 from typing import Dict, List, Tuple, Set, Optional, DefaultDict
 
 import arrow.arrow
@@ -36,7 +35,7 @@ from arrow.arrow import Arrow
 from gettext import gettext as _
 
 from PyQt5.QtCore import (
-    QAbstractTableModel, QModelIndex, Qt, QSize, QRect, QItemSelection, QItemSelectionModel,
+    QAbstractTableModel, QModelIndex, Qt, QSize, QSizeF, QRect, QItemSelection, QItemSelectionModel,
     QBuffer, QIODevice, pyqtSignal, pyqtSlot, QRectF, QPoint,
 )
 from PyQt5.QtWidgets import (
@@ -45,7 +44,8 @@ from PyQt5.QtWidgets import (
     QToolButton, QAction
 )
 from PyQt5.QtGui import (
-    QPainter, QFontMetrics, QFont, QColor, QGuiApplication, QPixmap, QPalette, QMouseEvent, QIcon
+    QPainter, QFontMetrics, QFont, QColor, QGuiApplication, QPixmap, QPalette, QMouseEvent, QIcon,
+    QFontMetricsF
 )
 
 from raphodo.constants import (
@@ -54,7 +54,9 @@ from raphodo.constants import (
 )
 from raphodo.rpdfile import FileTypeCounter
 from raphodo.preferences import Preferences
-from raphodo.viewutils import ThumbnailDataForProximity, QFramedWidget, QFramedLabel
+from raphodo.viewutils import (
+    ThumbnailDataForProximity, QFramedWidget, QFramedLabel, scaledIcon
+)
 from raphodo.timeutils import locale_time, strip_zero, make_long_date_format, strip_am, strip_pm
 from raphodo.utilities import runs
 from raphodo.constants import Roles
@@ -187,6 +189,9 @@ def humanize_time_span(start: Arrow, end: Arrow,
             return short_format
         else:
             # Translators: for example Nov 3 2015, 11:25 AM
+            # Translators: %(variable)s represents Python code, not a plural of the term
+            # variable. You must keep the %(variable)s untranslated, or the program will
+            # crash.
             return _('%(date)s, %(time)s') % dict(
                 date=make_long_date_format(start),
                 time=short_format
@@ -203,6 +208,9 @@ def humanize_time_span(start: Arrow, end: Arrow,
         elif (start.hour >= 12 and end.hour >= 12):
             start_time = strip_pm(start_time)
 
+        # Translators: %(variable)s represents Python code, not a plural of the term
+        # variable. You must keep the %(variable)s untranslated, or the program will
+        # crash.
         time_span = _('%(starttime)s - %(endtime)s') % dict(
             starttime=start_time,
             endtime=end_time
@@ -212,6 +220,9 @@ def humanize_time_span(start: Arrow, end: Arrow,
             return time_span
         else:
             # Translators: for example Nov 3 2015, 11:25 AM
+            # Translators: %(variable)s represents Python code, not a plural of the term
+            # variable. You must keep the %(variable)s untranslated, or the program will
+            # crash.
             return _('%(date)s, %(time)s') % dict(
                 date=make_long_date_format(start),
                 time=time_span
@@ -220,10 +231,16 @@ def humanize_time_span(start: Arrow, end: Arrow,
     # The start and end dates are on a different day
 
     # Translators: for example Nov 3 or Dec 31
+    # Translators: %(variable)s represents Python code, not a plural of the term
+    # variable. You must keep the %(variable)s untranslated, or the program will
+    # crash.
     start_date = _('%(month)s %(numeric_day)s') % dict(
         month=start.datetime.strftime('%b'),
         numeric_day=start.format('D')
     )
+    # Translators: %(variable)s represents Python code, not a plural of the term
+    # variable. You must keep the %(variable)s untranslated, or the program will
+    # crash.
     end_date = _('%(month)s %(numeric_day)s') % dict(
         month=end.datetime.strftime('%b'),
         numeric_day=end.format('D')
@@ -231,19 +248,34 @@ def humanize_time_span(start: Arrow, end: Arrow,
 
     if start.floor('year') != end.floor('year') or long_format:
         # Translators: for example Nov 3 2015
+        # Translators: %(variable)s represents Python code, not a plural of the term
+        # variable. You must keep the %(variable)s untranslated, or the program will
+        # crash.
         start_date = _('%(date)s %(year)s') % dict(date=start_date, year=start.year)
+        # Translators: %(variable)s represents Python code, not a plural of the term
+        # variable. You must keep the %(variable)s untranslated, or the program will
+        # crash.
         end_date = _('%(date)s %(year)s') % dict(date=end_date, year=end.year)
 
     # Translators: for example, Nov 3, 12:15 PM
+    # Translators: %(variable)s represents Python code, not a plural of the term
+    # variable. You must keep the %(variable)s untranslated, or the program will
+    # crash.
     start_datetime = _('%(date)s, %(time)s') % dict(
         date=start_date, time=strip_zero(locale_time(start.datetime), strip)
     )
+    # Translators: %(variable)s represents Python code, not a plural of the term
+    # variable. You must keep the %(variable)s untranslated, or the program will
+    # crash.
     end_datetime = _('%(date)s, %(time)s') % dict(
         date=end_date, time=strip_zero(locale_time(end.datetime), strip)
     )
 
     if not insert_cr_on_long_line or long_format:
         # Translators: for example, Nov 3, 12:15 PM - Nov 4, 1:00 AM
+        # Translators: %(variable)s represents Python code, not a plural of the term
+        # variable. You must keep the %(variable)s untranslated, or the program will
+        # crash.
         return _('%(earlier_time)s - %(later_time)s') % dict(
             earlier_time=start_datetime, later_time=end_datetime
         )
@@ -252,6 +284,9 @@ def humanize_time_span(start: Arrow, end: Arrow,
         # Nov 3 2012, 12:15 PM -
         # Nov 4 2012, 1:00 AM
         # (please keep the line break signified by \n)
+        # Translators: %(variable)s represents Python code, not a plural of the term
+        # variable. You must keep the %(variable)s untranslated, or the program will
+        # crash.
         return _('%(earlier_time)s -\n%(later_time)s') % dict(
             earlier_time=start_datetime, later_time=end_datetime
         )
@@ -314,16 +349,16 @@ class ProximityDisplayValues:
         self.assign_fonts()
 
         # Column 0 - month + year
-        self.col0_padding = 20
-        self.col0_center_space = 2
-        self.col0_center_space_half = 1
+        self.col0_padding = 20.0
+        self.col0_center_space = 2.0
+        self.col0_center_space_half = 1.0
 
         # Column 1 - weekday + day
-        self.col1_center_space = 2
-        self.col1_center_space_half = 1
-        self.col1_padding = 10
-        self.col1_v_padding = 50
-        self.col1_v_padding_top = self.col1_v_padding_bot = self.col1_v_padding // 2
+        self.col1_center_space = 2.0
+        self.col1_center_space_half = 1.0
+        self.col1_padding = 10.0
+        self.col1_v_padding = 50.0
+        self.col1_v_padding_top = self.col1_v_padding_bot = self.col1_v_padding / 2
 
         self.calculate_max_col1_size()
         self.day_proportion = self.max_day_height / self.max_col1_text_height
@@ -335,32 +370,32 @@ class ProximityDisplayValues:
         self.col2_new_file_dot_radius = self.col2_new_file_dot_size / 2
         self.col2_font_descent_adjust = self.proximityMetrics.descent() / 3
         self.col2_font_height_half = self.proximityMetrics.height() / 2
-        self.col2_new_file_dot_left_margin = 6
+        self.col2_new_file_dot_left_margin = 6.0
 
         if self.col2_new_file_dot:
             self.col2_text_left_margin = (
                 self.col2_new_file_dot_left_margin * 2 + self.col2_new_file_dot_size
             )
         else:
-            self.col2_text_left_margin = 10
-        self.col2_right_margin = 10
-        self.col2_v_padding = 6
-        self.col2_v_padding_half = 3
+            self.col2_text_left_margin = 10.0
+        self.col2_right_margin = 10.0
+        self.col2_v_padding = 6.0
+        self.col2_v_padding_half = 3.0
 
     def assign_fonts(self) -> None:
         self.proximityFont = proximityFont()
         self.proximityFontPrevious = QFont(self.proximityFont)
         self.proximityFontPrevious.setItalic(True)
-        self.proximityMetrics = QFontMetrics(self.proximityFont)
-        self.proximityMetricsPrevious = QFontMetrics(self.proximityFontPrevious)
+        self.proximityMetrics = QFontMetricsF(self.proximityFont)
+        self.proximityMetricsPrevious = QFontMetricsF(self.proximityFontPrevious)
         mf = monthFont()
         self.monthFont = mf.font
         self.month_kerning = mf.kerning
-        self.monthMetrics = QFontMetrics(self.monthFont)
+        self.monthMetrics = QFontMetricsF(self.monthFont)
         self.weekdayFont = weekdayFont()
         self.dayFont = dayFont()
         self.invalidRowFont = invalidRowFont()
-        self.invalidRowFontMetrics = QFontMetrics(self.invalidRowFont)
+        self.invalidRowFontMetrics = QFontMetricsF(self.invalidRowFont)
         self.invalidRowHeightMin = self.invalidRowFontMetrics.height() + \
                                    self.proximityMetrics.height()
 
@@ -372,27 +407,30 @@ class ProximityDisplayValues:
         self.dayFont = None
         self.invalidRowFont = self.invalidRowFontMetrics = None
 
-    def get_month_size(self, month: str) -> QSize:
-        boundingRect = self.monthMetrics.boundingRect(month)  # type: QRect
+    def get_month_size(self, month: str) -> QSizeF:
+        boundingRect = self.monthMetrics.boundingRect(month)  # type: QRectF
         height = boundingRect.height()
-        width = int(boundingRect.width() * self.month_kerning)
-        size = QSize(width, height)
+        width = boundingRect.width() * self.month_kerning
+        size = QSizeF(width, height)
         return size
 
     def get_month_text(self, month, year) -> str:
         if self.depth == 3:
+            # Translators: %(variable)s represents Python code, not a plural of the term
+            # variable. You must keep the %(variable)s untranslated, or the program will
+            # crash.
             return _('%(month)s  %(year)s') % dict(month=month.upper(), year=year)
         else:
             return month.upper()
 
-    def column0Size(self, year: str, month: str) -> QSize:
+    def column0Size(self, year: str, month: str) -> QSizeF:
         # Don't return a cell size for empty cells that have been
         # merged into the cell with content.
         month = self.get_month_text(month, year)
         size = self.get_month_size(month)
         # Height and width are reversed because of the rotation
         size.transpose()
-        return QSize(size.width() + self.col0_padding, size.height() + self.col0_padding)
+        return QSizeF(size.width() + self.col0_padding, size.height() + self.col0_padding)
 
     def calculate_max_col1_size(self) -> None:
         """
@@ -401,7 +439,7 @@ class ProximityDisplayValues:
         Column 1 cell sizes are fixed.
         """
 
-        dayMetrics = QFontMetrics(dayFont())
+        dayMetrics = QFontMetricsF(dayFont())
         day_width = 0
         day_height = 0
         for day in range(10, 32):
@@ -414,7 +452,7 @@ class ProximityDisplayValues:
 
         weekday_width = 0
         weekday_height = 0
-        weekdayMetrics = QFontMetrics(weekdayFont())
+        weekdayMetrics = QFontMetricsF(weekdayFont())
         for i in range(1, 7):
             dt = datetime(2015, 11, i)  # Year and month are totally irrelevant, only want day
             weekday = dt.strftime('%a').upper()
@@ -429,14 +467,14 @@ class ProximityDisplayValues:
         self.col1_width = self.max_col1_text_width + self.col1_padding
         self.col1_height = self.max_col1_text_height
 
-    def get_proximity_size(self, text: str) -> QSize:
+    def get_proximity_size(self, text: str) -> QSizeF:
         text = text.split('\n')
         width = height = 0
         for t in text:
-            boundingRect = self.proximityMetrics.boundingRect(t)  # type: QRect
+            boundingRect = self.proximityMetrics.boundingRect(t)  # type: QRectF
             width = max(width, boundingRect.width())
             height += boundingRect.height()
-        size = QSize(
+        size = QSizeF(
             width  + self.col2_text_left_margin + self.col2_right_margin,
             height + self.col2_v_padding
         )
@@ -513,22 +551,22 @@ class ProximityDisplayValues:
             for c1_children in c0_children:
                 c1_children_height = sum(c2.height() for c2 in c1_children)
                 c2_max_width = max(c2_max_width, max(c2.width() for c2 in c1_children))
-                extra = math.ceil(max(self.col1_height - c1_children_height, 0) / 2)
+                extra = max(self.col1_height - c1_children_height, 0) / 2
 
                 # Assign in c1's v_padding to first and last child, and any extra
-                c2 = c1_children[0]  # type: QSize
+                c2 = c1_children[0]  # type: QSizeF
                 c2.setHeight(c2.height() + self.col1_v_padding_top + extra)
-                c2 = c1_children[-1]  # type: QSize
+                c2 = c1_children[-1]  # type: QSizeF
                 c2.setHeight(c2.height() + self.col1_v_padding_bot + extra)
 
                 c1_children_height += self.col1_v_padding_top + self.col1_v_padding_bot + extra * 2
                 c0_children_height += c1_children_height
 
-            extra = math.ceil(max(c0_height - c0_children_height, 0) / 2)
+            extra = max(c0_height - c0_children_height, 0) / 2
             if extra:
-                c2 = c0_children[0][0]  # type: QSize
+                c2 = c0_children[0][0]  # type: QSizeF
                 c2.setHeight(c2.height() + extra)
-                c2 = c0_children[-1][-1]  # type: QSize
+                c2 = c0_children[-1][-1]  # type: QSizeF
                 c2.setHeight(c2.height() + extra)
 
             heights = [c2.height() for c1_children in c0_children for c2 in c1_children]
@@ -988,13 +1026,22 @@ class TemporalProximityGroups:
         else:
             weekday = numeric_day = ''
 
+        # Translators: %(variable)s represents Python code, not a plural of the term
+        # variable. You must keep the %(variable)s untranslated, or the program will
+        # crash.
         month_day = _('%(month)s %(numeric_day)s') % dict(
             month=atime.datetime.strftime('%b'),
             numeric_day=atime.format('D')
         )
         # Translators: for example Nov 2 2015
+        # Translators: %(variable)s represents Python code, not a plural of the term
+        # variable. You must keep the %(variable)s untranslated, or the program will
+        # crash.
         tooltip_col1 = _('%(date)s %(year)s') % dict(date= month_day, year=atime.year)
         # Translators: for example Nov 2015
+        # Translators: %(variable)s represents Python code, not a plural of the term
+        # variable. You must keep the %(variable)s untranslated, or the program will
+        # crash.
         tooltip_col0 = _('%(month)s %(year)s') % dict(
             month=atime.datetime.strftime('%b'),
             year=atime.year
@@ -1074,7 +1121,7 @@ def base64_thumbnail(pixmap: QPixmap, size: QSize) -> str:
 
 
 class TemporalProximityModel(QAbstractTableModel):
-    tooltip_image_size = QSize(90, 90)
+    tooltip_image_size = QSize(90, 90)  # FIXME high DPI?
 
     def __init__(self, rapidApp, groups: TemporalProximityGroups=None, parent=None) -> None:
         super().__init__(parent)
@@ -1262,6 +1309,7 @@ class TemporalProximityDelegate(QStyledItemDelegate):
     def paint(self, painter: QPainter, option: QStyleOptionViewItem, index: QModelIndex) -> None:
         row = index.row()
         column = index.column()
+        optionRectF = QRectF(option.rect)
 
         if column == 0:
             # Month and year
@@ -1275,15 +1323,15 @@ class TemporalProximityDelegate(QStyledItemDelegate):
                 color = self.darkGray
                 textColor = self.dv.tableColor
                 barColor = self.darkerGray
-            painter.fillRect(option.rect, color)
+            painter.fillRect(optionRectF, color)
             painter.setPen(textColor)
 
             year, month = index.data()
 
             month = self.dv.get_month_text(month, year)
 
-            x = option.rect.x()
-            y = option.rect.y()
+            x = optionRectF.x()
+            y = optionRectF.y()
 
             painter.setFont(self.dv.monthFont)
             painter.setPen(textColor)
@@ -1294,13 +1342,13 @@ class TemporalProximityDelegate(QStyledItemDelegate):
             painter.rotate(270.0)
 
             # Translate positioning to reflect new rotation
-            painter.translate(-1 * option.rect.height(), 0)
-            rect = QRect(0, 0, option.rect.height(), option.rect.width())
+            painter.translate(-1 * optionRectF.height(), 0)
+            rect = QRectF(0, 0, optionRectF.height(), optionRectF.width())
 
             painter.drawText(rect, Qt.AlignCenter, month)
 
             painter.setPen(barColor)
-            painter.drawLine(1, 0, 1, option.rect.width())
+            painter.drawLine(1, 0, 1, optionRectF.width())
 
             painter.restore()
 
@@ -1319,19 +1367,19 @@ class TemporalProximityDelegate(QStyledItemDelegate):
                 dayColor = QColor(Qt.white)
                 barColor = self.darkerGray
 
-            painter.fillRect(option.rect, color)
+            painter.fillRect(optionRectF, color)
             weekday, day = index.data()
             weekday = weekday.upper()
-            width = option.rect.width()
-            height = option.rect.height()
+            width = optionRectF.width()
+            height = optionRectF.height()
 
-            painter.translate(option.rect.x(), option.rect.y())
-            weekday_rect_bottom = int(
+            painter.translate(optionRectF.x(), optionRectF.y())
+            weekday_rect_bottom = (
                 height / 2 - self.dv.max_col1_text_height * self.dv.day_proportion
             ) + self.dv.max_weekday_height
-            weekdayRect = QRect(0, 0, width, weekday_rect_bottom)
+            weekdayRect = QRectF(0, 0, width, weekday_rect_bottom)
             day_rect_top = weekday_rect_bottom + self.dv.col1_center_space
-            dayRect = QRect(0, day_rect_top, width, height - day_rect_top)
+            dayRect = QRectF(0, day_rect_top, width, height - day_rect_top)
 
             painter.setFont(self.dv.weekdayFont)
             painter.setPen(weekdayColor)
@@ -1343,7 +1391,7 @@ class TemporalProximityDelegate(QStyledItemDelegate):
             if row in self.dv.c1_end_of_month:
                 painter.setPen(barColor)
                 painter.drawLine(
-                    0, option.rect.height() - 1, option.rect.width(), option.rect.height() - 1
+                    0, optionRectF.height() - 1, optionRectF.width(), optionRectF.height() - 1
                 )
 
             painter.restore()
@@ -1371,7 +1419,7 @@ class TemporalProximityDelegate(QStyledItemDelegate):
                 else:
                     textColor = self.darkGray
 
-            painter.fillRect(option.rect, color)
+            painter.fillRect(optionRectF, color)
 
             align = self.dv.c2_alignment.get(row)
 
@@ -1381,18 +1429,18 @@ class TemporalProximityDelegate(QStyledItemDelegate):
                 painter.setRenderHint(QPainter.Antialiasing)
                 painter.setBrush(self.newFileColor)
                 rect = QRectF(
-                    option.rect.x(),
-                    option.rect.y(),
+                    optionRectF.x(),
+                    optionRectF.y(),
                     self.dv.col2_new_file_dot_size,
                     self.dv.col2_new_file_dot_size
                 )
                 if align is None:
-                    height = option.rect.height() / 2 -self.dv.col2_new_file_dot_radius - \
+                    height = optionRectF.height() / 2 - self.dv.col2_new_file_dot_radius - \
                              self.dv.col2_font_descent_adjust
                     rect.translate(self.dv.col2_new_file_dot_left_margin, height)
                 elif align == Align.bottom:
                     height = (
-                        option.rect.height() - self.dv.col2_font_height_half -
+                        optionRectF.height() - self.dv.col2_font_height_half -
                         self.dv.col2_font_descent_adjust - self.dv.col2_new_file_dot_size
                     )
                     rect.translate(self.dv.col2_new_file_dot_left_margin, height)
@@ -1403,19 +1451,18 @@ class TemporalProximityDelegate(QStyledItemDelegate):
                     rect.translate(self.dv.col2_new_file_dot_left_margin, height)
                 painter.drawEllipse(rect)
 
-            rect = QRect(option.rect)
-            rect.translate(self.dv.col2_text_left_margin, 0)
+            rect = optionRectF.translated(self.dv.col2_text_left_margin, 0)
 
             painter.setPen(textColor)
 
             if invalid_rows:
                 # Render the row
-                invalidRightRect = QRect(option.rect)
+                invalidRightRect = QRectF(optionRectF)
                 invalidRightRect.translate(-2, 1)
                 painter.setFont(self.dv.invalidRowFont)
                 painter.drawText(invalidRightRect, Qt.AlignRight | Qt.AlignTop, str(row))
                 if align != Align.top and self.dv.invalidRowHeightMin < option.rect.height():
-                    invalidLeftRect = QRect(option.rect)
+                    invalidLeftRect = QRectF(option.rect)
                     invalidLeftRect.translate(1, 1)
                     painter.drawText(invalidLeftRect, Qt.AlignLeft | Qt.AlignTop, 'Debug mode')
 
@@ -1435,9 +1482,9 @@ class TemporalProximityDelegate(QStyledItemDelegate):
                     painter.setPen(self.darkerHighlight)
                 else:
                     painter.setPen(self.dv.tableColorDarker)
-                painter.translate(option.rect.x(), option.rect.y())
+                painter.translate(optionRectF.x(), optionRectF.y())
                 painter.drawLine(
-                    0, option.rect.height() - 1, self.dv.col_widths[2], option.rect.height() - 1
+                    0, optionRectF.height() - 1, self.dv.col_widths[2], optionRectF.height() - 1
                 )
 
             painter.restore()
@@ -1636,7 +1683,6 @@ class TemporalProximityView(QTableView):
             self.temporalProximityWidget.block_update_device_display = True
             super().mousePressEvent(event)
 
-
     @pyqtSlot(QMouseEvent)
     def mouseReleaseEvent(self, event: QMouseEvent) -> None:
         self.temporalProximityWidget.block_update_device_display = False
@@ -1690,7 +1736,7 @@ class TemporalValuePicker(QWidget):
 
         # Determine maximum width of display label
         width = 0
-        labelMetrics = QFontMetrics(QFont())
+        labelMetrics = QFontMetricsF(QFont())
         for m in range(len(proximity_time_steps)):
             boundingRect = labelMetrics.boundingRect(self.displayString(m))  # type: QRect
             width = max(width, boundingRect.width())
@@ -1705,7 +1751,7 @@ class TemporalValuePicker(QWidget):
 
         layout = QHBoxLayout()
         layout.setContentsMargins(0, 0, 0, 0)
-        layout.setSpacing(QFontMetrics(font).height() // 6)
+        layout.setSpacing(QFontMetricsF(font).height() / 6)
         self.setLayout(layout)
         layout.addWidget(self.slider)
         layout.addWidget(self.display)
@@ -1879,9 +1925,8 @@ class TemporalProximity(QWidget):
         }
 
         self.autoScrollButton = QToolButton(self)
-        icon = QIcon(':/icons/link.svg')
+        icon = scaledIcon(':/icons/link.svg', self.autoScrollButton.iconSize())
         self.autoScrollButton.setIcon(icon)
-        # self.autoScrollButton.setIconSize(QSize(16, 16))
         self.autoScrollButton.setAutoRaise(True)
         self.autoScrollButton.setCheckable(True)
         self.autoScrollButton.setToolTip(

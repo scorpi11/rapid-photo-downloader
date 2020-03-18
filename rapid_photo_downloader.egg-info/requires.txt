@@ -1,4 +1,4 @@
-PyGObject
+PyGObjectPyQt5
 arrow
 colour
 easygui

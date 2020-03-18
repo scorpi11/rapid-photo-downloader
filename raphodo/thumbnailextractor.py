@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 
-# Copyright (C) 2015-2019 Damon Lynch <damonlynch@gmail.com>
+# Copyright (C) 2015-2020 Damon Lynch <damonlynch@gmail.com>
 
 # This file is part of Rapid Photo Downloader.
 #
@@ -19,7 +19,7 @@
 # see <http://www.gnu.org/licenses/>.
 
 __author__ = 'Damon Lynch'
-__copyright__ = "Copyright 2015-2019, Damon Lynch"
+__copyright__ = "Copyright 2015-2020, Damon Lynch"
 
 import sys
 import logging
@@ -55,10 +55,13 @@ from raphodo.constants import (
 )
 from raphodo.rpdfile import RPDFile, Video, Photo
 from raphodo.constants import FileType
-from raphodo.utilities import stdchannel_redirected, show_errors, image_large_enough_fdo
+from raphodo.utilities import (
+    stdchannel_redirected, show_errors, image_large_enough_fdo
+)
 from raphodo.filmstrip import add_filmstrip
 from raphodo.cache import ThumbnailCacheSql, FdoCacheLarge, FdoCacheNormal
 import raphodo.exiftool as exiftool
+from raphodo.heif import have_heif_module, load_heif
 
 
 have_gst = Gst.init_check(None)
@@ -171,7 +174,9 @@ def get_video_frame(full_file_name: str,
     else:
         return None
 
+
 PhotoDetails = namedtuple('PhotoDetails', 'thumbnail, orientation')
+
 
 def qimage_to_png_buffer(image: QImage) -> QBuffer:
     """
@@ -226,6 +231,7 @@ class ThumbnailExtractor(LoadBalancerWorker):
         :param orientation: EXIF orientation tag
         :return: possibly rotated thumbnail
         """
+
         if orientation == self.rotate_90:
             thumbnail = thumbnail.transformed(QTransform().rotate(90))
         elif orientation == self.rotate_270:
@@ -559,6 +565,23 @@ class ThumbnailExtractor(LoadBalancerWorker):
             thumbnail = thumbnail_details.thumbnail
             if thumbnail is not None:
                 orientation = thumbnail_details.orientation
+
+        elif task in (ExtractionTask.load_heif_directly,
+                      ExtractionTask.load_heif_and_exif_directly):
+            assert have_heif_module
+            thumbnail = load_heif(
+                data.full_file_name_to_work_on, process_name=self.identity.decode()
+            )
+
+            if task == ExtractionTask.load_heif_and_exif_directly:
+                self.assign_photo_mdatatime(
+                    rpd_file=rpd_file, full_file_name=data.full_file_name_to_work_on
+                )
+            if ExtractionProcessing.orient in processing:
+                orientation = self.get_photo_orientation(
+                    rpd_file=rpd_file, full_file_name=data.full_file_name_to_work_on
+                )
+
         else:
             assert task in (
                 ExtractionTask.extract_from_file, ExtractionTask.extract_from_file_and_load_metadata
@@ -641,7 +664,6 @@ class ThumbnailExtractor(LoadBalancerWorker):
                     thumbnail, orientation = self.extract_thumbnail(
                         task, rpd_file, processing, data
                     )
-
                     if data.file_to_work_on_is_temporary:
                         os.remove(data.full_file_name_to_work_on)
                         rpd_file.temp_cache_full_file_chunk = ''
@@ -811,6 +833,7 @@ class ThumbnailExtractor(LoadBalancerWorker):
             "Terminating thumbnail extractor ExifTool process for %s", self.identity.decode()
         )
         self.exiftool_process.terminate()
+
 
 if __name__ == "__main__":
     thumbnail_extractor = ThumbnailExtractor()

@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 
-# Copyright (C) 2007-2018 Damon Lynch <damonlynch@gmail.com>
+# Copyright (C) 2007-2020 Damon Lynch <damonlynch@gmail.com>
 
 # This file is part of Rapid Photo Downloader.
 #
@@ -24,7 +24,7 @@ Read photo and video metadata using ExifTool daemon process.
 """
 
 __author__ = 'Damon Lynch'
-__copyright__ = "Copyright 2007-2018, Damon Lynch"
+__copyright__ = "Copyright 2007-2020, Damon Lynch"
 
 import datetime
 import re
@@ -47,6 +47,7 @@ _index_preview = {
             3: 'PreviewTIFF',
             4: 'ThumbnailTIFF'
 }
+
 
 class MetadataExiftool():
     """
@@ -98,8 +99,10 @@ class MetadataExiftool():
         )
         self.preview_smallest['3fr'] = 3, 4
 
+        # Format might have a thumbnail, but might not
         self.may_have_thumbnail = ('crw', 'mrw', 'orf', 'raw', 'x3f')
 
+        # Preview images that are at least 256 pixels big, according to self.index_preview
         self.preview256 = dict(
             arw=(0, ),
             cr2=(0, ),
@@ -622,7 +625,7 @@ class MetadataExiftool():
 
     def get_preview_256(self) -> Optional[bytes]:
         """
-        :return: if possible, return a preview image that is preferrably larger than 256 pixels,
+        :return: if possible, return a preview image that is preferably larger than 256 pixels,
          else the smallest preview if it exists
         """
 
@@ -638,7 +641,7 @@ class MetadataExiftool():
 
     def preview_names(self) -> Optional[List[str]]:
         """
-        Names of preview image located in the file, including the tag ThumbnailImage
+        Names of preview image located in the file, excluding the tag ThumbnailImage
 
         :return None if unsuccessful, else names of preview images
         """
@@ -651,12 +654,13 @@ class MetadataExiftool():
 
         return [v for v in self.index_preview.values() if v in self.metadata]
 
+
 if __name__ == '__main__':
     import sys
 
     with exiftool.ExifTool() as et_process:
         if (len(sys.argv) != 2):
-            print('Usage: ' + sys.argv[0] + ' path/to/video/containing/metadata')
+            print('Usage: ' + sys.argv[0] + ' path/to/video_or_photo/containing/metadata')
         else:
             file = sys.argv[1]
 
@@ -681,6 +685,23 @@ if __name__ == '__main__':
             print('Artist', m.artist())
             print('Subseconds:', m.sub_seconds())
             print('Orientation:', m.orientation())
+            print('Preview names (excluding Thumbnail): ', m.preview_names())
+            preview = m.get_small_thumbnail_or_first_indexed_preview()
+
+            thumb = m.get_small_thumbnail()
+            if thumb:
+                print('Thumbnail size: {} bytes'.format(len(thumb)))
+            else:
+                print('No thumbnail detected')
+
+            previews = et_process.execute(file.encode(), b'-preview:all')
+            print("ExifTool raw output:")
+            if previews:
+                print(previews.decode())
+            else:
+                print('No previews detected')
+
+
 
 
             # print("%sx%s" % (m.width(), m.height()))

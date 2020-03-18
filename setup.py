@@ -1,6 +1,6 @@
 #!/usr/bin/python3
 
-# Copyright (C) 2009-2018 Damon Lynch <damonlynch@gmail.com>
+# Copyright (C) 2009-2020 Damon Lynch <damonlynch@gmail.com>
 
 # This file is part of Rapid Photo Downloader.
 #
@@ -18,22 +18,19 @@
 # along with Rapid Photo Downloader.  If not,
 # see <http://www.gnu.org/licenses/>.
 
-# Copyright 2009-2017 Damon Lynch
+# Copyright 2009-2020 Damon Lynch
 # Contains portions Copyright 2014 Donald Stufft
 # Contains portions Copyright 2004, 2005, 2006, 2007, 2008, 2009, 2010, 2011, 2012, Canonical Ltd
 
 __author__ = 'Damon Lynch'
-__copyright__ = "Copyright 2009-2018, Damon Lynch. Copyright 2004-2012 Canonical Ltd. " \
+__copyright__ = "Copyright 2009-2020, Damon Lynch. Copyright 2004-2012 Canonical Ltd. " \
                 "Copyright 2014 Donald Stufft."
 
 import os
-import os.path
 from glob import glob
-import distutils
-import distutils.command.build
-from distutils.command.clean import clean
+from distutils.command.build import build
 from setuptools import setup, Command
-from setuptools.command.install import install
+from setuptools.command.sdist import sdist
 
 
 here = os.path.abspath(os.path.dirname(__file__))
@@ -43,109 +40,19 @@ with open(os.path.join(here, "raphodo", "__about__.py")) as f:
     exec(f.read(), about)
 
 
-class build_extra(distutils.command.build.build):
+class build_translations(Command):
     """
-    Adds the extra commands to the build target. This class should be used
-    with the core distutils
+    Adapted from DistutilsExtra.
 
-    Taken straight from DistutilsExtra, minus finalize_options
+    March, 2020: delete setup.cfg, place options here. Cut out extraneous code from
+    DistutilsExtra we do not need.
     """
-    def __init__(self, dist):
-        distutils.command.build.build.__init__(self, dist)
-
-        self.user_options.extend([("i18n", None, "use the localisation"),
-                                  ("icons", None, "use icons"),
-                                  ("kdeui", None, "use kdeui"),
-                                  ("help", None, "use help system")])
-    def initialize_options(self):
-        distutils.command.build.build.initialize_options(self)
-        self.i18n = False
-        self.icons = False
-        self.help = False
-        self.kdeui = False
-
-
-class build_extra_commands(build_extra):
-    """
-    Adds the extra commands to the build target.
-    This class should be used with setuptools.
-
-    Taken straight from DistutilsExtra
-    """
-
-    def finalize_options(self):
-        def has_help(command):
-            return self.help == "True"
-        def has_icons(command):
-            return self.icons == "True"
-        def has_i18n(command):
-            return self.i18n == "True"
-        def has_kdeui(command):
-            return self.kdeui == "True"
-        distutils.command.build.build.finalize_options(self)
-        self.sub_commands.append(("build_i18n", has_i18n))
-        self.sub_commands.append(("build_icons", has_icons))
-        self.sub_commands.append(("build_help", has_help))
-        self.sub_commands.insert(0, ("build_kdeui", has_kdeui))  # need to run before build_py
-
-
-class build_extra_man_page(build_extra_commands):
-    """
-    Taken from the Canonical project 'germinate'
-    """
-    def __init__(self, dist):
-        super().__init__(dist)
-        self.user_options.extend([('pod2man', None, 'use pod2man')])
-
-    def initialize_options(self):
-        super().initialize_options()
-        self.pod2man = False
-
-    def finalize_options(self):
-        def has_pod2man(command):
-            return self.pod2man == 'True'
-
-        super().finalize_options()
-        self.sub_commands.append(('build_pod2man', has_pod2man))
-
-
-class build_pod2man(Command):
-    """
-    Based on code in the Canonical project 'germinate'
-    """
-    description = "build POD manual pages"
-
-    user_options = [('pod-files=', None, 'POD files to build')]
-
-    def initialize_options(self):
-        self.pod_files = []
-
-    def finalize_options(self):
-        pass
-
-    def run(self):
-        for pod_file in glob('doc/*.1.pod'):
-            name = os.path.basename(pod_file)[:-6].upper()
-            build_path =  os.path.join('build', os.path.splitext(pod_file)[0])
-            if not os.path.isdir(os.path.join('build', 'doc')):
-                os.mkdir(os.path.join('build', 'doc'))
-            self.spawn(['pod2man', '--section=1', '--release={}'.format(about["__version__"]),
-                    "--center=General Commands Manual", '--name="{}"'.format(name),
-                    pod_file, build_path])
-
-
-class build_i18n(distutils.cmd.Command):
-    """ Taken straight from DistutilsExtra"""
 
     description = "integrate the gettext framework"
 
     user_options = [
         ('desktop-files=', None, '.desktop.in files that should be merged'),
         ('xml-files=', None, '.xml.in files that should be merged'),
-        ('schemas-files=', None, '.schemas.in files that should be merged'),
-        ('ba-files=', None, 'bonobo-activation files that should be merged'),
-        ('rfc822deb-files=', None, 'RFC822 files that should be merged'),
-        ('key-files=', None, '.key.in files that should be merged'),
         ('domain=', 'd', 'gettext domain'),
         ('merge-po', 'm', 'merge po files against template'),
         ('po-dir=', 'p', 'directory that holds the i18n files'),
@@ -155,16 +62,18 @@ class build_i18n(distutils.cmd.Command):
     boolean_options = ['merge-po']
 
     def initialize_options(self):
-        self.desktop_files = []
-        self.xml_files = []
-        self.key_files = []
-        self.schemas_files = []
-        self.ba_files = []
-        self.rfc822deb_files = []
-        self.domain = None
+        self.desktop_files = [
+            ("share/applications", ("data/net.damonlynch.rapid_photo_downloader.desktop.in",)),
+            ("share/solid/actions", ("data/kde/net.damonlynch.rapid_photo_downloader.desktop.in",))
+        ]
+        self.xml_files = [
+            ("share/metainfo", ("data/net.damonlynch.rapid_photo_downloader.metainfo.xml.in",))
+        ]
+
+        self.domain = 'rapid-photo-downloader'
         self.merge_po = False
-        self.bug_contact = None
-        self.po_dir = None
+        self.bug_contact = 'damonlynch@gmail.com'
+        self.po_dir = 'po'
 
     def finalize_options(self):
         if self.domain is None:
@@ -181,22 +90,8 @@ class build_i18n(distutils.cmd.Command):
             return
 
         data_files = self.distribution.data_files
-        if data_files is None:
-            # in case not data_files are defined in setup.py
-            self.distribution.data_files = data_files = []
 
-        if self.bug_contact is not None:
-            os.environ["XGETTEXT_ARGS"] = "--msgid-bugs-address=%s " % \
-                                          self.bug_contact
-
-        # Print a warning if there is a Makefile that would overwrite our
-        # values
-        if os.path.exists("%s/Makefile" % self.po_dir):
-            self.announce("""
-WARNING: Intltool will use the values specified from the
-         existing po/Makefile in favor of the vaules
-         from setup.cfg.
-         Remove the Makefile to avoid problems.""")
+        os.environ["XGETTEXT_ARGS"] = "--msgid-bugs-address=%s " % self.bug_contact
 
         # If there is a po/LINGUAS file, or the LINGUAS environment variable
         # is set, only compile the languages listed there.
@@ -235,16 +130,7 @@ WARNING: Intltool will use the values specified from the
             data_files.append((targetpath, (mo_file,)))
 
         # merge .in with translation
-        for (option, switch) in ((self.xml_files, "-x"),
-                                 (self.desktop_files, "-d"),
-                                 (self.schemas_files, "-s"),
-                                 (self.rfc822deb_files, "-r"),
-                                 (self.ba_files, "-b"),
-                                 (self.key_files, "-k"),):
-            try:
-                file_set = eval(option)
-            except:
-                continue
+        for (file_set, switch) in ((self.xml_files, "-x"), (self.desktop_files, "-d")):
             for (target, files) in file_set:
                 build_target = os.path.join("build", target)
                 if not os.path.exists(build_target):
@@ -256,8 +142,7 @@ WARNING: Intltool will use the values specified from the
                     else:
                         file_merged = os.path.basename(file)
                     file_merged = os.path.join(build_target, file_merged)
-                    cmd = ["intltool-merge", switch, self.po_dir, file,
-                           file_merged]
+                    cmd = ["intltool-merge", switch, self.po_dir, file, file_merged]
                     mtime_merged = os.path.exists(file_merged) and \
                                    os.path.getmtime(file_merged) or 0
                     mtime_file = os.path.getmtime(file)
@@ -268,11 +153,14 @@ WARNING: Intltool will use the values specified from the
                 data_files.append((target, files_merged))
 
 
-class build_icons(distutils.cmd.Command):
-    """ Taken straight from DistutilsExtra"""
+class build_icons(Command):
+    """
+    Automatically include icon files without having to list them individually
 
-    description = "select all icons for installation"
+    Based on DistutilsExtra code.
+    """
 
+    description = "build icons"
     user_options= [('icon-dir=', 'i', 'icon directory of the source tree')]
 
     def initialize_options(self):
@@ -280,7 +168,7 @@ class build_icons(distutils.cmd.Command):
 
     def finalize_options(self):
         if self.icon_dir is None:
-            self.icon_dir = os.path.join("data","icons")
+            self.icon_dir = os.path.join("data", "icons")
 
     def run(self):
         data_files = self.distribution.data_files
@@ -300,28 +188,54 @@ class build_icons(distutils.cmd.Command):
                         )
                     )
 
-class clean_extra(clean):
+
+class build_man_page(Command):
+    """
+    Based on code in the Canonical project 'germinate'
+    """
+
+    description = "build POD manual pages"
+
+    user_options = [('pod-files=', None, 'POD files to build')]
+
+    def initialize_options(self):
+        self.pod_files = []
+
+    def finalize_options(self):
+        pass
+
     def run(self):
-        clean.run(self)
+        for pod_file in glob('doc/*.1.pod'):
+            name = os.path.basename(pod_file)[:-6].upper()
+            build_path =  os.path.join('build', os.path.splitext(pod_file)[0])
+            if not os.path.isdir(os.path.join('build', 'doc')):
+                os.mkdir(os.path.join('build', 'doc'))
+            self.spawn(
+                [
+                    'pod2man', '--section=1', '--release={}'.format(about["__version__"]),
+                    "--center=General Commands Manual", '--name="{}"'.format(name),
+                    pod_file, build_path
+                ]
+            )
 
-        for path, dirs, files in os.walk('.'):
-            for i in reversed(range(len(dirs))):
-                if dirs[i].startswith('.') or dirs[i] == 'debian':
-                    del dirs[i]
-                elif dirs[i] == '__pycache__' or dirs[i].endswith('.egg-info'):
-                    self.spawn(['rm', '-r', os.path.join(path, dirs[i])])
-                    del dirs[i]
 
-            for f in files:
-                f = os.path.join(path, f)
-                if f.endswith('.pyc'):
-                    self.spawn(['rm', f])
-                elif f.startswith('./debhelper') and f.endswith('.1'):
-                    self.spawn(['rm', f])
+class raphodo_build(build):
+    sub_commands = build.sub_commands + [
+        ('build_man_page', None), ('build_icons', None), ('build_translations', None),
+    ]
+
+
+class raphodo_sdist(sdist):
+    def run(self):
+        self.run_command('build_man_page')
+        self.run_command('build_icons')
+        self.run_command('build_translations')
+        sdist.run(self)
 
 
 with open(os.path.join(here, 'README.rst'), encoding='utf-8') as f:
     long_description = f.read()
+
 
 setup(
     name=about["__title__"],
@@ -335,6 +249,7 @@ setup(
     author=about["__author__"],
     author_email=about["__email__"],
     zip_safe=False,
+
     install_requires=[
         'gphoto2',
         'pyzmq',
@@ -351,13 +266,14 @@ setup(
         'scandir;python_version<"3.5"',
         'typing;python_version<"3.5"',
         'PyGObject'
+        'PyQt5'
     ],
     extras_require={
         'color_ouput': ['colorlog',],
         'progress_bar': ['pyprind',]
     },
-    include_package_data = False,
-    data_files = [
+    include_package_data=False,
+    data_files=[
         (
             'share/man/man1', [
                 'build/doc/rapid-photo-downloader.1', 'build/doc/analyze-pv-structure.1'
@@ -365,21 +281,22 @@ setup(
         ),
         (
             'share/applications', [
-                'build/share/applications/net.damonlynch.rapid-photo-downloader.desktop'
+                'build/share/applications/net.damonlynch.rapid_photo_downloader.desktop'
             ]
         ),
         (
             'share/solid/actions', [
-                'build/share/solid/actions/net.damonlynch.rapid-photo-downloader.desktop'
+                'build/share/solid/actions/net.damonlynch.rapid_photo_downloader.desktop'
             ],
         ),
         (
-            'share/appdata', [
-                'build/share/appdata/net.damonlynch.rapid-photo-downloader.appdata.xml'
+            'share/metainfo', [
+                'build/share/metainfo/net.damonlynch.rapid_photo_downloader.metainfo.xml'
             ]
         )
     ],
-    packages = ['raphodo'],
+    packages=['raphodo'],
+    python_requires='>=3.4.*, <4',
     entry_points={
         'gui_scripts': ['rapid-photo-downloader=raphodo.rapid:main'],
         'console_scripts': ['analyze-pv-structure=raphodo.analyzephotos:main']
@@ -387,6 +304,7 @@ setup(
     classifiers=[
         'Development Status :: 5 - Production/Stable',
         'Environment :: X11 Applications :: Qt',
+        'Operating System :: POSIX :: Linux',
         'Intended Audience :: End Users/Desktop',
         'License :: OSI Approved :: GNU General Public License v3 or later (GPLv3+)',
         'Operating System :: POSIX :: Linux',
@@ -394,17 +312,21 @@ setup(
         'Programming Language :: Python :: 3.5',
         'Programming Language :: Python :: 3.6',
         'Programming Language :: Python :: 3.7',
+        'Programming Language :: Python :: 3.8',
         'Topic :: Multimedia :: Graphics',
         'Topic :: Multimedia :: Video'
     ],
-    keywords='photo, video, download, ingest, import, camera, phone, backup, rename, photography,' \
-             ' photographer, transfer, copy, raw, cr2, nef, arw',
-    cmdclass={
-        'build': build_extra_man_page,
-        'build_pod2man': build_pod2man,
-        "build_icons" : build_icons,
-        'install': install,
-        'clean': clean_extra,
-        "build_i18n": build_i18n,
+    keywords='photo video download ingest import camera phone backup rename photography '
+             'photographer transfer copy raw cr2 cr3 nef arw dng',
+    project_urls={
+        'Bug Reports': 'https://bugs.launchpad.net/rapid',
+        'Source': 'https://code.launchpad.net/~dlynch3/rapid/zeromq_pyqt',
     },
+    cmdclass={
+        'build_man_page': build_man_page,
+        'build_icons': build_icons,
+        'build_translations': build_translations,
+        'build': raphodo_build,
+        'sdist': raphodo_sdist,
+    }
 )

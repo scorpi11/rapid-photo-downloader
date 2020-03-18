@@ -1,4 +1,4 @@
-# Copyright (C) 2011-2018 Damon Lynch <damonlynch@gmail.com>
+# Copyright (C) 2011-2020 Damon Lynch <damonlynch@gmail.com>
 
 # This file is part of Rapid Photo Downloader.
 #
@@ -17,7 +17,7 @@
 # see <http://www.gnu.org/licenses/>.
 
 __author__ = 'Damon Lynch'
-__copyright__ = "Copyright 2011-2018, Damon Lynch"
+__copyright__ = "Copyright 2011-2020, Damon Lynch"
 
 import os
 import time
@@ -249,6 +249,9 @@ class FileTypeCounter(Counter):
          present e.g. "photos and videos"
         """
         file_types_present = self.file_types_present()
+        # Translators: %(variable)s represents Python code, not a plural of the term
+        # variable. You must keep the %(variable)s untranslated, or the program will
+        # crash.
         file_count_summary = _("%(number)s %(filetypes)s") % dict(
             number=thousands(self[FileType.photo] + self[FileType.video]),
             filetypes=file_types_present
@@ -268,15 +271,21 @@ class FileTypeCounter(Counter):
         v = self[FileType.video]
 
         if v > 1:
-            videos =  _('%(no_videos)s Videos') % dict(no_videos=thousands(v))
+            # Translators: %(variable)s represents Python code, not a plural of the term
+            # variable. You must keep the %(variable)s untranslated, or the program will
+            # crash.
+            videos = _('%(no_videos)s Videos') % dict(no_videos=thousands(v))
         elif v == 1:
             if singular_natural:
                 # translators: natural language expression signifying a single video
                 videos = _('a video')
             else:
-                videos =  _('1 Video')
+                videos = _('1 Video')
 
         if p > 1:
+            # Translators: %(variable)s represents Python code, not a plural of the term
+            # variable. You must keep the %(variable)s untranslated, or the program will
+            # crash.
             photos = _('%(no_photos)s Photos') % dict(no_photos=thousands(p))
         elif p == 1:
             if singular_natural:
@@ -673,7 +682,6 @@ class RPDFile:
         """
         return self.mime_type == 'image/jpeg'
 
-
     def is_jpeg_type(self) -> bool:
         """
         :return:True if the image is a jpeg or MPO image
@@ -693,6 +701,13 @@ class RPDFile:
         :return: True if the image is a RAW file
         """
         return self.extension in fileformats.RAW_EXTENSIONS
+
+    def is_heif(self) -> bool:
+        """
+        Inspects file extension to determine if an HEIF / HEIC file
+        :return:
+        """
+        return self.extension in fileformats.HEIF_EXTENTIONS
 
     def is_tiff(self) -> bool:
         """
@@ -727,7 +742,6 @@ class RPDFile:
 
         # take advantage of Python's left to right evaluation:
         return self.temp_sample_full_file_name or self.get_current_full_file_name()
-
 
     def get_current_name(self) -> str:
         """
@@ -782,6 +796,8 @@ class RPDFile:
         """
 
         if self.from_camera:
+            # Translators: %(variable)s represents Python code, not a plural of the term variable.
+            # You must keep the %(variable)s untranslated, or the program will crash.
             return _('%(path)s on %(camera)s') % dict(
                 path=self.full_file_name, camera=self.camera_display_name
             )
@@ -823,7 +839,7 @@ class Photo(RPDFile):
         :return: True if successful, False otherwise
         """
 
-        if fileformats.use_exiftool_on_photo(self.extension):
+        if fileformats.use_exiftool_on_photo(self.extension, preview_extraction_irrelevant=True):
             self.metadata = metadataexiftool.MetadataExiftool(
                 full_file_name=full_file_name, et_process=et_process, file_type=self.file_type
             )
