@@ -11,8 +11,6 @@ Forwarded: not-needed
 Last-update: 2018-03-14
 Author: Antoine Beaupre <anarcat@debian.org>
 
-diff --git a/raphodo/constants.py b/raphodo/constants.py
-index 8406456..21701cc 100644
 --- a/raphodo/constants.py
 +++ b/raphodo/constants.py
 @@ -31,7 +31,7 @@
