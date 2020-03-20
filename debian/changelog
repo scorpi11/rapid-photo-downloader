@@ -1,3 +1,15 @@
+rapid-photo-downloader (0.9.19-1) unstable; urgency=medium
+
+  * New upstream version 0.9.19 (Closes: #954172)
+    - New patch to fix syntax error and a FTBFS in setup.py
+  * Update Standards-Version to 4.5.0, no changes needed
+  * Update d/copyright
+  * Remove override for dh_auto_install, it's no longer needed.
+    Upstream has changed the installation path of the appdata.xml
+    file, so the move within d/rules is not necessary anymore.
+
+ -- Dr. Tobias Quathamer <toddy@debian.org>  Fri, 20 Mar 2020 23:29:02 +0100
+
 rapid-photo-downloader (0.9.17-1) unstable; urgency=medium
 
   * New upstream version 0.9.17
