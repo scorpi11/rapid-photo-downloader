@@ -3,7 +3,7 @@ Section: graphics
 Priority: optional
 Maintainer: Dr. Tobias Quathamer <toddy@debian.org>
 Uploaders: Antoine Beaupré <anarcat@debian.org>
-Build-Depends: debhelper-compat (= 12),
+Build-Depends: debhelper-compat (= 13),
                dh-python,
                intltool,
                python3,
