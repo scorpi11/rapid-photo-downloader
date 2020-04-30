@@ -37,8 +37,12 @@ import logging
 import shutil
 import datetime
 import locale
-# Use the default locale as defined by the LANG variable
-locale.setlocale(locale.LC_ALL, '')
+try:
+    # Use the default locale as defined by the LANG variable
+    locale.setlocale(locale.LC_ALL, '')
+except locale.Error:
+    pass
+
 from collections import namedtuple, defaultdict
 import platform
 import argparse
@@ -51,9 +55,6 @@ import shlex
 import subprocess
 from urllib.request import pathname2url
 import inspect
-
-from gettext import gettext as _
-
 
 import gi
 gi.require_version('Notify', '0.7')
@@ -117,7 +118,8 @@ from raphodo.constants import (
     Desktop, BackupFailureType, DeviceState, Sort, Show, DestinationDisplayType,
     DisplayingFilesOfType, DownloadingFileTypes, RememberThisMessage, RightSideButton,
     CheckNewVersionDialogState, CheckNewVersionDialogResult, RememberThisButtons,
-    BackupStatus, CompletedDownloads, disable_version_check
+    BackupStatus, CompletedDownloads, disable_version_check, FileManagerType, ScalingAction,
+    ScalingDetected
 )
 from raphodo.thumbnaildisplay import (
     ThumbnailView, ThumbnailListModel, ThumbnailDelegate, DownloadStats, MarkedSummary
@@ -127,12 +129,13 @@ from raphodo.proximity import (TemporalProximityGroups, TemporalProximity)
 from raphodo.utilities import (
     same_device, make_internationalized_list, thousands, addPushButtonLabelSpacer,
     make_html_path_non_breaking, prefs_list_from_gconftool2_string,
-    pref_bool_from_gconftool2_string, extract_file_from_tar, format_size_for_user
+    pref_bool_from_gconftool2_string, extract_file_from_tar, format_size_for_user,
+    is_snap, version_check_disabled, installed_using_pip
 )
 from raphodo.rememberthisdialog import RememberThisDialog
 import raphodo.utilities
 from raphodo.rpdfile import (
-    RPDFile, file_types_by_number, FileTypeCounter, Video
+    RPDFile, file_types_by_number, FileTypeCounter, Video, Photo, FileSizeSum
 )
 import raphodo.fileformats as fileformats
 import raphodo.downloadtracker as downloadtracker
@@ -177,7 +180,7 @@ from raphodo.problemnotification import (
 )
 from raphodo.viewutils import (
     standardIconSize, qt5_screen_scale_environment_variable, QT5_VERSION, validateWindowSizeLimit,
-    validateWindowPosition, scaledIcon
+    validateWindowPosition, scaledIcon, any_screen_scaled
 )
 import raphodo.didyouknow as didyouknow
 from raphodo.thumbnailextractor import gst_version, libraw_version, rawkit_version
@@ -455,6 +458,9 @@ class RapidWindow(QMainWindow):
     def __init__(self, splash: 'SplashScreen',
                  fractional_scaling: str,
                  scaling_set: str,
+                 scaling_action: ScalingAction,
+                 scaling_detected: ScalingDetected,
+                 xsetting_running: bool,
                  photo_rename: Optional[bool]=None,
                  video_rename: Optional[bool]=None,
                  auto_detect: Optional[bool]=None,
@@ -500,11 +506,18 @@ class RapidWindow(QMainWindow):
 
         self.close_event_run = False
 
-        for version in get_versions():
+        self.file_manager, self.file_manager_type = get_default_file_manager()
+
+        for version in get_versions(
+                self.file_manager, self.file_manager_type, scaling_action,
+                scaling_detected, xsetting_running):
             logging.info('%s', version)
 
         if disable_version_check:
             logging.debug("Version checking disabled via code")
+
+        if is_snap():
+            logging.debug("Version checking disabled because running in a snap")
 
         if EXIFTOOL_VERSION is None:
             logging.error("ExifTool is either missing or has a problem")
@@ -523,6 +536,9 @@ class RapidWindow(QMainWindow):
         self.prefs = Preferences()
         self.checkPrefsUpgrade()
         self.prefs.program_version = __about__.__version__
+
+        if self.prefs.force_exiftool:
+            logging.debug("ExifTool and not Exiv2 will be used to read photo metadata")
 
         # track devices on which there was an error setting a file's filesystem metadata
         self.copy_metadata_errors = FSMetadataErrors()
@@ -673,7 +689,7 @@ class RapidWindow(QMainWindow):
                 elif pv > rv:
                     logging.info(
                         "Version downgrade detected, from %s to %s",
-                        __about__.__version__, previous_version
+                        previous_version, __about__.__version__
                     )
                 if pv < pkgr.parse_version('0.9.7b1'):
                     # Remove any duplicate subfolder generation or file renaming custom presets
@@ -847,14 +863,6 @@ class RapidWindow(QMainWindow):
             self.updateThumbnailModelAfterProximityChange
         )
 
-        self.file_manager, self.file_manager_type = get_default_file_manager()
-        if self.file_manager:
-            logging.info(
-                "Default file manager: %s (%s)", self.file_manager, self.file_manager_type.name
-            )
-        else:
-            logging.warning("Default file manager could not be determined")
-
         # Setup notification system
         try:
             self.have_libnotify = Notify.init(_('Rapid Photo Downloader'))
@@ -881,40 +889,31 @@ class RapidWindow(QMainWindow):
 
         logging.debug("Probing desktop environment")
         desktop_env = get_desktop_environment()
-        if desktop_env is not None:
-            logging.debug("Desktop environment: %s", desktop_env)
-        else:
-            logging.debug("Desktop environment variable not set")
 
         self.unity_progress = False
         self.desktop_launchers = []
-        if get_desktop() in (Desktop.unity, Desktop.ubuntugnome):
-            if not have_unity:
+
+        if have_unity:
+            logging.info("Unity LauncherEntry API installed")
+            launchers = (
+                'net.damonlynch.rapid_photo_downloader.desktop',
+            )
+            for launcher in launchers:
+                desktop_launcher = Unity.LauncherEntry.get_for_desktop_id(launcher)
+                if desktop_launcher is not None:
+                    self.desktop_launchers.append(desktop_launcher)
+                    self.unity_progress = True
+
+            if not self.desktop_launchers:
                 logging.warning(
-                    "Desktop environment is Unity Launcher API compatible, but could not load "
-                    "Unity 7.0 module"
+                    "Desktop environment is Unity Launcher API compatible, but could not "
+                    "find program's .desktop file"
                 )
             else:
-                # Unity auto-generated desktop files use underscores, it seems
-                launchers = (
-                    'net.damonlynch.rapid_photo_downloader.desktop',
+                logging.debug(
+                    "Unity progress indicator found, using %s launcher(s)",
+                    len(self.desktop_launchers)
                 )
-                for launcher in launchers:
-                    desktop_launcher = Unity.LauncherEntry.get_for_desktop_id(launcher)
-                    if desktop_launcher is not None:
-                        self.desktop_launchers.append(desktop_launcher)
-                        self.unity_progress = True
-
-                if not self.desktop_launchers:
-                    logging.warning(
-                        "Desktop environment is Unity Launcher API compatible, but could not "
-                        "find program's .desktop file"
-                    )
-                else:
-                    logging.debug(
-                        "Unity progress indicator found, using %s launcher(s)",
-                        len(self.desktop_launchers)
-                    )
 
         self.createPathViews()
 
@@ -965,8 +964,9 @@ class RapidWindow(QMainWindow):
             self.gvolumeMonitor.partitionUnmounted.connect(self.partitionUmounted)
             self.gvolumeMonitor.volumeAddedNoAutomount.connect(self.noGVFSAutoMount)
             self.gvolumeMonitor.cameraPossiblyRemoved.connect(self.cameraRemoved)
+            self.gvolumeMonitor.cameraVolumeAdded.connect(self.cameraVolumeAdded)
 
-        if disable_version_check:
+        if version_check_disabled():
             logging.debug("Version check disabled")
         else:
             logging.debug("Starting version check")
@@ -1075,6 +1075,7 @@ class RapidWindow(QMainWindow):
         self.scanmq.scanProblems.connect(self.scanProblemsReceived)
         self.scanmq.workerFinished.connect(self.scanFinished)
         self.scanmq.fatalError.connect(self.scanFatalError)
+        self.scanmq.cameraRemovedDuringScan.connect(self.cameraRemovedDuringScan)
 
         self.scanmq.moveToThread(self.scanThread)
 
@@ -1087,7 +1088,6 @@ class RapidWindow(QMainWindow):
 
         self.splash.setProgress(70)
 
-
         # Setup the copyfiles process
         self.copyfilesThread = QThread()
         self.copyfilesmq = CopyFilesManager(logging_port=self.logging_port)
@@ -1099,6 +1099,7 @@ class RapidWindow(QMainWindow):
         self.copyfilesmq.tempDirs.connect(self.tempDirsReceivedFromCopyFiles)
         self.copyfilesmq.copyProblems.connect(self.copyfilesProblems)
         self.copyfilesmq.workerFinished.connect(self.copyfilesFinished)
+        self.copyfilesmq.cameraRemoved.connect(self.cameraRemovedWhileCopyingFiles)
 
         self.copyfilesmq.moveToThread(self.copyfilesThread)
 
@@ -2572,7 +2573,7 @@ class RapidWindow(QMainWindow):
         self.menu.addSeparator()
         self.menu.addAction(self.helpAct)
         self.menu.addAction(self.didYouKnowAct)
-        if not disable_version_check:
+        if not version_check_disabled():
             self.menu.addAction(self.newVersionAct)
         self.menu.addAction(self.reportProblemAct)
         self.menu.addAction(self.makeDonationAct)
@@ -2584,7 +2585,7 @@ class RapidWindow(QMainWindow):
 
     def doCheckForNewVersion(self) -> None:
         """Check online for a new program version"""
-        if not disable_version_check:
+        if not version_check_disabled():
             self.newVersionCheckDialog.reset()
             self.newVersionCheckDialog.show()
             self.checkForNewVersionRequest.emit()
@@ -3425,8 +3426,10 @@ Do you want to proceed with the download?
             assert total_downloaded >= 0
             assert chunk_downloaded >= 0
         except AssertionError:
-            logging.critical("Unexpected negative values for total / chunk downloaded: %s %s ",
-                             total_downloaded, chunk_downloaded)
+            logging.critical(
+                "Unexpected negative values for total / chunk downloaded: %s %s ",
+                total_downloaded, chunk_downloaded
+            )
 
         self.download_tracker.set_total_bytes_copied(scan_id, total_downloaded)
         if len(self.devices.have_downloaded_from) > 1:
@@ -3493,7 +3496,8 @@ Do you want to proceed with the download?
                     data=ThumbnailDaemonData(
                         rpd_file=rpd_file,
                         write_fdo_thumbnail=self.prefs.save_fdo_thumbnails,
-                        use_thumbnail_cache=self.prefs.use_thumbnail_cache
+                        use_thumbnail_cache=self.prefs.use_thumbnail_cache,
+                        force_exiftool=self.prefs.force_exiftool,
                     )
                 )
             else:
@@ -3559,7 +3563,8 @@ Do you want to proceed with the download?
                         rpd_file=rpd_file,
                         write_fdo_thumbnail=True,
                         backup_full_file_names=self.backup_fdo_thumbnail_cache[uid],
-                        fdo_name=rpd_file.fdo_thumbnail_128_name
+                        fdo_name=rpd_file.fdo_thumbnail_128_name,
+                        force_exiftool=self.prefs.force_exiftool
                     )
                 )
                 del self.backup_fdo_thumbnail_cache[uid]
@@ -3731,7 +3736,8 @@ Do you want to proceed with the download?
                     rpd_file=rpd_file,
                     write_fdo_thumbnail=True,
                     backup_full_file_names=[backup_full_file_name],
-                    fdo_name=self.generated_fdo_thumbnails[uid]
+                    fdo_name=self.generated_fdo_thumbnails[uid],
+                    force_exiftool=self.prefs.force_exiftool,
                 )
             )
 
@@ -4283,7 +4289,7 @@ Do you want to proceed with the download?
     def scanFilesReceived(self, rpd_files: List[RPDFile],
                           sample_files: List[RPDFile],
                           file_type_counter: FileTypeCounter,
-                          file_size_sum: int,
+                          file_size_sum: FileSizeSum,
                           entire_video_required: Optional[bool],
                           entire_photo_required: Optional[bool]) -> None:
         """
@@ -4301,7 +4307,7 @@ Do you want to proceed with the download?
             logging.info(
                 "Updating example file name using sample photo from %s", device.display_name
             )
-            self.devices.sample_photo = sample_photo
+            self.devices.sample_photo = sample_photo  # type: Photo
             self.renamePanel.setSamplePhoto(self.devices.sample_photo)
             # sample required for editing download subfolder generation
             self.photoDestinationDisplay.sample_rpd_file = self.devices.sample_photo
@@ -4323,6 +4329,7 @@ Do you want to proceed with the download?
 
         device.file_type_counter = file_type_counter
         device.file_size_sum = file_size_sum
+
         self.mapModel(scan_id).updateDeviceScan(scan_id)
 
         self.thumbnailModel.addFiles(
@@ -4484,6 +4491,80 @@ Do you want to proceed with the download?
         self.removeDevice(scan_id=scan_id, show_warning=False)
 
     @pyqtSlot(int)
+    def cameraRemovedDuringScan(self, scan_id: int) -> None:
+        """
+        Scenarios: a camera was physically removed, or file transfer was disabled on an MTP device.
+
+        If disabled, a problem is that the device has not yet been removed from the system.
+
+        But in any case, sometimes camera removal is not picked up by the system while it's being
+        accessed. So let's remove it ourselves.
+
+        :param scan_id: device that was removed / disabled
+        """
+
+        try:
+            device = self.devices[scan_id]
+        except KeyError:
+            logging.debug("Got scan error from device that no longer exists (scan id %s)", scan_id)
+            return
+
+        logging.debug("Camera %s was removed during a scan", device.display_name)
+        self.removeDevice(scan_id=scan_id)
+
+    @pyqtSlot(int)
+    def cameraRemovedWhileThumbnailing(self, scan_id: int) -> None:
+        """
+        Scenarios: a camera was physically removed, or file transfer was disabled on an MTP device.
+
+        If disabled, a problem is that the device has not yet been removed from the system.
+
+        But in any case, sometimes camera removal is not picked up by the system while it's being
+        accessed. So let's remove it ourselves.
+
+        :param scan_id: device that was removed / disabled
+        """
+
+        try:
+            device = self.devices[scan_id]
+        except KeyError:
+            logging.debug(
+                "Got thumbnailing error from a camera that no longer exists (scan id %s)", scan_id
+            )
+            return
+
+        logging.debug(
+            "Camera %s was removed while thumbnails were being generated", device.display_name
+        )
+        self.removeDevice(scan_id=scan_id)
+
+    @pyqtSlot(int)
+    def cameraRemovedWhileCopyingFiles(self, scan_id: int) -> None:
+        """
+        Scenarios: a camera was physically removed, or file transfer was disabled on an MTP device.
+
+        If disabled, a problem is that the device has not yet been removed from the system.
+
+        But in any case, sometimes camera removal is not picked up by the system while it's being
+        accessed. So let's remove it ourselves.
+
+        :param scan_id: device that was removed / disabled
+        """
+
+        try:
+            device = self.devices[scan_id]
+        except KeyError:
+            logging.debug(
+                "Got copy files error from a camera that no longer exists (scan id %s)", scan_id
+            )
+            return
+
+        logging.debug(
+            "Camera %s was removed while filed were being copied from it", device.display_name
+        )
+        self.removeDevice(scan_id=scan_id)
+
+    @pyqtSlot(int)
     def scanFinished(self, scan_id: int) -> None:
         """
         A single device has finished its scan. Other devices can be in any
@@ -4606,6 +4687,7 @@ Do you want to proceed with the download?
                 reason
             )
 
+
     @pyqtSlot(TemporalProximityGroups)
     def proximityGroupsGenerated(self, proximity_groups: TemporalProximityGroups) -> None:
         if self.temporalProximity.setGroups(proximity_groups=proximity_groups):
@@ -4643,6 +4725,12 @@ Do you want to proceed with the download?
                 # Incidentally, it's the renameandmovefile process that
                 # updates the SQL database with the file downloads,
                 # so no need to update or close it in this main process
+
+        if self.unity_progress:
+            for launcher in self.desktop_launchers:
+                launcher.set_property("count", 0)
+                launcher.set_property("count_visible", False)
+                launcher.set_property('progress_visible', False)
 
         self.writeWindowSettings()
         logging.debug("Cleaning up provisional download folders")
@@ -4685,7 +4773,7 @@ Do you want to proceed with the download?
         else:
             del self.gvolumeMonitor
 
-        if not disable_version_check:
+        if not version_check_disabled():
             self.newVersionThread.quit()
             self.newVersionThread.wait(100)
 
@@ -4725,14 +4813,12 @@ Do you want to proceed with the download?
         :rtype Tuple[str, bool]
         """
         if self.gvfsControlsMounts:
-            iconNames, canEject = self.gvolumeMonitor.getProps(
-                mount.rootPath())
+            iconNames, canEject = self.gvolumeMonitor.getProps(mount.rootPath())
         else:
             # get the system device e.g. /dev/sdc1
             systemDevice = bytes(mount.device()).decode()
-            iconNames, canEject = self.udisks2Monitor.get_device_props(
-                systemDevice)
-        return (iconNames, canEject)
+            iconNames, canEject = self.udisks2Monitor.get_device_props(systemDevice)
+        return iconNames, canEject
 
     def addToDeviceDisplay(self, device: Device, scan_id: int) -> None:
         self.mapModel(scan_id).addDevice(scan_id, device)
@@ -4763,19 +4849,22 @@ Do you want to proceed with the download?
         libgphoto2
         """
 
+        logging.debug("Examining system for removed camera")
         sc = autodetect_cameras(self.gp_context)
-        system_cameras = ((model, port) for model, port in sc if not
-                          port.startswith('disk:'))
+        system_cameras = ((model, port) for model, port in sc if not port.startswith('disk:'))
         kc = self.devices.cameras.items()
         known_cameras = ((model, port) for port, model in kc)
         removed_cameras = set(known_cameras) - set(system_cameras)
         for model, port in removed_cameras:
             scan_id = self.devices.scan_id_from_camera_model_port(model, port)
-            device = self.devices[scan_id]
-            # Don't log a warning when the camera was removed while the user was being
-            # informed it was locked or inaccessible
-            show_warning = not device in self.prompting_for_user_action
-            self.removeDevice(scan_id=scan_id, show_warning=show_warning)
+            if scan_id is None:
+                logging.debug("The camera with scan id %s was already removed", scan_id)
+            else:
+                device = self.devices[scan_id]
+                # Don't log a warning when the camera was removed while the user was being
+                # informed it was locked or inaccessible
+                show_warning = not device in self.prompting_for_user_action
+                self.removeDevice(scan_id=scan_id, show_warning=show_warning)
 
         if removed_cameras:
             self.setDownloadCapabilities()
@@ -4793,9 +4882,14 @@ Do you want to proceed with the download?
         logging.error("Implement noGVFSAutoMount()")
 
     @pyqtSlot()
-    def cameraMounted(self):
+    def cameraMounted(self) -> None:
         if have_gio:
             self.searchForCameras()
+
+    @pyqtSlot(str)
+    def cameraVolumeAdded(self, path):
+        assert self.gvfsControlsMounts
+        self.searchForCameras()
 
     def unmountCameraToEnableScan(self, model: str,
                                   port: str,
@@ -5832,7 +5926,11 @@ class QtSingleApplication(QApplication):
             self.messageReceived.emit(msg)
 
 
-def get_versions() -> List[str]:
+def get_versions(file_manager: Optional[str],
+                 file_manager_type: Optional[FileManagerType],
+                 scaling_action: ScalingAction,
+                 scaling_detected: ScalingDetected,
+                 xsetting_running: bool) -> List[str]:
     if 'cython' in zmq.zmq_version_info.__module__:
         pyzmq_backend = 'cython'
     else:
@@ -5843,10 +5941,18 @@ def get_versions() -> List[str]:
         used = format_size_for_user(ram.used)
     except Exception:
         total = used = 'unknown'
+
+    try:
+        pip_install = installed_using_pip()
+    except Exception:
+        pip_install = False
+
     versions = [
         'Rapid Photo Downloader: {}'.format(__about__.__version__),
         'Platform: {}'.format(platform.platform()),
         'Memory: {} used of {}'.format(used, total),
+        'Confinement: {}'.format('snap' if is_snap() else 'none'),
+        'Installed using pip: {}'.format('yes' if pip_install else 'no'),
         'Python: {}'.format(platform.python_version()),
         'Python executable: {}'.format(sys.executable),
         'Qt: {}'.format(QtCore.QT_VERSION_STR),
@@ -5891,10 +5997,38 @@ def get_versions() -> List[str]:
             versions.append('libheif: {}'.format(v))
     for display in ('XDG_SESSION_TYPE', 'WAYLAND_DISPLAY'):
         session = os.getenv(display, '')
-        if session:
+        if session.find('wayland') >= 0:
+            wayland_platform = os.getenv('QT_QPA_PLATFORM', '')
+            if wayland_platform != 'wayland':
+                session = 'wayland desktop (but this application is probably running in XWayland)'
+                break
+            else:
+                session = 'wayland desktop (with wayland enabled for this application)'
+        elif session:
             break
     if session:
         versions.append('Session: {}'.format(session))
+
+    versions.append('Desktop scaling: {}'.format(scaling_action.name.replace('_', ' ')))
+    versions.append(
+        'Desktop scaling detection: {}{}'.format(
+            scaling_detected.name.replace('_', ' '),
+            '' if xsetting_running else ' (xsetting not running)'
+        )
+    )
+
+    try:
+        versions.append("Desktop: {} ({})".format(get_desktop_environment(), get_desktop().name))
+    except Exception:
+        pass
+
+    if file_manager:
+        file_manager_details = "{} ({})".format(file_manager, file_manager_type.name)
+    else:
+        file_manager_details = "Unknown"
+
+    versions.append("Default file manager: {}".format(file_manager_details))
+
     return versions
 
 # def darkFusion(app: QApplication):
@@ -6261,38 +6395,49 @@ def critical_startup_error(message: str) -> None:
 
 
 def main():
-    # Set Qt 5 screen scaling if it is not already set in an environment variable
-    qt5_variable = qt5_screen_scale_environment_variable()
-    scaling_variables = {qt5_variable, 'QT_SCALE_FACTOR', 'QT_SCREEN_SCALE_FACTORS'}
-    if not scaling_variables & set(os.environ):
-        scaling_set = 'High DPI scaling automatically set to ON because one of the ' \
-                      'following environment variables not already ' \
-                      'set: {}'.format(', '.join(scaling_variables))
-        if pkgr.parse_version(QtCore.QT_VERSION_STR) >= pkgr.parse_version('5.6.0'):
-            QApplication.setAttribute(Qt.AA_EnableHighDpiScaling)
-        else:
-            os.environ[qt5_variable] = '1'
+    scaling_action = ScalingAction.not_set
+
+    scaling_detected, xsetting_running = any_screen_scaled()
+
+    if scaling_detected == ScalingDetected.undetected:
+        scaling_set = 'High DPI scaling disabled because no scaled screen was detected'
+        fractional_scaling = 'Fractional scaling not set'
     else:
-        scaling_set = 'High DPI scaling not automatically set to ON because environment ' \
-                      'variable(s) already ' \
-                      'set: {}'.format(', '.join(scaling_variables & set(os.environ)))
-
-    QApplication.setAttribute(Qt.AA_UseHighDpiPixmaps)
-
-    try:
-        # Enable fractional scaling support on Qt 5.14 or above
-        # Doesn't seem to be working on Gnome X11, however :-/
-        # Works on KDE Neon
-        if pkgr.parse_version(QtCore.QT_VERSION_STR) >= pkgr.parse_version('5.14.0'):
-            QApplication.setHighDpiScaleFactorRoundingPolicy(
-                Qt.HighDpiScaleFactorRoundingPolicy.PassThrough
-            )
-            fractional_scaling = 'Fractional scaling set to pass through'
+        # Set Qt 5 screen scaling if it is not already set in an environment variable
+        qt5_variable = qt5_screen_scale_environment_variable()
+        scaling_variables = {qt5_variable, 'QT_SCALE_FACTOR', 'QT_SCREEN_SCALE_FACTORS'}
+        if not scaling_variables & set(os.environ):
+            scaling_set = 'High DPI scaling automatically set to ON because one of the ' \
+                          'following environment variables not already ' \
+                          'set: {}'.format(', '.join(scaling_variables))
+            scaling_action = ScalingAction.turned_on
+            if pkgr.parse_version(QtCore.QT_VERSION_STR) >= pkgr.parse_version('5.6.0'):
+                QApplication.setAttribute(Qt.AA_EnableHighDpiScaling)
+            else:
+                os.environ[qt5_variable] = '1'
         else:
-            fractional_scaling = 'Fractional scaling unable to be set because Qt version is too old'
-    except Exception:
-        fractional_scaling = 'Error setting fractional scaling'
-        logging.warning(fractional_scaling)
+            scaling_set = 'High DPI scaling not automatically set to ON because environment ' \
+                          'variable(s) already ' \
+                          'set: {}'.format(', '.join(scaling_variables & set(os.environ)))
+            scaling_action = ScalingAction.already_set
+
+        QApplication.setAttribute(Qt.AA_UseHighDpiPixmaps)
+
+        try:
+            # Enable fractional scaling support on Qt 5.14 or above
+            # Doesn't seem to be working on Gnome X11, however :-/
+            # Works on KDE Neon
+            if pkgr.parse_version(QtCore.QT_VERSION_STR) >= pkgr.parse_version('5.14.0'):
+                QApplication.setHighDpiScaleFactorRoundingPolicy(
+                    Qt.HighDpiScaleFactorRoundingPolicy.PassThrough
+                )
+                fractional_scaling = 'Fractional scaling set to pass through'
+            else:
+                fractional_scaling = 'Fractional scaling unable to be set because Qt version is ' \
+                                     'older than 5.14'
+        except Exception:
+            fractional_scaling = 'Error setting fractional scaling'
+            logging.warning(fractional_scaling)
 
     if sys.platform.startswith('linux') and os.getuid() == 0:
         sys.stderr.write("Never run this program as the sudo / root user.\n")
@@ -6323,14 +6468,21 @@ def main():
 
     args = parser.parse_args()
     if args.detailed_version:
-        print('\n'.join(get_versions()))
+        file_manager, file_manager_type = get_default_file_manager()
+        print(
+            '\n'.join(
+                get_versions(
+                    file_manager, file_manager_type, scaling_action, scaling_detected,
+                    xsetting_running
+                )
+            )
+        )
         sys.exit(0)
 
     if args.extensions:
         photos = list((ext.upper() for ext in fileformats.PHOTO_EXTENSIONS))
         videos = list((ext.upper() for ext in fileformats.VIDEO_EXTENSIONS))
-        extensions = ((photos, _("Photos")),
-                      (videos, _("Videos")))
+        extensions = ((photos, _("Photos")), (videos, _("Videos")))
         for exts, file_type in extensions:
             extensions = make_internationalized_list(exts)
             print('{}: {}'.format(file_type, extensions))
@@ -6580,7 +6732,10 @@ def main():
         log_gphoto2=args.log_gphoto2,
         splash=splash,
         fractional_scaling=fractional_scaling,
-        scaling_set=scaling_set
+        scaling_set=scaling_set,
+        scaling_action=scaling_action,
+        scaling_detected=scaling_detected,
+        xsetting_running=xsetting_running,
     )
 
     app.setActivationWindow(rw)

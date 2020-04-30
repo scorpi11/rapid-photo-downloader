@@ -1,5 +1,7 @@
-PyGObjectPyQt5
+PyGObject
+PyQt5
 arrow
+babel
 colour
 easygui
 gphoto2

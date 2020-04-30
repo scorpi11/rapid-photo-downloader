@@ -68,7 +68,7 @@ If you installed the man pages, they are found in ``/usr/local/share/man/man1``.
 Install on CentOS 7.5
 =====================
 
-Consult the release notes for additional steps to take prior to running
+Consult the online documentation for additional steps to take prior to running
 the installation script. Once completed, the steps are the same as above,
 except the command ``python3`` is replaced by ``python3.6``
 
@@ -102,6 +102,7 @@ Rapid Photo Downloader requires:
     - GExiv2 0.10
     - Gst 1.0
     - Notify 0.7
+    - Gdk 3.0
  - `python-gphoto2`_ 1.4.0 or newer
  - pyzmq_
  - tornado_
@@ -122,6 +123,7 @@ Rapid Photo Downloader requires:
  - Requests_
  - Tenacity_
  - intltool_
+ - Babel_
  - If using Python 3.4, these additional modules:
     - typing_
     - scandir_
@@ -269,3 +271,4 @@ environment's directory.
 .. _Tenacity: https://github.com/jd/tenacity
 .. _pyheif: https://github.com/david-poirier-csn/pyheif
 .. _pillow: https://github.com/python-pillow/Pillow
+.. _Babel: http://babel.pocoo.org/en/latest/

@@ -21,9 +21,9 @@ __copyright__ = "Copyright 2011-2020, Damon Lynch"
 
 
 import logging
-from distutils.version import LooseVersion
 from typing import Optional, Tuple
 import os
+from pkg_resources import parse_version
 
 import raphodo.programversions as programversions
 from raphodo.constants import thumbnail_offset, FileType, FileExtension
@@ -36,10 +36,12 @@ def exiftool_capabilities() -> Tuple[bool, bool]:
 
     v = 'unknown'
     try:
-        v = LooseVersion(programversions.exiftool_version_info())
-        cr3 = v >= LooseVersion('10.87')
-        heif = v >= LooseVersion('10.63')
-        return cr3, heif
+        if programversions.EXIFTOOL_VERSION is not None:
+            v = parse_version(programversions.EXIFTOOL_VERSION)
+            cr3 = v >= parse_version('10.87')
+            heif = v >= parse_version('10.63')
+            return cr3, heif
+        return False, False
     except:
         logging.error('Unable to compare ExifTool version number: %s', v)
         return False, False
@@ -55,15 +57,6 @@ def exiv2_cr3() -> bool:
     """
 
     return False
-
-    # v = 'unknown'
-    # try:
-    #     v = programversions.exiv2_version()
-    #     if v:
-    #         return LooseVersion(v) >= LooseVersion('0.28')
-    # except:
-    #     logging.error('Unable to compare Exiv2 version number: %s', v)
-    # return False
 
 
 _exiv2_cr3 = exiv2_cr3()
@@ -81,7 +74,7 @@ def heif_capable() -> bool:
 
 RAW_EXTENSIONS = [
     '3fr', 'arw', 'dcr', 'cr2', 'crw',  'dng', 'fff', 'iiq', 'mos', 'mef', 'mrw', 'nef',
-    'nrw', 'orf', 'pef', 'raf', 'raw', 'rw2', 'sr2', 'srw', 'x3f'
+    'nrw', 'orf', 'ori','pef', 'raf', 'raw', 'rw2', 'sr2', 'srw', 'x3f'
 ]
 
 HEIF_EXTENTIONS = ['heif', 'heic', 'hif']
@@ -133,7 +126,8 @@ MUST_CACHE_VIDEOS = [video for video in VIDEO_EXTENSIONS if thumbnail_offset.get
 def use_exiftool_on_photo(extension: str, preview_extraction_irrelevant: bool) -> bool:
     """
     Determine if the file extension indicates its exif information
-    must be extracted using ExifTool and not Exiv2
+    must be extracted using ExifTool and not Exiv2.
+
     :param extension: lower case, no leading period
     :param preview_extraction_irrelevant: if True, return True only taking into
      account the exif string data, not the exif preview data

@@ -32,14 +32,16 @@ import tempfile
 import time
 import tarfile
 from collections import namedtuple, defaultdict
+
 from datetime import datetime
-from gettext import gettext as _
 from itertools import groupby, zip_longest
-from typing import Optional, List, Union, Any, Tuple
+from typing import Optional, List, Union, Any, Tuple, Iterator
 import struct
 import ctypes
 import signal
 import warnings
+import babel
+from glob import glob
 from pkg_resources import parse_version
 import pkg_resources
 
@@ -48,6 +50,8 @@ import psutil
 from PyQt5.QtCore import QSize
 
 import raphodo.__about__ as __about__
+from raphodo.constants import disable_version_check
+from raphodo import localedir, i18n_domain
 
 
 # Arrow 0.9.0 separated the replace and shift functions into separate calls, deprecating using
@@ -67,6 +71,7 @@ else:
         arrow_shift_support = True
     except AttributeError:
         arrow_shift_support = False
+
 
 # Suppress parsing warnings for 0.14.3 <= Arrow version < 0.15
 if arrow_version >= parse_version('0.14.3') and arrow_version < parse_version('0.15.0'):
@@ -503,7 +508,9 @@ def runs(iterable):
     for k, g in groupby(iterable, AdjacentKey):
         yield first_and_last(g)
 
+
 numbers = namedtuple('numbers', 'number, plural')
+
 
 long_numbers = {
     1: _('one'),
@@ -580,6 +587,7 @@ def datetime_roughly_equal(dt1: Union[datetime, float], dt2: Union[datetime, flo
     True
     """
 
+    # arrow.get from time stamp gives UTC time
     at1 = arrow.get(dt1)
     at2 = arrow.get(dt2)
     if arrow_shift_support:
@@ -612,6 +620,7 @@ def process_running(process_name: str, partial_name: bool=True) -> bool:
                 if name == process_name:
                     return True
     return False
+
 
 def make_html_path_non_breaking(path: str) -> str:
     """
@@ -860,17 +869,18 @@ def remove_topmost_directory_from_path(path: str) -> str:
     return path[path[1:].find(os.sep) + 1:]
 
 
-def arrow_locale() -> str:
+def arrow_locale(lang: str) -> str:
     """
     Test if locale is suitable for use with Arrow.
     :return: Return user locale if it works with Arrow, else Arrow default ('en_us')
     """
 
     default = 'en_us'
-    try:
-        lang = locale.getdefaultlocale()[0]
-    except Exception:
-        return default
+    if not lang:
+        try:
+            lang = locale.getdefaultlocale()[0]
+        except Exception:
+            return default
 
     try:
         arrow.locales.get_locale(lang)
@@ -1005,3 +1015,152 @@ def python_package_version(package: str) -> str:
     except pkg_resources.DistributionNotFound:
         return ''
 
+
+def is_snap() -> bool:
+    """
+    Determine if program is running in a snap environment
+    :return: True if it is False otherwise
+    """
+
+    snap_name = os.getenv('SNAP_NAME', '')
+    return snap_name.find('rapid-photo-downloader') >= 0
+
+
+def version_check_disabled():
+    """
+    Determine if version checking should be disabled or not
+    :return: True if it should be False otherwise
+    """
+
+    return disable_version_check or is_snap()
+
+
+def available_lang_codes() -> List[str]:
+    """
+    Detect translations that exist for Rapid Photo Downloader
+    :return: list of language codes
+    """
+
+    if localedir is not None:
+        files = glob(os.path.join(localedir, '*', 'LC_MESSAGES', '%s.mo' % i18n_domain))
+        langs = [file.split(os.path.sep)[-3] for file in files]
+        langs.append('en')
+        return langs
+    else:
+        return []
+
+
+# Auto-generated from extract_language_names.py do not delete
+substitute_languages = {
+    'fa': 'Persian',
+    'sk': 'Slovak',
+    'it': 'Italian',
+    'oc': 'Occitan (post 1500)',
+    'fi': 'Finnish',
+    'sv': 'Swedish',
+    'cs': 'Czech',
+    'pl': 'Polish',
+    'kab': 'Kabyle',
+    'tr': 'Turkish',
+    'hr': 'Croatian',
+    'nn': 'Norwegian Nynorsk',
+    'da': 'Danish',
+    'de': 'German',
+    'sr': 'српски',
+    'pt_BR': 'Brazilian Portuguese',
+    'ja': 'Japanese',
+    'bg': 'Bulgarian',
+    'uk': 'Ukrainian',
+    'ar': 'Arabic',
+    'ca': 'Catalan',
+    'nb': 'Norwegian Bokmal',
+    'ru': 'Russian',
+    'hu': 'magyar',
+    'be': 'Belarusian',
+    'es': 'Spanish',
+    'pt': 'Portuguese',
+    'zh_CN': 'Chinese (Simplified)',
+    'fr': 'Français',
+    'et': 'Estonian',
+    'nl': 'Dutch',
+    'ro': 'Romanian',
+    'id': 'Indonesian',
+    'el': 'Greek',
+}  # Auto-generated from extract_language_names.py do not delete
+
+
+def get_language_display_name(lang_code: str,
+                              make_missing_lower: bool,
+                              locale_code: str) -> str:
+    """
+    Use babel to the human friendly name for a locale, or failing that our
+    auto-generated version
+    :param lang_code: locale code for language to get the display name for
+    :param make_missing_lower: whether to make the default name when
+     babel does not suppply it lower case
+    :param locale_code: current system locale code
+    :return: human friendly version
+    """
+
+    try:
+        return babel.Locale.parse(lang_code).get_display_name(locale_code)
+    except babel.core.UnknownLocaleError:
+        display = substitute_languages[lang_code]
+        return display if not make_missing_lower else display.lower()
+
+
+def available_languages(display_locale_code: str='') -> List[Tuple[str, str]]:
+    """
+    Detect translations that exist for Rapid Photo Downloader
+    :return: iterator of Tuple of language code and localized name
+    """
+
+    lang_codes = available_lang_codes()
+
+    if not lang_codes:  # Testing code when translations are not installed
+        lang_codes = ['en', 'de', 'es']
+
+    if not display_locale_code:
+        try:
+            locale_code = locale.getdefaultlocale()[0]
+        except Exception:
+            locale_code = 'en_US'
+    else:
+        locale_code = display_locale_code
+
+    # Determine if this locale makes its language names lower case
+    babel_sample = babel.Locale.parse('en').get_display_name(locale_code)
+    make_missing_lower = babel_sample.islower()
+
+    langs = zip(
+        lang_codes, [
+            get_language_display_name(code, make_missing_lower, locale_code) for code in lang_codes
+        ]
+    )
+
+    # Sort languages by display name
+    langs = list(langs)
+    try:
+        langs.sort(key=lambda l: locale.strxfrm(l[1]))
+    except Exception:
+        logging.error("Error sorting language names for display in program preferences")
+    return langs
+
+
+def installed_using_pip(package='rapid-photo-downloader') -> bool:
+    """
+    Determine if python package was installed using pip.
+
+    Exceptions are not caught.
+
+    :param package: package name to search for
+    :return: True if installed via pip, else False
+    """
+
+    pip_install = False
+    pkg = pkg_resources.get_distribution(package)
+    if pkg.has_metadata('INSTALLER'):
+        if pkg.get_metadata('INSTALLER').strip() == 'pip':
+            pip_install = True
+
+    return pip_install

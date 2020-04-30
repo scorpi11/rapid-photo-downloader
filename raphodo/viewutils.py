@@ -21,19 +21,20 @@ __copyright__ = "Copyright 2015-2020, Damon Lynch"
 
 from typing import List, Dict, Tuple, Optional
 from collections import namedtuple
-from distutils.version import LooseVersion
-
-from gettext import gettext as _
+from pkg_resources import parse_version
+import sys
 
 from PyQt5.QtWidgets import (
     QStyleOptionFrame, QStyle, QStylePainter, QWidget, QLabel, QListWidget, QProxyStyle,
     QStyleOption, QDialogButtonBox
 )
-from PyQt5.QtGui import QFontMetrics, QFont, QPainter, QPixmap, QIcon
+from PyQt5.QtGui import QFontMetrics, QFont, QPainter, QPixmap, QIcon, QGuiApplication
 from PyQt5.QtCore import QSize, Qt, QT_VERSION_STR, QPoint
 
-QT5_VERSION = LooseVersion(QT_VERSION_STR)
+QT5_VERSION = parse_version(QT_VERSION_STR)
 
+from raphodo.constants import ScalingDetected
+import raphodo.xsettings as xsettings
 
 class RowTracker:
     r"""
@@ -265,7 +266,7 @@ def qt5_screen_scale_environment_variable() -> str:
     :return: correct variable
     """
 
-    if QT5_VERSION < LooseVersion('5.14.0'):
+    if QT5_VERSION < parse_version('5.14.0'):
         return 'QT_AUTO_SCREEN_SCALE_FACTOR'
     else:
         return 'QT_ENABLE_HIGHDPI_SCALING'
@@ -350,3 +351,58 @@ def scaledIcon(path: str, size: Optional[QSize]=None) -> QIcon:
         size = QSize(s, s)
     i.addFile(path, size)
     return i
+
+
+def screen_scaled_xsettings() -> bool:
+    """
+    Use xsettings to detect if screen scaling is on.
+
+    No error checking.
+
+    :return: True if detected, False otherwise
+    """
+
+    x11 = xsettings.get_xsettings()
+    return x11.get(b'Gdk/WindowScalingFactor', 1) > 1
+
+
+def any_screen_scaled_qt() -> bool:
+    """
+    Detect if any of the screens on this system have scaling enabled.
+
+    Call before QApplication is initialized. Uses temporary QGuiApplication.
+
+    :return: True if found, else False
+    """
+
+    app = QGuiApplication(sys.argv)
+    ratio = app.devicePixelRatio()
+    del app
+
+    return ratio > 1.0
+
+
+def any_screen_scaled() -> Tuple[ScalingDetected, bool]:
+    """
+    Detect if any of the screens on this system have scaling enabled.
+
+    Uses Qt and xsettings to do detection.
+
+    :return: True if found, else False
+    """
+
+    qt_detected_scaling = any_screen_scaled_qt()
+    try:
+        xsettings_detected_scaling = screen_scaled_xsettings()
+        xsettings_running = True
+    except:
+        xsettings_detected_scaling = False
+        xsettings_running = False
+
+    if qt_detected_scaling:
+        if xsettings_detected_scaling:
+            return ScalingDetected.Qt_and_Xsetting, xsettings_running
+        return ScalingDetected.Qt, xsettings_running
+    if xsettings_detected_scaling:
+        return ScalingDetected.Xsetting, xsettings_running
+    return ScalingDetected.undetected, xsettings_running

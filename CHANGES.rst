@@ -1,6 +1,146 @@
 Changelog for Rapid Photo Downloader
 ====================================
 
+0.9.23 (2020-04-16)
+-------------------
+
+ - Fixed bug #1872188: sqlite3.OperationalError when generating thumbnails.
+
+ - Fixed bug #1873057: Add ORI to list of supported image formats.
+
+ - Fixed bug #1873233: RAW and JPG don't synchronize when using stored number.
+
+ - Fixed bug where HEIF/HEIC thumbnails on a camera were not being generated
+   until they were downloaded.
+
+ - When generating video thumbnails for phones and tablets, the entire video
+   will now be downloaded and cached. Previously only a portion of the video was
+   downloaded, in the hope that this portion could generate the thumbnail, but
+   unfortunately it did not always render. This new behavior will slow down
+   thumbnail generation, but does ensure the thumbnail will be rendered. If you
+   object to this new behavior or know of a better approach, please share your
+   thoughts in the discussion forum:
+
+   https://discuss.pixls.us/c/software/rapid-photo-downloader
+
+0.9.23a1 (2020-04-15)
+---------------------
+
+ - Fixed bug #1872338 segfault on startup after upgrade. When running under a
+   Gtk-based desktop, the application now queries xsettings to detect if monitor
+   scaling is enabled. In the previous release, Gtk was queried directly, which
+   caused segfaults (crashes) on some systems.
+
+0.9.22 (2020-04-11)
+-------------------
+
+ - Fixed bugs where camera insertion and removal was not being detected in some
+   circumstances. In KDE, it was camera removal. In Gnome-like systems where
+   auto mounting of cameras is disabled or not functional, it was insertion.
+
+ - More robustly handle a camera being unexpectedly removed during scanning,
+   thumbnailing, and copying files.
+
+0.9.22a1 (2020-04-10)
+---------------------
+
+ - Fixed bug #1871649: Window corruption when application scaling enabled on
+   certain desktop environments. The application now uses Qt and Gdk to query
+   whether any monitor has scaling enabled. If no scaling is enabled on any
+   monitor, then Rapid Photo Downloader will not enable automatic scaling.
+
+ - New package dependency: Python 3 gobject introspection for Gdk 3.0
+
+   For openSUSE:
+
+   - python3-gobject-Gdk
+
+ - Fixed packaged detection in install.py script for openSUSE. Fixed bug when
+   enabling RPM Fusion Free on Fedora.
+
+
+0.9.21 (2020-04-07)
+-------------------
+
+ - Added an option to extract photo metadata (including thumbnails) using only
+   ExifTool. Rapid Photo Downloader defaults to using Exiv2, relying on ExifTool
+   only when Exiv2 does not support the file format being read. Exiv2 is
+   fast, accurate, and almost always reliable, but it crashes when extracting
+   metadata from a small number of files, such as DNG files produced by Leica M8
+   cameras.
+
+ - Fixed bug #1869065: Debian Buster can't find package
+
+ - Fixed bug introduced in 0.9.20 when resetting program preferences back to
+   default values in the Preferences Dialog window.
+
+ - Fixed bug #1870566: Missing default locale causes startup failure.
+
+ - Fixed a bug where the number of photos and videos for a camera or phone would
+   not be displayed under the devices section if the preference value "Scan only
+   specific folders on devices" was not enabled.
+
+ - Reinstated creation of build directory in setup.py if the build directory
+   does not exist.
+
+ - The install.py script will now only try to copy man pages to system man page
+   directory if the same man pages were not previously installed.
+
+ - Simplified release notes by moving content online documentation.
+
+ - Updated Czech, Dutch, French, German, Japanese, Russian, Spanish and Turkish
+   translations.
+
+0.9.20 (2020-03-22)
+-------------------
+
+ - Added support for program icon progress bars and badge counts on any desktop
+   that supports the Unity LauncherEntry API, not just Ubuntu Unity or Gnome
+   running under Ubuntu. (The Unity LauncherEntry API is used by desktops other
+   than Unity and Ubuntu Gnome, e.g. KDE, Dash to Panel.)
+
+ - Added missing property StartupWMClass to the program's desktop file. It's now
+   possible to add the Rapid Photo Downloader launcher as a Favorite to the
+   Gnome Shell dock and not have it appear as a duplicate entry when the program
+   runs. This fix also enables program icon progress bars and badge counts under
+   Gnome Shell extensions that support them.
+
+ - Implemented feature request in bug #1810102: cannot change language in
+   program preferences. You can now specify the language you want the user
+   interface to display in regardless of the system locale setting.
+
+ - Fixed problems in setup.py. Made requirements.txt more conformant.
+
+ - Better handle missing ExifTool on startup.
+
+ - For distribution packagers, this release adds new package dependencies. The
+   SVG module for Qt 5 must be listed a required dependency, or else Rapid Photo
+   Downloader's SVG assets will fail to display (this has been happening under
+   Pop!_OS, for example).
+
+   For openSUSE:
+
+   - typelib-1_0-UnityExtras-7_0
+   - typelib-1_0-Unity-7_0
+   - typelib-1_0-Dbusmenu-0_4
+   - typelib-1_0-Dee-1_0
+   - python3-babel
+   - libQt5Svg5
+
+   For Debian:
+
+   - gir1.2-unity-5.0
+   - python3-babel
+   - libqt5svg5
+
+   For Arch:
+
+   - qt5-svg
+
+   For Fedora:
+
+   - qt5-qtsvg
+
 0.9.19 (2020-03-17)
 -------------------
 

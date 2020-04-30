@@ -89,6 +89,11 @@ from raphodo.fileformats import use_exiftool_on_photo
 from raphodo.heif import have_heif_module
 
 
+def cache_dir_name(device_name: str) -> str:
+    """Generate a directory name for a temporary file cache"""
+    return 'rpd-cache-{}-'.format(device_name[:10].replace(' ', '_'))
+
+
 def split_list(alist: list, wanted_parts=2):
     """
     Split list into smaller parts
@@ -426,6 +431,9 @@ class GenerateThumbnails(WorkerInPublishPullPipeline):
         task = ExtractionTask.undetermined
         file_to_work_on_is_temporary = False
 
+        if rpd_file.is_mtp_device and rpd_file.file_type == FileType.video:
+            entire_file_required = True
+
         if not entire_file_required:
             # For many photos videos, extract a small part of the file and use
             # that to get the metadata
@@ -481,6 +489,9 @@ class GenerateThumbnails(WorkerInPublishPullPipeline):
 
         self.prefs = Preferences()
 
+        # Whether we must use ExifTool to read photo metadata
+        force_exiftool = self.prefs.force_exiftool
+
         # If the entire photo or video is required to extract the thumbnail, which is determined
         # when extracting sample metadata from a photo or video during the device scan
         entire_photo_required = arguments.entire_photo_required
@@ -492,7 +503,7 @@ class GenerateThumbnails(WorkerInPublishPullPipeline):
         thumbnail_caches = GetThumbnailFromCache(use_thumbnail_cache=use_thumbnail_cache)
 
         photo_cache_dir = video_cache_dir = None
-        cache_file_from_camera = False
+        cache_file_from_camera = force_exiftool
 
         rpd_files = arguments.rpd_files
 
@@ -530,6 +541,13 @@ class GenerateThumbnails(WorkerInPublishPullPipeline):
                     "Prematurely exiting thumbnail generation due to lack of access to camera %s",
                     arguments.camera
                 )
+                self.content = pickle.dumps(
+                    GenerateThumbnailsResults(
+                        scan_id=arguments.scan_id,
+                        camera_removed=True,
+                    ), pickle.HIGHEST_PROTOCOL
+                )
+                self.send_message_to_sink()
                 self.disconnect_logging()
                 self.send_finished_command()
                 sys.exit(0)
@@ -550,10 +568,10 @@ class GenerateThumbnails(WorkerInPublishPullPipeline):
                 # the download process
                 self.photo_cache_dir = create_temp_dir(
                     folder=arguments.cache_dirs.photo_cache_dir,
-                    prefix='rpd-cache-{}-'.format(self.device_name[:10]))
+                    prefix=cache_dir_name(self.device_name))
                 self.video_cache_dir = create_temp_dir(
                     folder=arguments.cache_dirs.video_cache_dir,
-                    prefix='rpd-cache-{}-'.format(self.device_name[:10]))
+                    prefix=cache_dir_name(self.device_name))
                 cache_dirs = CacheDirs(self.photo_cache_dir, self.video_cache_dir)
                 self.content = pickle.dumps(
                     GenerateThumbnailsResults(
@@ -631,6 +649,7 @@ class GenerateThumbnails(WorkerInPublishPullPipeline):
                             if self.cache_full_size_file_from_camera(rpd_file):
                                 task = ExtractionTask.load_heif_and_exif_directly
                                 processing.add(ExtractionProcessing.resize)
+                                full_file_name_to_work_on = rpd_file.cache_full_file_name
                                 # For now, do not orient, as it seems pyheif or libheif does
                                 # that automatically.
                                 # processing.add(ExtractionProcessing.orient)
@@ -648,7 +667,7 @@ class GenerateThumbnails(WorkerInPublishPullPipeline):
                                     thumbnail_bytes = None
                             else:
 
-                                if use_exiftool_on_photo(rpd_file.extension,
+                                if force_exiftool or use_exiftool_on_photo(rpd_file.extension,
                                                            preview_extraction_irrelevant=False):
                                     task, full_file_name_to_work_on, \
                                         file_to_work_on_is_temporary =\
@@ -796,7 +815,8 @@ class GenerateThumbnails(WorkerInPublishPullPipeline):
                         use_thumbnail_cache=use_thumbnail_cache,
                         file_to_work_on_is_temporary=file_to_work_on_is_temporary,
                         write_fdo_thumbnail=False,
-                        send_thumb_to_main=True
+                        send_thumb_to_main=True,
+                        force_exiftool=force_exiftool
                     ),
                     pickle.HIGHEST_PROTOCOL)
                 self.frontend.send_multipart([b'data', self.content])

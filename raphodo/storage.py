@@ -1,4 +1,4 @@
-# Copyright (C) 2015-2019 Damon Lynch <damonlynch@gmail.com>
+# Copyright (C) 2015-2020 Damon Lynch <damonlynch@gmail.com>
 # Copyright (C) 2008-2015 Canonical Ltd.
 # Copyright (C) 2013 Bernard Baeyens
 
@@ -43,7 +43,7 @@ regarding mount points and XDG related functionality.
 """
 
 __author__ = 'Damon Lynch'
-__copyright__ = "Copyright 2011-2019, Damon Lynch. Copyright 2008-2015 Canonical Ltd. Copyright" \
+__copyright__ = "Copyright 2011-2020, Damon Lynch. Copyright 2008-2015 Canonical Ltd. Copyright" \
                 " 2013 Bernard Baeyens."
 
 import logging
@@ -56,7 +56,7 @@ import shlex
 import pwd
 import shutil
 from collections import namedtuple
-from typing import Optional, Tuple, List, Dict
+from typing import Optional, Tuple, List, Dict, Set
 from urllib.request import pathname2url, quote
 from tempfile import NamedTemporaryFile
 
@@ -73,7 +73,7 @@ gi.require_version('GExiv2', '0.10')
 gi.require_version('GLib', '2.0')
 from gi.repository import GUdev, UDisks, GLib
 
-from gettext import gettext as _
+
 
 from raphodo.constants import (
     Desktop, Distro, FileManagerType, DefaultFileBrowserFallback, FileManagerBehavior
@@ -117,8 +117,6 @@ def get_distro() -> Distro:
         with open(os_release, 'r') as f:
             for line in f:
                 if line.startswith('NAME='):
-                    if line.find('Korora') > 0:
-                        return Distro.korora
                     if line.find('elementary') > 0:
                         return Distro.elementary
                     if line.find('CentOS Linux') > 0:
@@ -127,6 +125,8 @@ def get_distro() -> Distro:
                         return Distro.opensuse
                     if line.find('Deepin') > 0:
                         return Distro.deepin
+                    if line.find('Zorin') > 0:
+                        return Distro.zorin
                 if line.startswith('ID='):
                     return get_distro_id(line[3:])
                 if line.startswith('ID_LIKE='):
@@ -172,13 +172,13 @@ def get_media_dir() -> str:
 
     if sys.platform.startswith('linux'):
         media_dir = '/media/{}'.format(get_user_name())
-        run_media_dir = '/run{}'.format(media_dir)
+        run_media_dir = '/run/media'
         distro = get_distro()
         if os.path.isdir(run_media_dir) and distro not in (
                 Distro.ubuntu, Distro.debian, Distro.neon, Distro.galliumos, Distro.peppermint,
-                Distro.elementary):
+                Distro.elementary, Distro.zorin):
             if distro not in (Distro.fedora, Distro.manjaro, Distro.arch, Distro.opensuse,
-                              Distro.gentoo, Distro.antergos, Distro.korora, Distro.centos):
+                              Distro.gentoo, Distro.antergos, Distro.centos):
                 logging.debug(
                     "Detected /run/media directory, but distro does not appear to be CentOS, "
                     "Fedora, Arch, openSUSE, Gentoo, Korora, Manjaro, or Antergos"
@@ -187,7 +187,7 @@ def get_media_dir() -> str:
             return run_media_dir
         return media_dir
     else:
-        raise ("Mounts.setValidMountPoints() not implemented on %s", sys.platform())
+        raise ("Mounts.setValidMountPoints() not implemented on %s", sys.platform)
 
 
 _gvfs_gphoto2 = re.compile('gvfs.*gphoto2.*host')
@@ -403,6 +403,8 @@ def get_desktop() -> Desktop:
         env = 'gnome'
     elif env == 'budgie:gnome':
         env = 'gnome'
+    elif env == 'zorin:gnome':
+        env = 'zorin'
 
     try:
         return Desktop[env]
@@ -615,6 +617,7 @@ def _default_file_manager_for_desktop() -> Tuple[Optional[str], Optional[FileMan
     global _default_file_manager_type
 
     try:
+        fm = ''
         fm = DefaultFileBrowserFallback[_desktop.name]
         assert shutil.which(fm)
         t = FileManagerBehavior[fm]
@@ -625,7 +628,7 @@ def _default_file_manager_for_desktop() -> Tuple[Optional[str], Optional[FileMan
         logging.debug("Error determining default file manager")
         return None, None
     except AssertionError:
-        logging.debug("Default file manager %s cannot be found")
+        logging.debug("Default file manager %s cannot be found", fm)
         return None, None
 
 
@@ -858,12 +861,29 @@ def udev_attributes(devname: str) -> Optional[UdevAttr]:
     for device in enumerator.execute():
         model = device.get_property('ID_MODEL')  # type: str
         if model is not None:
-            is_mtp = device.get_property('ID_MTP_DEVICE') == '1'
+            is_mtp = device.get_property('ID_MTP_DEVICE') == '1' or \
+                     device.get_property('ID_MEDIA_PLAYER') == '1'
             vendor = device.get_property('ID_VENDOR')  # type: str
             model = model.replace('_', ' ').strip()
             vendor = vendor.replace('_', ' ').strip()
             return UdevAttr(is_mtp, vendor, model)
     return None
+
+
+def udev_is_camera(devname: str) -> bool:
+    """
+    Query udev to see if device is a gphoto2 device (a camera or phone)
+    :param devname: udev DEVNAME e.g. '/dev/bus/usb/001/003'
+    :return: True if so, else False
+    """
+
+    client = GUdev.Client(subsystems=['usb', 'block'])
+    enumerator = GUdev.Enumerator.new(client)
+    enumerator.add_match_property('DEVNAME', devname)
+    for device in enumerator.execute():
+        if device.get_property('ID_GPHOTO2') == '1':
+            return True
+    return False
 
 
 def fs_device_details(path: str) -> Tuple:
@@ -945,9 +965,13 @@ class CameraHotplug(QObject):
         logging.debug("... camera hotplug monitor started")
         self.enumerateCameras()
         if self.cameras:
-            logging.debug("Camera Hotplug found %d cameras:", len(self.cameras))
+            logging.info(
+                "Camera Hotplug found %d camera(s): %s", len(self.cameras), ', '.join(
+                    (model for port, model in self.cameras.items())
+                )
+            )
             for port, model in self.cameras.items():
-                logging.debug("%s at %s", model, port)
+                logging.debug("%s is at %s", model, port)
 
     def enumerateCameras(self):
         """
@@ -977,34 +1001,43 @@ class CameraHotplug(QObject):
         path = device.get_sysfs_path()
         parent_device = device.get_parent()
         parent_path = parent_device.get_sysfs_path()
-        logging.debug("Device change: %s. Path: %s Parent Device: %s Parent path: %s",
-                      action, path, parent_device, parent_path)
+        logging.debug("Device change: %s. Path: %s Parent path: %s", action, path, parent_path)
+
+        # Ignore 'bind' action: seems to add nothing we need to know
 
         if action == 'add':
             if parent_path not in self.cameras:
                 model = device.get_property('ID_MODEL')
-                logging.debug("Hotplug: new camera: %s", model)
+                logging.info("Hotplug: new camera: %s", model.replace('_', ' '))
                 self.cameras[path] = model
                 self.cameraAdded.emit()
             else:
-                logging.debug("Hotplug: already know about %s", self.cameras[
-                    parent_path])
+                logging.debug("Hotplug: already know about %s", self.cameras[parent_path])
 
         elif action == 'remove':
             emit_remove = False
             name = ''
-            if path in self.cameras:
-                name = self.cameras[path]
-                del self.cameras[path]
-                emit_remove = True
-            elif device.get_property('ID_GPHOTO2') == '1':
-                # This should not need to be called. However,
-                # self.enumerateCameras may not have been called earlier
-                name = device.get_property('ID_MODEL')
-                if name is not None:
+
+            # A path might look like:
+            # /sys/devices/pci0000:00/0000:00:1c.6/0000:0e:00.0/usb3/3-2/3-2:1.0
+            # When what we want is:
+            # /sys/devices/pci0000:00/0000:00:1c.6/0000:0e:00.0/usb3/3-2
+            # This unchanged path used to work, so test both the unchanged and modified
+            # path
+            # Note enumerateCameras() above finds only the path as in the 2nd type, without the
+            # 3-2:1.0
+            split_path = os.path.split(path)[0]
+
+            for p in (path, split_path):
+                if p in self.cameras:
+                    name = self.cameras[p]
+                    logging.debug("Hotplug: removing %s on basis of path %s", name, p)
+                    del self.cameras[p]
                     emit_remove = True
+                    break
+
             if emit_remove:
-                logging.debug("Hotplug: %s has been removed", name)
+                logging.info("Hotplug: %s has been removed", name)
                 self.cameraRemoved.emit()
 
 
@@ -1280,6 +1313,7 @@ if have_gio:
         partitionUnmounted = pyqtSignal(str)
         volumeAddedNoAutomount = pyqtSignal()
         cameraPossiblyRemoved = pyqtSignal()
+        cameraVolumeAdded = pyqtSignal(str)
 
         def __init__(self, validMounts: ValidMounts) -> None:
             super().__init__()
@@ -1290,14 +1324,28 @@ if have_gio:
             self.vm.connect('volume-removed', self.volumeRemoved)
             self.portSearch = re.compile(r'usb:([\d]+),([\d]+)')
             self.scsiPortSearch = re.compile(r'usbscsi:(.+)')
+            self.possibleCamera = re.compile(r'/usb/([\d]+)/([\d]+)')
             self.validMounts = validMounts
+            self.camera_volumes_added = dict()  # type: Dict[str, str]
+            self.camera_volumes_mounted = set()  # type: Set[str]
 
-        def mountMightBeCamera(self, mount: Gio.Mount) -> bool:
+        @staticmethod
+        def mountMightBeCamera(mount: Gio.Mount) -> bool:
             """
             :param mount: the mount to check
             :return: True if the mount needs to be checked if it is a camera
             """
             return not mount.is_shadowed() and mount.get_volume() is not None
+
+        def unixDevicePathIsCamera(self, devname: str) -> bool:
+            """
+            Test if the device at unix device path devname is a camera
+            :param devname: Gio.VOLUME_IDENTIFIER_KIND_UNIX_DEVICE device path
+             e.g. '/dev/bus/usb/001/003'
+            :return: True if camera else False
+            """
+
+            return self.possibleCamera.search(devname) is not None and udev_is_camera(devname)
 
         def ptpCameraMountPoint(self, model: str, port: str) -> Optional[Gio.Mount]:
             """
@@ -1311,19 +1359,24 @@ if have_gio:
                 p1 = p.group(1)
                 p2 = p.group(2)
                 device_path = '/dev/bus/usb/{}/{}'.format(p1, p2)
-                #pattern = re.compile(r'%\S\Susb%\S\S{}%\S\S{}%\S\S'.format(p1, p2))
+                return self.cameraMountPointByUnixDevice(device_path=device_path)
             else:
                 p = self.scsiPortSearch.match(port)
                 if p is None:
                     logging.error("Unknown camera mount method %s %s", model, port)
                 return None
 
+        def cameraMountPointByUnixDevice(self, device_path: str) -> Optional[Gio.Mount]:
+            """
+            :return: the mount point of the PTP / MTP camera, if it is mounted,
+             else None. If camera is not mounted with PTP / MTP, None is
+             returned.
+            """
+
             to_unmount = None
 
             for mount in self.vm.get_mounts():
                 if self.mountMightBeCamera(mount):
-                    # According to GTK docs, Gio.VOLUME_IDENTIFIER_KIND_UNIX_DEVICE is
-                    # deprecated, but what should replace it?
                     identifier = mount.get_volume().get_identifier(
                         Gio.VOLUME_IDENTIFIER_KIND_UNIX_DEVICE
                     )
@@ -1434,11 +1487,13 @@ if have_gio:
                     mpath = root.get_path()
                     if path == mpath:
                         logging.info("Attempting to unmount %s...", path)
-                        mount.unmount_with_operation(0, None, None, self.unmountVolumeCallback,
-                                                     path)
+                        mount.unmount_with_operation(
+                            0, None, None, self.unmountVolumeCallback, path
+                        )
                         break
 
-        def unmountVolumeCallback(self, mount: Gio.Mount,
+        @staticmethod
+        def unmountVolumeCallback(mount: Gio.Mount,
                                   result: Gio.AsyncResult,
                                   user_data: str) -> None:
 
@@ -1464,7 +1519,11 @@ if have_gio:
             """
             Determine if the mount refers to a camera by checking the
             path to see if gphoto2 or mtp is in the last folder in the
-            root path
+            root path.
+
+            Does not query udev, deliberately. This can be called when device
+            is being unmounted. Unclear if the device is still on the system
+            at this point, or how realible that is even if it is.
 
             :param mount: mount to check
             :return: True if mount refers to a camera, else False
@@ -1476,10 +1535,10 @@ if have_gio:
                     logging.warning('Unable to get mount root')
                 else:
                     path = root.get_path()
-                    logging.debug("GIO: Looking for camera at mount {}".format(path))
                     if path:
-                    # check last two levels of the path name, as it might be in a format like
-                    # /run/..../gvfs/gphoto2:host=Canon_Inc._Canon_Digital_Camera/store_00010001
+                        logging.debug("GIO: Looking for camera at mount {}".format(path))
+                        # check last two levels of the path name, as it might be in a format like
+                        # /run/..../gvfs/gphoto2:host=Canon_Inc._Canon_Digital_Camera/store_00010001
                         for i in (1, 2):
                             path, folder_name = os.path.split(path)
                             if folder_name:
@@ -1511,13 +1570,36 @@ if have_gio:
             return False
 
         def mountAdded(self, volumeMonitor, mount: Gio.Mount) -> None:
+            """
+            Determine if mount is valid partition or is a camera, or something
+            else.
+
+            :param volumeMonitor: not used
+            :param mount: the mount to examine
+            """
+
+            logging.debug("Examining mount %s", mount.get_name())
+            try:
+                identifier = mount.get_volume().get_identifier(
+                    Gio.VOLUME_IDENTIFIER_KIND_UNIX_DEVICE
+                )
+                if identifier in self.camera_volumes_added:
+                    logging.debug("%s is now mounted", self.camera_volumes_added[identifier])
+                    self.camera_volumes_mounted.add(identifier)
+                    self.cameraMounted.emit()
+                    return
+            except Exception:
+                pass
+
             if self.mountIsCamera(mount):
+                # Can be called on startup if camera was already mounted in GIO before the program
+                # started. In that case, previous check would not have detected the camera.
                 self.cameraMounted.emit()
             elif self.mountIsPartition(mount):
                 icon_names = self.getIconNames(mount)
-                self.partitionMounted.emit(mount.get_root().get_path(),
-                                           icon_names,
-                                           mount.can_eject())
+                self.partitionMounted.emit(
+                    mount.get_root().get_path(), icon_names, mount.can_eject()
+                )
 
         def mountRemoved(self, volumeMonitor, mount: Gio.Mount) -> None:
             if not self.mountIsCamera(mount):
@@ -1526,12 +1608,38 @@ if have_gio:
                     self.partitionUnmounted.emit(mount.get_root().get_path())
 
         def volumeAdded(self, volumeMonitor, volume: Gio.Volume) -> None:
-            logging.debug("GIO: Volume added %s. Automount: %s",
-                          volume.get_name(),
-                          volume.should_automount())
-            if not volume.should_automount():
-                # TODO is it possible to determine the device type?
-                self.volumeAddedNoAutomount.emit()
+            volume_name = volume.get_name()
+            logging.debug(
+                "GIO: Volume added %s. Automount: %s (might be incorrect)",
+                volume_name, volume.should_automount()
+            )
+
+            # Even if volume.should_automount(), the volume in fact may not be mounted
+            # automatically. Unbelievable.
+
+            device_path = volume.get_identifier(
+                Gio.VOLUME_IDENTIFIER_KIND_UNIX_DEVICE
+            )
+
+            if self.unixDevicePathIsCamera(device_path):
+                self.camera_volumes_added[device_path] = volume_name
+                logging.debug(
+                    "%s is a camera at %s", volume_name, device_path
+                )
+                # Time is in milliseconds; 3000 is 3 seconds.
+                QTimer.singleShot(3000, lambda: self.cameraVolumeAddedCheckMount(device_path))
+
+        def cameraVolumeAddedCheckMount(self, device_path) -> None:
+            if device_path not in self.camera_volumes_mounted:
+                logging.debug(
+                    "%s had not been automatically mounted. Will initiate camera scan.",
+                    self.camera_volumes_added[device_path]
+                )
+                self.cameraVolumeAdded.emit(device_path)
+            else:
+                logging.debug(
+                    "%s had been automatically mounted", self.camera_volumes_added[device_path]
+                )
 
         def volumeRemoved(self, volumeMonitor, volume: Gio.Volume) -> None:
             logging.debug("GIO: %s volume removed", volume.get_name())
@@ -1539,7 +1647,14 @@ if have_gio:
                 logging.debug("GIO: %s might be a camera", volume.get_name())
                 self.cameraPossiblyRemoved.emit()
 
-        def getIconNames(self, mount: Gio.Mount) -> List[str]:
+        @staticmethod
+        def getIconNames(mount: Gio.Mount) -> List[str]:
+            """
+            Get icons for the mount from theme
+
+            :param mount:
+            :return:
+            """
             icon_names = []
             icon = mount.get_icon()
             if isinstance(icon, Gio.ThemedIcon):
@@ -1567,7 +1682,7 @@ if have_gio:
 
 
 def _get_info_size_value(info: Gio.FileInfo, attr: str) -> int:
-    if info.get_attribute_data(attr).type ==  Gio.FileAttributeType.UINT64:
+    if info.get_attribute_data(attr).type == Gio.FileAttributeType.UINT64:
         return info.get_attribute_uint64(attr)
     else:
         return info.get_attribute_uint32(attr)
@@ -1592,8 +1707,11 @@ def get_mount_size(mount: QStorageInfo) -> Tuple[int, int]:
 
     logging.debug("Using GIO to query file system attributes for %s...", path)
     p = Gio.File.new_for_path(os.path.abspath(path))
-    info = p.query_filesystem_info(','.join((Gio.FILE_ATTRIBUTE_FILESYSTEM_SIZE,
-                                             Gio.FILE_ATTRIBUTE_FILESYSTEM_FREE)))
+    info = p.query_filesystem_info(
+        ','.join(
+            (Gio.FILE_ATTRIBUTE_FILESYSTEM_SIZE, Gio.FILE_ATTRIBUTE_FILESYSTEM_FREE)
+        )
+    )
     logging.debug("...query of file system attributes for %s completed", path)
     bytes_total = _get_info_size_value(info, Gio.FILE_ATTRIBUTE_FILESYSTEM_SIZE)
     bytes_free = _get_info_size_value(info, Gio.FILE_ATTRIBUTE_FILESYSTEM_FREE)

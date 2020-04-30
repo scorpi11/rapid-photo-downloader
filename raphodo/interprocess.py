@@ -1,4 +1,4 @@
-# Copyright (C) 2015-2019 Damon Lynch <damonlynch@gmail.com>
+# Copyright (C) 2015-2020 Damon Lynch <damonlynch@gmail.com>
 
 # This file is part of Rapid Photo Downloader.
 #
@@ -17,7 +17,7 @@
 # see <http://www.gnu.org/licenses/>.
 
 __author__ = 'Damon Lynch'
-__copyright__ = "Copyright 2015-2019, Damon Lynch"
+__copyright__ = "Copyright 2015-2020, Damon Lynch"
 
 import argparse
 import sys
@@ -501,9 +501,6 @@ class LRUQueue:
 
     def handle_controller(self, msg):
         self.terminating = True
-        # logging.debug(
-        #     "%s load balancer requesting %s workers to stop", self.worker_type, len(self.workers)
-        # )
 
         while len(self.workers):
             worker_identity = self.workers.popleft()
@@ -526,7 +523,7 @@ class LRUQueue:
 
         zw = self.process_manager.zombie_workers()
         if zw:
-            logging.error("%s dead thumbnail extractors", len(zw))
+            logging.critical("%s dead thumbnail extractors", len(zw))
 
         # Second frame is empty
         assert empty == b''
@@ -1064,7 +1061,7 @@ class WorkerInPublishPullPipeline(WorkerProcess):
             # If there is no command,exception will occur
             worker_id, command = self.controller.recv_multipart(zmq.DONTWAIT)
             assert command in [b'PAUSE', b'STOP']
-            assert  worker_id == self.worker_id
+            assert worker_id == self.worker_id
 
             if command == b'PAUSE':
                 # Because the process is paused, do a blocking read to
@@ -1252,10 +1249,6 @@ class ScanArguments:
         :param ignore_other_types: ignore file types like TIFF
         :param log_gphoto2: whether to generate detailed gphoto2 log
          messages
-        :param scan_only_DCIM: if the device is an auto-detected volume,
-         then if True, scan only in it's DCIM folder
-        :param warn_unknown_file: whether to issue a warning when
-         encountering an unknown (unrecognized) file
         """
 
         self.device = device
@@ -1280,6 +1273,7 @@ class ScanResults:
                  sample_video: Optional[Video]=None,
                  problems: Optional[ScanProblems]=None,
                  fatal_error: Optional[bool]=None,
+                 camera_removed: Optional[bool]=None,
                  entire_video_required: Optional[bool]=None,
                  entire_photo_required: Optional[bool]=None) -> None:
         self.rpd_files = rpd_files
@@ -1294,6 +1288,7 @@ class ScanResults:
         self.sample_video = sample_video
         self.problems = problems
         self.fatal_error = fatal_error
+        self.camera_removed = camera_removed
         self.entire_video_required = entire_video_required
         self.entire_photo_required = entire_photo_required
 
@@ -1335,7 +1330,8 @@ class CopyFilesResults:
                  rpd_file: Optional[RPDFile]=None,
                  download_count: Optional[int]=None,
                  mdata_exceptions: Optional[Tuple]=None,
-                 problems: Optional[CopyingProblems]=None) -> None:
+                 problems: Optional[CopyingProblems]=None,
+                 camera_removed: Optional[bool]=None) -> None:
         """
 
         :param scan_id: scan id of the device the files are being
@@ -1370,6 +1366,7 @@ class CopyFilesResults:
         self.download_count = download_count
         self.mdata_exceptions = mdata_exceptions
         self.problems = problems
+        self.camera_removed = camera_removed
 
 
 class ThumbnailDaemonData:
@@ -1385,13 +1382,15 @@ class ThumbnailDaemonData:
                  write_fdo_thumbnail: Optional[bool]=None,
                  use_thumbnail_cache: Optional[bool]=None,
                  backup_full_file_names: Optional[List[str]]=None,
-                 fdo_name: Optional[str]=None) -> None:
+                 fdo_name: Optional[str]=None,
+                 force_exiftool: Optional[bool]=None) -> None:
         self.frontend_port = frontend_port
         self.rpd_file = rpd_file
         self.write_fdo_thumbnail = write_fdo_thumbnail
         self.use_thumbnail_cache = use_thumbnail_cache
         self.backup_full_file_names = backup_full_file_names
         self.fdo_name = fdo_name
+        self.force_exiftool = force_exiftool
 
 
 class RenameAndMoveFileData:
@@ -1564,12 +1563,14 @@ class GenerateThumbnailsResults:
     def __init__(self, rpd_file: Optional[RPDFile]=None,
                  thumbnail_bytes: Optional[bytes]=None,
                  scan_id: Optional[int]=None,
-                 cache_dirs: Optional[CacheDirs]=None) -> None:
+                 cache_dirs: Optional[CacheDirs]=None,
+                 camera_removed: Optional[bool]=None,) -> None:
         self.rpd_file = rpd_file
         # If thumbnail_bytes is None, there is no thumbnail
         self.thumbnail_bytes = thumbnail_bytes
         self.scan_id = scan_id
         self.cache_dirs = cache_dirs
+        self.camera_removed = camera_removed
 
 
 class ThumbnailExtractorArgument:
@@ -1583,7 +1584,8 @@ class ThumbnailExtractorArgument:
                  use_thumbnail_cache: bool,
                  file_to_work_on_is_temporary: bool,
                  write_fdo_thumbnail: bool,
-                 send_thumb_to_main: bool) -> None:
+                 send_thumb_to_main: bool,
+                 force_exiftool: bool) -> None:
         self.rpd_file = rpd_file
         self.task = task
         self.processing = processing
@@ -1595,6 +1597,7 @@ class ThumbnailExtractorArgument:
         self.use_thumbnail_cache = use_thumbnail_cache
         self.write_fdo_thumbnail = write_fdo_thumbnail
         self.send_thumb_to_main = send_thumb_to_main
+        self.force_exiftool = force_exiftool
 
 
 class RenameMoveFileManager(PushPullDaemonManager):
@@ -1689,6 +1692,7 @@ class ScanManager(PublishPullPipelineManager):
     deviceDetails = pyqtSignal(int, 'PyQt_PyObject', 'PyQt_PyObject', str)
     scanProblems = pyqtSignal(int, 'PyQt_PyObject')
     fatalError = pyqtSignal(int)
+    cameraRemovedDuringScan = pyqtSignal(int)
 
     def __init__(self, logging_port: int) -> None:
         super().__init__(logging_port=logging_port, thread_name=ThreadNames.scan)
@@ -1721,6 +1725,10 @@ class ScanManager(PublishPullPipelineManager):
                 )
             elif data.problems is not None:
                 self.scanProblems.emit(data.scan_id, data.problems)
+            elif data.camera_removed is not None:
+                self.cameraRemovedDuringScan.emit(
+                    data.scan_id
+                )
             else:
                 assert data.fatal_error
                 self.fatalError.emit(data.scan_id)
@@ -1774,6 +1782,7 @@ class CopyFilesManager(PublishPullPipelineManager):
     tempDirs = pyqtSignal(int, str,str)
     bytesDownloaded = pyqtSignal(int, 'PyQt_PyObject', 'PyQt_PyObject')
     copyProblems = pyqtSignal(int, 'PyQt_PyObject')
+    cameraRemoved = pyqtSignal(int)
 
     def __init__(self, logging_port: int) -> None:
         super().__init__(logging_port=logging_port, thread_name=ThreadNames.copy)
@@ -1800,6 +1809,8 @@ class CopyFilesManager(PublishPullPipelineManager):
 
         elif data.problems is not None:
             self.copyProblems.emit(data.scan_id, data.problems)
+        elif data.camera_removed is not None:
+            self.cameraRemoved.emit(data.scan_id)
 
         else:
             assert (data.photo_temp_dir is not None and

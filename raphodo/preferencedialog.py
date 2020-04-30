@@ -25,7 +25,7 @@ __copyright__ = "Copyright 2017-2020, Damon Lynch"
 
 import webbrowser
 from typing import List
-from gettext import gettext as _
+import logging
 
 
 from PyQt5.QtCore import (Qt, pyqtSlot, pyqtSignal, QObject, QThread, QTimer, QSize)
@@ -41,13 +41,16 @@ from PyQt5.QtGui import (
 
 from raphodo.preferences import Preferences
 from raphodo.constants import (
-    KnownDeviceType, CompletedDownloads, TreatRawJpeg, MarkRawJpeg, disable_version_check
+    KnownDeviceType, CompletedDownloads, TreatRawJpeg, MarkRawJpeg
 )
 from raphodo.viewutils import QNarrowListWidget, translateButtons
 from raphodo.utilities import available_cpu_count, format_size_for_user, thousands
 from raphodo.cache import ThumbnailCacheSql
 from raphodo.constants import ConflictResolution
-from raphodo.utilities import current_version_is_dev_version, make_internationalized_list
+from raphodo.utilities import (
+    current_version_is_dev_version, make_internationalized_list, version_check_disabled,
+    available_languages
+)
 from raphodo.fileformats import (
     PHOTO_EXTENSIONS, AUDIO_EXTENSIONS, VIDEO_EXTENSIONS, VIDEO_THUMBNAIL_EXTENSIONS,
     ALL_KNOWN_EXTENSIONS
@@ -65,6 +68,7 @@ class ClickableLabel(QLabel):
 consolidation_implemented = False
 # consolidation_implemented = True
 
+system_language = 'SYSTEM'
 
 
 class PreferencesDialog(QDialog):
@@ -107,22 +111,23 @@ class PreferencesDialog(QDialog):
 
         if consolidation_implemented:
             self.chooser_items = (
-                _('Devices'), _('Automation'), _('Thumbnails'), _('Error Handling'), _('Warnings'),
-                _('Consolidation'), _('Miscellaneous')
+                _('Devices'), _('Language'), _('Automation'), _('Thumbnails'), _('Error Handling'),
+                _('Warnings'), _('Consolidation'), _('Miscellaneous')
             )
             icons = (
-                ":/prefs/devices.svg", ":/prefs/automation.svg", ":/prefs/thumbnails.svg",
-                ":/prefs/error-handling.svg", ":/prefs/warnings.svg", ":/prefs/consolidation.svg",
-                ":/prefs/miscellaneous.svg"
+                ":/prefs/devices.svg", ":/prefs/language.svg", ":/prefs/automation.svg",
+                ":/prefs/thumbnails.svg", ":/prefs/error-handling.svg", ":/prefs/warnings.svg",
+                ":/prefs/consolidation.svg", ":/prefs/miscellaneous.svg"
             )
         else:
             self.chooser_items = (
-                _('Devices'), _('Automation'), _('Thumbnails'), _('Error Handling'), _('Warnings'),
-                _('Miscellaneous')
+                _('Devices'), _('Language'), _('Automation'), _('Thumbnails'), _('Error Handling'),
+                _('Warnings'), _('Miscellaneous')
             )
             icons = (
-                ":/prefs/devices.svg", ":/prefs/automation.svg", ":/prefs/thumbnails.svg",
-                ":/prefs/error-handling.svg", ":/prefs/warnings.svg", ":/prefs/miscellaneous.svg"
+                ":/prefs/devices.svg", ":/prefs/language.svg", ":/prefs/automation.svg",
+                ":/prefs/thumbnails.svg", ":/prefs/error-handling.svg", ":/prefs/warnings.svg",
+                ":/prefs/miscellaneous.svg"
             )
 
         for prefIcon, label in zip(icons, self.chooser_items):
@@ -279,6 +284,35 @@ class PreferencesDialog(QDialog):
 
         self.devices.setLayout(devicesLayout)
         devicesLayout.setContentsMargins(0, 0, 0, 0)
+
+        self.language = QWidget()
+        self.languages = QComboBox()
+        self.languages.setEditable(False)
+        self.languagesLabel = QLabel(_('Language: '))
+        self.languages.setSizeAdjustPolicy(QComboBox.AdjustToContents)
+        # self.languages.setSizePolicy(QSizePolicy.Minimum, QSizePolicy.Minimum)
+
+        self.setLanguageWidgetValues()
+
+        self.languages.currentIndexChanged.connect(self.languagesChanged)
+
+        languageWidgetsLayout = QHBoxLayout()
+        languageWidgetsLayout.addWidget(self.languagesLabel)
+        languageWidgetsLayout.addWidget(self.languages)
+        # Translators: the * acts as an asterisk to denote a reference to an annotation
+        # such as '* Takes effect upon program restart'
+        languageWidgetsLayout.addWidget(QLabel(_('*')))
+        languageWidgetsLayout.addStretch()
+        languageWidgetsLayout.setSpacing(5)
+
+        languageLayout = QVBoxLayout()
+        languageLayout.addLayout(languageWidgetsLayout)
+        # Translators: the * acts as an asterisk to denote a reference to this annotation
+        languageLayout.addWidget(QLabel(_('* Takes effect upon program restart')))
+        languageLayout.addStretch()
+        languageLayout.setContentsMargins(0, 0, 0, 0)
+        languageLayout.setSpacing(18)
+        self.language.setLayout(languageLayout)
 
         self.automation = QWidget()
 
@@ -701,7 +735,7 @@ class PreferencesDialog(QDialog):
             self.treatRawJpegGroup.buttonClicked.connect(self.treatRawJpegGroupClicked)
             self.markRawJpegGroup.buttonClicked.connect(self.markRawJpegGroupClicked)
 
-        if not disable_version_check:
+        if not version_check_disabled():
             self.newVersionBox = QGroupBox(_('Version Check'))
             self.checkNewVersion = QCheckBox(_('Check for new version at startup'))
             self.checkNewVersion.setToolTip(
@@ -733,11 +767,25 @@ class PreferencesDialog(QDialog):
         )
         self.ignoreMdatatimeMtpDng.setToolTip(tip)
 
+        self.forceExiftool = QCheckBox(_('Read photo metadata using only ExifTool'))
+        tip = _(
+            'Use ExifTool instead of Exiv2 to read photo metadata and extract thumbnails.\n\n'
+            'The default is to use Exiv2, relying on ExifTool only when Exiv2 does not support\n'
+            'the file format being read.\n\n'
+            'Exiv2 is fast, accurate, and almost always reliable, but it crashes when extracting\n'
+            'metadata from a small number of files, such as DNG files produced by Leica M8\n'
+            'cameras.'
+        )
+
+        self.forceExiftool.setToolTip(tip)
+
         self.setMetdataValues()
         self.ignoreMdatatimeMtpDng.stateChanged.connect(self.ignoreMdatatimeMtpDngChanged)
+        self.forceExiftool.stateChanged.connect(self.forceExiftoolChanged)
 
         metadataLayout = QVBoxLayout()
         metadataLayout.addWidget(self.ignoreMdatatimeMtpDng)
+        metadataLayout.addWidget(self.forceExiftool)
         self.metadataBox.setLayout(metadataLayout)
 
         if not consolidation_implemented:
@@ -752,7 +800,7 @@ class PreferencesDialog(QDialog):
 
         self.miscWidget = QWidget()
         miscLayout = QVBoxLayout()
-        if not disable_version_check:
+        if not version_check_disabled():
             miscLayout.addWidget(self.newVersionBox)
         miscLayout.addWidget(self.metadataBox)
         if not consolidation_implemented:
@@ -763,6 +811,7 @@ class PreferencesDialog(QDialog):
         self.miscWidget.setLayout(miscLayout)
 
         self.panels.addWidget(self.devices)
+        self.panels.addWidget(self.language)
         self.panels.addWidget(self.automation)
         self.panels.addWidget(self.performance)
         self.panels.addWidget(self.errorWidget)
@@ -830,6 +879,21 @@ class PreferencesDialog(QDialog):
         self.removeAllDevice.setEnabled(self.knownDevices.count())
         self.setIgnorePathWidgetValues()
 
+    def setLanguageWidgetValues(self) -> None:
+        # Translators: this is an option when the user chooses the language to use for
+        # Rapid Photo Downloader and it allows them to reset it back to whatever their
+        # system language settings are. The < and > are not HTML codes. They are there
+        # simply to set this choice apart from all the other choices in the drop down list.
+        # You can keep the < > if you like, or replace them with whatever you typically use
+        # in your language.
+        self.languages.addItem(_('<System Language>'), system_language)
+        for code, language in available_languages(display_locale_code=self.prefs.language):
+            self.languages.addItem(language, code)
+        value = self.prefs.language
+        if value:
+            index = self.languages.findData(value)
+            self.languages.setCurrentIndex(index)
+
     def setFoldersToScanWidgetValues(self) -> None:
         self.foldersToScan.clear()
         if self.prefs.list_not_empty('folders_to_scan'):
@@ -870,10 +934,12 @@ class PreferencesDialog(QDialog):
 
     def setPerformanceValues(self, check_boxes_only: bool=False) -> None:
         self.generateThumbnails.setChecked(self.prefs.generate_thumbnails)
-        self.useThumbnailCache.setChecked(self.prefs.use_thumbnail_cache and
-                                          self.prefs.generate_thumbnails)
-        self.fdoThumbnails.setChecked(self.prefs.save_fdo_thumbnails and
-                                      self.prefs.generate_thumbnails)
+        self.useThumbnailCache.setChecked(
+            self.prefs.use_thumbnail_cache and self.prefs.generate_thumbnails
+        )
+        self.fdoThumbnails.setChecked(
+            self.prefs.save_fdo_thumbnails and self.prefs.generate_thumbnails
+        )
 
         if not check_boxes_only:
             available = available_cpu_count(physical_only=True)
@@ -1026,6 +1092,7 @@ class PreferencesDialog(QDialog):
 
     def setMetdataValues(self) -> None:
         self.ignoreMdatatimeMtpDng.setChecked(self.prefs.ignore_mdatatime_for_mtp_dng)
+        self.forceExiftool.setChecked(self.prefs.force_exiftool)
 
     def setCompletedDownloadsValues(self) -> None:
         s = self.prefs.completed_downloads
@@ -1160,6 +1227,15 @@ class PreferencesDialog(QDialog):
     @pyqtSlot()
     def ignorePathsReLabelClicked(self) -> None:
         self.ignoredPathsRe.click()
+
+    @pyqtSlot(int)
+    def languagesChanged(self, index: int) -> None:
+        if index == 0:
+            self.prefs.language = ''
+            logging.info("Resetting user interface language to system default")
+        elif index > 0:
+            self.prefs.language = self.languages.currentData()
+            logging.info("Setting user interface language to %s", self.prefs.language)
 
     @pyqtSlot(int)
     def autoDownloadStartupChanged(self, state: int) -> None:
@@ -1345,6 +1421,10 @@ class PreferencesDialog(QDialog):
     def ignoreMdatatimeMtpDngChanged(self, state: int) -> None:
         self.prefs.ignore_mdatatime_for_mtp_dng = state == Qt.Checked
 
+    @pyqtSlot(int)
+    def forceExiftoolChanged(self, state: int) -> None:
+        self.prefs.force_exiftool = state == Qt.Checked
+
     @pyqtSlot(QAbstractButton)
     def noConsolidationGroupClicked(self, button: QRadioButton) -> None:
         if button == self.keepCompletedDownloads:
@@ -1364,11 +1444,14 @@ class PreferencesDialog(QDialog):
             self.removeAllDeviceClicked()
             self.setDeviceWidgetValues()
         elif row == 1:
+            self.prefs.restore('language')
+            self.languages.setCurrentIndex(0)
+        elif row == 2:
             for value in ('auto_download_at_startup', 'auto_download_upon_device_insertion',
                           'auto_unmount', 'auto_exit', 'auto_exit_force'):
                 self.prefs.restore(value)
             self.setAutomationWidgetValues()
-        elif row == 2:
+        elif row == 3:
             for value in ('generate_thumbnails', 'use_thumbnail_cache', 'save_fdo_thumbnails',
                           'max_cpu_cores', 'keep_thumbnails_days'):
                 self.prefs.restore(value)
@@ -1376,32 +1459,33 @@ class PreferencesDialog(QDialog):
             self.maxCores.setCurrentText(str(self.prefs.max_cpu_cores))
             self.setPerfomanceEnabled()
             self.thumbnailCacheDaysKeep.setValue(self.prefs.keep_thumbnails_days)
-        elif row == 3:
+        elif row == 4:
             for value in ('conflict_resolution', 'backup_duplicate_overwrite'):
                 self.prefs.restore(value)
             self.setErrorHandingValues()
-        elif row == 4:
+        elif row == 5:
             for value in (
                     'warn_downloading_all', 'warn_backup_problem',
                     'warn_broken_or_missing_libraries', 'warn_fs_metadata_error',
                     'warn_unhandled_files', 'ignore_unhandled_file_exts'):
                 self.prefs.restore(value)
             self.setWarningValues()
-        elif row == 5 and consolidation_implemented:
+        elif row == 6 and consolidation_implemented:
             for value in (
                     'completed_downloads', 'consolidate_identical', 'one_raw_jpeg',
                     'do_not_mark_jpeg', 'do_not_mark_raw'):
                 self.prefs.restore(value)
             self.setConsolidatedValues()
-        elif (row == 6 and consolidation_implemented) or (row == 5 and not
+        elif (row == 7 and consolidation_implemented) or (row == 6 and not
                 consolidation_implemented):
-            if not disable_version_check:
+            if not version_check_disabled():
                 self.prefs.restore('check_for_new_versions')
-            for value in ('include_development_release', 'ignore_mdatatime_for_mtp_dng'):
+            for value in ('include_development_release', 'ignore_mdatatime_for_mtp_dng',
+                          'force_exiftool'):
                 self.prefs.restore(value)
             if not consolidation_implemented:
                 self.prefs.restore('completed_downloads')
-            if not disable_version_check:
+            if not version_check_disabled():
                 self.setVersionCheckValues()
             self.setMetdataValues()
             if not consolidation_implemented:
@@ -1413,24 +1497,28 @@ class PreferencesDialog(QDialog):
         if row == 0:
             location = '#devicepreferences'
         elif row == 1:
-            location = '#automationpreferences'
+            location = '#languagepreferences'
         elif row == 2:
-            location = '#thumbnailpreferences'
+            location = '#automationpreferences'
         elif row == 3:
-            location = '#errorhandlingpreferences'
+            location = '#thumbnailpreferences'
         elif row == 4:
-            location = '#warningpreferences'
+            location = '#errorhandlingpreferences'
         elif row == 5:
+            location = '#warningpreferences'
+        elif row == 6:
             if consolidation_implemented:
                 location = '#consolidationpreferences'
             else:
                 location = '#miscellaneousnpreferences'
-        elif row == 6:
+        elif row == 7:
             location = '#miscellaneousnpreferences'
         else:
             location = ''
 
-        webbrowser.open_new_tab("http://www.damonlynch.net/rapid/documentation/{}".format(location))
+        webbrowser.open_new_tab(
+            "https://www.damonlynch.net/rapid/documentation/{}".format(location)
+        )
 
     def closeEvent(self, event: QCloseEvent) -> None:
         self.cacheSizeThread.quit()

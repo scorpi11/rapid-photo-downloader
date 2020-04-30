@@ -29,10 +29,13 @@ from collections import namedtuple
 import logging
 from typing import Sequence, Optional, List, Union
 import locale
-# Use the default locale as defined by the LANG variable
-locale.setlocale(locale.LC_ALL, '')
+try:
+    # Use the default locale as defined by the LANG variable
+    locale.setlocale(locale.LC_ALL, '')
+except locale.Error:
+    pass
 
-from gettext import gettext as _
+
 
 from raphodo.preferences import DownloadsTodayTracker
 from raphodo.problemnotification import (
@@ -789,5 +792,5 @@ class Sequences:
             session_sequence_no=self._session_sequence_no + 1,
             sequence_letter=self._sequence_letter + 1,
             downloads_today=self._get_downloads_today(),
-            stored_sequence_no=self._stored_sequence_no
+            stored_sequence_no=self._stored_sequence_no + 1
         )

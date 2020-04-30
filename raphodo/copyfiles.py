@@ -22,6 +22,7 @@ __author__ = 'Damon Lynch'
 __copyright__ = "Copyright 2011-2020, Damon Lynch"
 
 import os
+import sys
 import errno
 import io
 import shutil
@@ -34,12 +35,13 @@ from itertools import chain
 from collections import defaultdict
 from typing import Dict, Optional, Tuple
 import locale
-# Use the default locale as defined by the LANG variable
-locale.setlocale(locale.LC_ALL, '')
+try:
+    # Use the default locale as defined by the LANG variable
+    locale.setlocale(locale.LC_ALL, '')
+except locale.Error:
+    pass
 
 import gphoto2 as gp
-
-from gettext import gettext as _
 
 from raphodo.camera import (
     Camera, CameraProblemEx, gphoto2_python_logging
@@ -201,6 +203,20 @@ class CopyFilesWorker(WorkerInPublishPullPipeline, FileCopy):
     def __init__(self):
         super().__init__('CopyFiles')
 
+    def terminate_camera_removed(self) -> None:
+        self.cleanup_pre_stop()
+        self.content = pickle.dumps(
+            CopyFilesResults(
+                scan_id=self.scan_id,
+                camera_removed=True
+            ),
+            pickle.HIGHEST_PROTOCOL
+        )
+        self.send_message_to_sink()
+        self.disconnect_logging()
+        self.send_finished_command()
+        sys.exit(0)
+
     def cleanup_pre_stop(self) -> None:
         super().cleanup_pre_stop()
         if self.camera is not None:
@@ -263,7 +279,9 @@ class CopyFilesWorker(WorkerInPublishPullPipeline, FileCopy):
         except CameraProblemEx as e:
             name = rpd_file.name
             uri = rpd_file.get_uri()
-            if e.code == CameraErrorCode.read:
+            if e.gp_code in (gp.GP_ERROR_IO_USB_FIND, gp.GP_ERROR_BAD_PARAMETERS):
+                self.terminate_camera_removed()
+            elif e.code == CameraErrorCode.read:
                 self.problems.append(CameraFileReadProblem(name=name, uri=uri, gp_code=e.gp_code))
             else:
                 assert e.code == CameraErrorCode.write
@@ -290,7 +308,9 @@ class CopyFilesWorker(WorkerInPublishPullPipeline, FileCopy):
                 uri = get_uri(
                     full_file_name=associate_file_fullname, camera_details=rpd_file.camera_details
                 )
-                if e.code == CameraErrorCode.read:
+                if e.gp_code in (gp.GP_ERROR_IO_USB_FIND, gp.GP_ERROR_BAD_PARAMETERS):
+                    self.terminate_camera_removed()
+                elif e.code == CameraErrorCode.read:
                     self.problems.append(
                         CameraFileReadProblem(name=file_name, uri=uri, gp_code=e.gp_code)
                     )
@@ -358,6 +378,7 @@ class CopyFilesWorker(WorkerInPublishPullPipeline, FileCopy):
                     CameraInitializationProblem(gp_code=e.gp_code)
                 )
                 logging.error("Could not initialize camera %s", self.display_name)
+                self.terminate_camera_removed()
             else:
                 rescan = RescanCamera(camera=self.camera, prefs=prefs)
                 rescan.rescan_camera(rpd_files=rescan_check)
@@ -379,11 +400,14 @@ class CopyFilesWorker(WorkerInPublishPullPipeline, FileCopy):
             args.photo_download_folder, args.video_download_folder)
 
         # Notify main process of temp directory names
-        self.content = pickle.dumps(CopyFilesResults(
-                    scan_id=args.scan_id,
-                    photo_temp_dir=photo_temp_dir or '',
-                    video_temp_dir=video_temp_dir or ''),
-                    pickle.HIGHEST_PROTOCOL)
+        self.content = pickle.dumps(
+            CopyFilesResults(
+                scan_id=args.scan_id,
+                photo_temp_dir=photo_temp_dir or '',
+                video_temp_dir=video_temp_dir or ''
+            ),
+            pickle.HIGHEST_PROTOCOL
+        )
         self.send_message_to_sink()
 
         # Sort the files to be copied by modification time
@@ -436,8 +460,9 @@ class CopyFilesWorker(WorkerInPublishPullPipeline, FileCopy):
                             )
                         )
                     if self.verify_file:
-                        rpd_file.md5 = hashlib.md5(open(
-                            temp_full_file_name).read()).hexdigest()
+                        rpd_file.md5 = hashlib.md5(
+                            open(temp_full_file_name, 'rb').read()
+                        ).hexdigest()
                     self.update_progress(rpd_file.size, rpd_file.size)
                 else:
                     # The download folder changed since the scan occurred, and is now
@@ -450,8 +475,10 @@ class CopyFilesWorker(WorkerInPublishPullPipeline, FileCopy):
                     try:
                         os.remove(source)
                     except (OSError, PermissionError, FileNotFoundError) as e:
-                        logging.error("Error removing RPD Cache file %s while copying %s. Error "
-                                      "code: %s", source, rpd_file.full_file_name, e.errno)
+                        logging.error(
+                            "Error removing RPD Cache file %s while copying %s. Error code: %s",
+                            source, rpd_file.full_file_name, e.errno
+                        )
                         self.problems.append(
                             FileDeleteProblem(
                                 name=os.path.basename(source), uri=get_uri(source), exception=e
