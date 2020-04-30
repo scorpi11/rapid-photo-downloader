@@ -1,3 +1,13 @@
+rapid-photo-downloader (0.9.23-1) unstable; urgency=medium
+
+  * New upstream version 0.9.23 (Closes: #956125)
+    - Remove patch, has been applied upstream
+    - Add python3-pyqt5 to Build-Depends
+    - Add libqt5svg5 and python3-babel to Depends
+  * Use debhelper v13
+
+ -- Dr. Tobias Quathamer <toddy@debian.org>  Thu, 30 Apr 2020 12:10:11 +0200
+
 rapid-photo-downloader (0.9.19-1) unstable; urgency=medium
 
   * New upstream version 0.9.19 (Closes: #954172)
