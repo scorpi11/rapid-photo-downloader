@@ -1,4 +1,5 @@
 colour python3-colour
 gphoto2 python3-gphoto2
 pyprind python3-pyprind
+pyqt5 python3-pyqt5
 rawkit python3-rawkit

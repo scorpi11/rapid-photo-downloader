@@ -11,6 +11,7 @@ Build-Depends: debhelper-compat (= 13),
                python3-colour,
                python3-mediainfodll,
                python3-pymediainfo,
+               python3-pyqt5,
                python3-setuptools,
                python3-xdg
 Standards-Version: 4.5.0
