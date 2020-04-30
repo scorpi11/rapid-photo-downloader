@@ -1,6 +1,6 @@
 Metadata-Version: 2.1
 Name: rapid-photo-downloader
-Version: 0.9.19
+Version: 0.9.23
 Summary: Downloads, renames and backs up photos and videos from cameras, phones, memory cards and other devices
 Home-page: http://www.damonlynch.net/rapid
 Author: Damon Lynch
@@ -78,7 +78,7 @@ Description: Rapid Photo Downloader
         Install on CentOS 7.5
         =====================
         
-        Consult the release notes for additional steps to take prior to running
+        Consult the online documentation for additional steps to take prior to running
         the installation script. Once completed, the steps are the same as above,
         except the command ``python3`` is replaced by ``python3.6``
         
@@ -112,6 +112,7 @@ Description: Rapid Photo Downloader
             - GExiv2 0.10
             - Gst 1.0
             - Notify 0.7
+            - Gdk 3.0
          - `python-gphoto2`_ 1.4.0 or newer
          - pyzmq_
          - tornado_
@@ -132,6 +133,7 @@ Description: Rapid Photo Downloader
          - Requests_
          - Tenacity_
          - intltool_
+         - Babel_
          - If using Python 3.4, these additional modules:
             - typing_
             - scandir_
@@ -279,6 +281,7 @@ Description: Rapid Photo Downloader
         .. _Tenacity: https://github.com/jd/tenacity
         .. _pyheif: https://github.com/david-poirier-csn/pyheif
         .. _pillow: https://github.com/python-pillow/Pillow
+        .. _Babel: http://babel.pocoo.org/en/latest/
 Keywords: photo video download ingest import camera phone backup rename photography photographer transfer copy raw cr2 cr3 nef arw dng
 Platform: UNKNOWN
 Classifier: Development Status :: 5 - Production/Stable

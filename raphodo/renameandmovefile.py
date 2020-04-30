@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 
-# Copyright (C) 2011-2017 Damon Lynch <damonlynch@gmail.com>
+# Copyright (C) 2011-2020 Damon Lynch <damonlynch@gmail.com>
 
 # This file is part of Rapid Photo Downloader.
 #
@@ -25,7 +25,7 @@ Runs as a daemon process.
 """
 
 __author__ = 'Damon Lynch'
-__copyright__ = "Copyright 2011-2017, Damon Lynch"
+__copyright__ = "Copyright 2011-2020, Damon Lynch"
 
 import os
 from datetime import datetime
@@ -38,10 +38,13 @@ import sys
 from typing import Union, Tuple, Dict, Optional
 import sqlite3
 import locale
-# Use the default locale as defined by the LANG variable
-locale.setlocale(locale.LC_ALL, '')
+try:
+    # Use the default locale as defined by the LANG variable
+    locale.setlocale(locale.LC_ALL, '')
+except locale.Error:
+    pass
 
-from gettext import gettext as _
+
 
 import raphodo.exiftool as exiftool
 import raphodo.generatename as gn
@@ -87,14 +90,17 @@ class SyncRawJpeg:
                      sequence_number_used: gn.MatchedSequences) -> None:
 
         if not isinstance(date_time, datetime):
-            logging.debug("Rejecting %s for sync RAW jpeg matching because its"
-                          "metadata date time does not exist", name)
+            logging.debug(
+                "Rejecting %s for sync RAW jpeg matching because its metadata date time "
+                "does not exist", name
+            )
             return
 
         if name not in self.photos:
-            self.photos[name] = SyncRawJpegRecord(extension=[extension],
-                                                  date_time=date_time,
-                                                  sequence_number_used=sequence_number_used)
+            self.photos[name] = SyncRawJpegRecord(
+                extension=[extension], date_time=date_time,
+                sequence_number_used=sequence_number_used
+            )
         else:
             if extension not in self.photos[name].extension:
                 self.photos[name].extension.append(extension)
@@ -168,9 +174,11 @@ def load_metadata(rpd_file: Union[Photo, Video],
                                       et_process=et_process):
             # Error in reading metadata
 
-            problems.append(FileMetadataLoadProblem(
-                name=rpd_file.name, uri=rpd_file.get_uri(), file_type=rpd_file.title
-            ))
+            problems.append(
+                FileMetadataLoadProblem(
+                    name=rpd_file.name, uri=rpd_file.get_uri(), file_type=rpd_file.title
+                )
+            )
             return False
     return True
 
@@ -592,12 +600,14 @@ class RenameMoveFileWorker(DaemonProcess):
             identifier = '_%s' % self.duplicate_files[full_name]
             rpd_file.download_name = '{}{}{}'.format(name[0], identifier, name[1])
             rpd_file.download_full_file_name = os.path.join(
-                rpd_file.download_path, rpd_file.download_name)
+                rpd_file.download_path, rpd_file.download_name
+            )
 
             try:
                 if os.path.exists(rpd_file.download_full_file_name):
-                    raise OSError(errno.EEXIST, "File exists: %s" %
-                                  rpd_file.download_full_file_name)
+                    raise OSError(
+                        errno.EEXIST, "File exists: %s" % rpd_file.download_full_file_name
+                    )
                 os.rename(rpd_file.temp_full_file_name, rpd_file.download_full_file_name)
                 self.notify_file_already_exists(rpd_file, identifier)
                 return True

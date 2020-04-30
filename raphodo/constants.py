@@ -501,7 +501,8 @@ class Desktop(Enum):
     ubuntugnome = 9
     popgnome = 10
     deepin = 11
-    unknown = 12
+    zorin = 12
+    unknown = 13
 
 
 class FileManagerType(Enum):
@@ -544,7 +545,7 @@ class Distro(Enum):
     fedora = 3
     neon = 4
     linuxmint = 5
-    korora = 6
+    zorin = 6
     arch = 7
     opensuse = 8
     manjaro = 9
@@ -776,6 +777,20 @@ class Plural(Enum):
     two_form_plural = 3
 
 
+class ScalingAction(Enum):
+    turned_on = 1
+    not_set = 2
+    already_set = 3
+
+
+class ScalingDetected(Enum):
+    Qt = 1
+    Xsetting = 2
+    Qt_and_Xsetting = 3
+    undetected = 4
+
+
 # Use the character . to for download_name and path to indicate the user manually marked a
 # file as previously downloaded
 manually_marked_previously_downloaded = '.'
+

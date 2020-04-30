@@ -30,7 +30,6 @@ from typing import List, Tuple, Optional
 
 from PyQt5.QtCore import QSettings, QTime, Qt
 
-from gettext import gettext as _
 
 from raphodo.storage import (
     xdg_photos_directory, xdg_videos_directory, xdg_photos_identifier, xdg_videos_identifier
@@ -317,7 +316,10 @@ class Preferences:
         # see constants.MarkRawJpeg:
         mark_raw_jpeg=3,
         # introduced in 0.9.6b1:
-        auto_scroll=True
+        auto_scroll=True,
+        # If you change the language setting update it in __init__.py too, where it is
+        # read directly without using this class.
+        language='',
     )
     device_defaults = dict(
         only_external_mounts=True,
@@ -360,7 +362,7 @@ class Preferences:
     )
     error_defaults = dict(
         conflict_resolution=int(constants.ConflictResolution.skip),
-        backup_duplicate_overwrite=False
+        backup_duplicate_overwrite=False,
     )
     destinations = dict(
         photo_backup_destinations=[''],
@@ -375,6 +377,9 @@ class Preferences:
         purge_thumbnails=False,
         optimize_thumbnail_db=False
     )
+    metadata_defaults = dict(
+        force_exiftool=False,
+    )
 
     def __init__(self) -> None:
         # To avoid infinite recursions arising from the use of __setattr__,
@@ -385,16 +390,17 @@ class Preferences:
         # These next two values must be kept in sync
         dicts = (
             self.program_defaults, self.rename_defaults,
-             self.timeline_defaults, self.display_defaults,
-             self.device_defaults,
-             self.backup_defaults, self.automation_defaults,
-             self.performance_defaults, self.error_defaults,
-             self.destinations, self.version_check, self.restart_directives
+            self.timeline_defaults, self.display_defaults,
+            self.device_defaults,
+            self.backup_defaults, self.automation_defaults,
+            self.performance_defaults, self.error_defaults,
+            self.destinations, self.version_check, self.restart_directives,
+            self.metadata_defaults,
         )
         group_names = (
             'Program', 'Rename', 'Timeline', 'Display', 'Device', 'Backup',
             'Automation', 'Performance', 'ErrorHandling', 'Destinations',
-            'VersionCheck', 'RestartDirectives'
+            'VersionCheck', 'RestartDirectives', 'Metadata'
         )
         assert len(dicts) == len(group_names)
 

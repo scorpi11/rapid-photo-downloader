@@ -129,6 +129,7 @@ raphodo/toggleview.py
 raphodo/utilities.py
 raphodo/videoattributes.py
 raphodo/viewutils.py
+raphodo/xsettings.py
 rapid_photo_downloader.egg-info/PKG-INFO
 rapid_photo_downloader.egg-info/SOURCES.txt
 rapid_photo_downloader.egg-info/dependency_links.txt

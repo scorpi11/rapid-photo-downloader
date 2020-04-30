@@ -23,7 +23,6 @@ Display an About window
 __author__ = 'Damon Lynch'
 __copyright__ = "Copyright 2016-2020, Damon Lynch"
 
-from gettext import gettext as _
 
 from PyQt5.QtCore import Qt, pyqtSlot, QSize
 from PyQt5.QtGui import QPixmap, QFont
@@ -123,6 +122,7 @@ class AboutDialog(QDialog):
         Portions copyright © 2013 Bernard Baeyens.
         Portions copyright © 2012-2015 Jim Easterbrook.
         Portions copyright © 2012 Sven Marnach.
+        Portions copyright © 2015 Dmitry Shachnev.
 
         Photo %(photolink)s copyright © 2014-2018 Damon Lynch, all rights reserved.
         Camera icon courtesy %(artlink1)s.

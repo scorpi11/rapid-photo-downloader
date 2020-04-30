@@ -224,6 +224,11 @@ class raphodo_build(build):
         ('build_man_page', None), ('build_icons', None), ('build_translations', None),
     ]
 
+    def run(self):
+        if not os.path.isdir('build'):
+            os.mkdir('build')
+        build.run(self)
+
 
 class raphodo_sdist(sdist):
     def run(self):
@@ -265,8 +270,9 @@ setup(
         'tornado',
         'scandir;python_version<"3.5"',
         'typing;python_version<"3.5"',
-        'PyGObject'
-        'PyQt5'
+        'PyGObject',
+        'PyQt5',
+        'babel',
     ],
     extras_require={
         'color_ouput': ['colorlog',],

@@ -54,8 +54,11 @@ from datetime import datetime
 import tempfile
 import operator
 import locale
-# Use the default locale as defined by the LANG variable
-locale.setlocale(locale.LC_ALL, '')
+try:
+    # Use the default locale as defined by the LANG variable
+    locale.setlocale(locale.LC_ALL, '')
+except locale.Error:
+    pass
 
 if sys.version_info < (3,5):
     import scandir
@@ -74,7 +77,7 @@ from raphodo.interprocess import (
     WorkerInPublishPullPipeline, ScanResults, ScanArguments
 )
 from raphodo.camera import (
-    Camera, CameraError, CameraProblemEx, gphoto2_python_logging
+    Camera, CameraError, CameraProblemEx, gphoto2_python_logging, gphoto2_named_error
 )
 import raphodo.rpdfile as rpdfile
 from raphodo.constants import (
@@ -84,7 +87,8 @@ from raphodo.constants import (
 from raphodo.rpdsql import DownloadedSQL, FileDownloaded
 from raphodo.cache import ThumbnailCacheSql
 from raphodo.utilities import (
-    stdchannel_redirected, datetime_roughly_equal, GenerateRandomFileName, format_size_for_user
+    stdchannel_redirected, datetime_roughly_equal, GenerateRandomFileName, format_size_for_user,
+    is_snap
 )
 from raphodo.exiftool import ExifTool
 import raphodo.metadatavideo as metadatavideo
@@ -221,180 +225,52 @@ class ScanWorker(WorkerInPublishPullPipeline):
 
         self.files_scanned = 0
         self.camera = None
+        terminated = False
 
         if not self.download_from_camera:
-            # Download from file system - either on This Computer, or an external volume like a
-            # memory card or USB Flash or external drive of some kind
-            path = os.path.abspath(scan_arguments.device.path)
-            self.display_name = scan_arguments.device.display_name
-
-            scanning_specific_path = self.prefs.scan_specific_folders and \
-                            scan_arguments.device.device_type == DeviceType.volume
-            if scanning_specific_path:
-                specific_folder_prefs = self.prefs.folders_to_scan
-                paths = tuple(
-                    os.path.join(path, folder) for folder in os.listdir(path)
-                    if folder in specific_folder_prefs and os.path.isdir(os.path.join(path, folder))
-                )
-                logging.info(
-                    "For device %s, identified paths: %s", self.display_name, ', '.join(paths)
-                )
-            else:
-                paths = path,
-
-            if scan_arguments.device.device_type == DeviceType.volume:
-                device_type = 'device'
-            else:
-                device_type = 'This Computer path'
-            logging.info("Scanning {} {}".format(device_type, self.display_name))
-
-            self.problems.uri = get_uri(path=path)
-            self.problems.name = self.display_name
-
-            # Before doing anything else, determine time zone approach
-            # Need two different walks because first folder of files
-            # might be videos, then the 2nd folder photos, etc.
-            for path in paths:
-                self.distinguish_non_camera_device_timestamp(path)
-                if self.device_timestamp_type != DeviceTimestampTZ.undetermined:
-                    break
-
-            for path in paths:
-                if scanning_specific_path:
-                    logging.info("Scanning {} on {}".format(path, self.display_name))
-                for dir_name, name in self.walk_file_system(path):
-                    self.dir_name = dir_name
-                    self.file_name = name
-                    self.process_file()
-
+            self.scan_file_system(scan_arguments)
         else:
-            # scanning directly from camera
-            have_optimal_display_name = scan_arguments.device.have_optimal_display_name
-            if self.prefs.scan_specific_folders:
-                specific_folder_prefs =  self.prefs.folders_to_scan
-            else:
-                specific_folder_prefs = None
-            while True:
+            try:
+                self.scan_camera(scan_arguments)
+                # Sanity check: ensure file contents are still accessible
                 try:
-                    self.camera = Camera(
-                        model=scan_arguments.device.camera_model,
-                        port=scan_arguments.device.camera_port,
-                        raise_errors=True,
-                        specific_folders=specific_folder_prefs
-                    )
-                    if not have_optimal_display_name:
-                        # Update the GUI with the real name of the camera
-                        # and its storage information
-                        have_optimal_display_name = True
-                        self.camera_display_name = self.camera.display_name
-                        self.display_name = self.camera_display_name
-                        storage_space = self.camera.get_storage_media_capacity(refresh=True)
-                        storage_descriptions = self.camera.get_storage_descriptions()
-                        self.content = pickle.dumps(
-                            ScanResults(
-                                optimal_display_name=self.camera_display_name,
-                                storage_space=storage_space,
-                                storage_descriptions=storage_descriptions,
-                                scan_id=int(self.worker_id),
-                            ),
-                            pickle.HIGHEST_PROTOCOL
-                        )
-                        self.send_message_to_sink()
-                    break
-                except CameraProblemEx as e:
-                    self.content = pickle.dumps(
-                        ScanResults(
-                            error_code=e.code, scan_id=int(self.worker_id)
-                        ),
-                        pickle.HIGHEST_PROTOCOL
-                    )
-                    self.send_message_to_sink()
-                    # Wait for command to resume or halt processing
-                    self.resume_work()
+                    self.camera.camera.folder_list_files('/', self.camera.context)
+                except gp.GPhoto2Error as e:
+                    raise CameraError(CameraErrorCode.inaccessible)
+                else:
+                    self.camera.free_camera()
 
-            if self.download_from_camera:
-                self.camera_details = 0
-            self.problems.uri = get_uri(camera_details=self.camera_details)
-            self.problems.name = self.display_name
+            except CameraError as e:
+                if e.code == CameraErrorCode.inaccessible:
+                    terminated = True
+                    logging.info("Terminating scan of %s", self.display_name)
+                    if self.is_mtp_device:
+                        logging.debug("%s is an MTP device", self.display_name)
+                    if self.camera is not None:
+                        self.camera.free_camera()
+                else:
+                    raise
 
-            if self.ignore_mdatatime_for_mtp_dng:
-                logging.info(
-                    "For any DNG files on the %s, when determining the creation date/"
-                    "time, the metadata date/time will be ignored, and the file "
-                    "modification date/time used instead", self.display_name
+        if not terminated:
+            if self.file_batch:
+                # Send any remaining files, including the sample photo or video
+                self.content = pickle.dumps(
+                    ScanResults(
+                        self.file_batch,
+                        self.file_type_counter,
+                        self.file_size_sum,
+                        sample_photo=self.sample_photo,
+                        sample_video=self.sample_video,
+                        entire_video_required=self.entire_video_required,
+                        entire_photo_required=self.entire_photo_required,
+                    ),
+                    pickle.HIGHEST_PROTOCOL
                 )
-
-            # Download only from the DCIM folder(s) in the camera.
-            # Phones especially have many directories with images, which we
-            # must ignore
-            if self.camera.camera_has_dcim_like_folder():
-                logging.info("Scanning {}".format(self.display_name))
-                self._camera_folders_and_files = []
-                self._camera_file_names = defaultdict(list)
-                self._camera_audio_files = defaultdict(list)
-                self._camera_video_thumbnails = defaultdict(list)
-                self._camera_xmp_files = defaultdict(list)
-                self._camera_log_files = defaultdict(list)
-                self._folder_identifiers = {}
-                self._folder_identifers_for_file = \
-                    defaultdict(list) # type: DefaultDict[int, List[int]]
-                self._camera_directories_for_file = defaultdict(list)
-                self._camera_photos_videos_by_type = \
-                    defaultdict(list)  # type: DefaultDict[FileExtension, List[CameraMetadataDetails]]
-
-                specific_folders = self.camera.specific_folders
-
-                if self.camera.dual_slots_active:
-                    # This camera has dual memory cards in use.
-                    # Give each folder an numeric identifier that will be
-                    # used to identify which card a given file comes from
-                    for idx, folders in enumerate(specific_folders):
-                        for folder in folders:
-                            self._folder_identifiers[folder] = idx + 1
-
-                # locate photos and videos, identifying duplicate files
-                # identify candidates for extracting metadata
-                for idx, folders in enumerate(specific_folders):
-                    # Setup camera details for each storage space in the camera
-                    self.camera_details = idx
-                    # Now initialize the problems container, if not already done so
-                    if idx:
-                        self.problems.name = self.camera_display_name
-                        self.problems.uri = get_uri(camera_details=self.camera_details)
-
-                    for specific_folder in folders:
-                        logging.debug(
-                            "Scanning %s on %s", specific_folder, self.camera.display_name
-                        )
-                        folder_identifier = self._folder_identifiers.get(specific_folder)
-                        basedir = os.path.dirname(specific_folder)
-                        self.locate_files_on_camera(specific_folder, folder_identifier, basedir)
-
-                # extract non camera metadata
-                if self._camera_photos_videos_by_type:
-                    self.identify_camera_tz_and_sample_files()
-
-                # now, process each file
-                for self.dir_name, self.file_name in self._camera_folders_and_files:
-                    self.process_file()
-            else:
-                logging.warning(
-                    "Unable to detect any specific folders (like DCIM) on %s", self.display_name
-                )
-
-            self.camera.free_camera()
-
-        if self.file_batch:
-            # Send any remaining files, including the sample photo or video
+                self.send_message_to_sink()
+        elif self.download_from_camera:
             self.content = pickle.dumps(
                 ScanResults(
-                    self.file_batch,
-                    self.file_type_counter,
-                    self.file_size_sum,
-                    sample_photo=self.sample_photo,
-                    sample_video=self.sample_video,
-                    entire_video_required=self.entire_video_required,
-                    entire_photo_required=self.entire_photo_required,
+                    scan_id=int(self.worker_id), camera_removed=True
                 ),
                 pickle.HIGHEST_PROTOCOL
             )
@@ -441,6 +317,180 @@ class ScanWorker(WorkerInPublishPullPipeline):
                     dir_list[:] = filter(self.scan_preferences.scan_this_path, dir_list)
             for name in file_list:
                 yield dir_name, name
+
+    def scan_file_system(self, scan_arguments: ScanArguments):
+        """
+        Download from file system - either on This Computer, or an external volume like a
+        # memory card or USB Flash or external drive of some kind
+
+        :param scan_arguments: scan configuration
+        """
+
+        path = os.path.abspath(scan_arguments.device.path)
+        self.display_name = scan_arguments.device.display_name
+
+        scanning_specific_path = self.prefs.scan_specific_folders and \
+                                 scan_arguments.device.device_type == DeviceType.volume
+        if scanning_specific_path:
+            specific_folder_prefs = self.prefs.folders_to_scan
+            paths = tuple(
+                os.path.join(path, folder) for folder in os.listdir(path)
+                if folder in specific_folder_prefs and os.path.isdir(os.path.join(path, folder))
+            )
+            logging.info(
+                "For device %s, identified paths: %s", self.display_name, ', '.join(paths)
+            )
+        else:
+            paths = path,
+
+        if scan_arguments.device.device_type == DeviceType.volume:
+            device_type = 'device'
+        else:
+            device_type = 'This Computer path'
+        logging.info("Scanning {} {}".format(device_type, self.display_name))
+
+        self.problems.uri = get_uri(path=path)
+        self.problems.name = self.display_name
+
+        # Before doing anything else, determine time zone approach
+        # Need two different walks because first folder of files
+        # might be videos, then the 2nd folder photos, etc.
+        for path in paths:
+            self.distinguish_non_camera_device_timestamp(path)
+            if self.device_timestamp_type != DeviceTimestampTZ.undetermined:
+                break
+
+        for path in paths:
+            if scanning_specific_path:
+                logging.info("Scanning {} on {}".format(path, self.display_name))
+            for dir_name, name in self.walk_file_system(path):
+                self.dir_name = dir_name
+                self.file_name = name
+                self.process_file()
+
+    def scan_camera(self, scan_arguments: ScanArguments) -> None:
+        """
+        Scan camera for files.
+
+        Raises error if camera becomes inaccessible
+
+        :param scan_arguments: scan configuration
+        """
+
+        have_optimal_display_name = scan_arguments.device.have_optimal_display_name
+        if self.prefs.scan_specific_folders:
+            specific_folder_prefs = self.prefs.folders_to_scan
+        else:
+            specific_folder_prefs = None
+        while True:
+            try:
+                self.camera = Camera(
+                    model=scan_arguments.device.camera_model,
+                    port=scan_arguments.device.camera_port,
+                    raise_errors=True,
+                    specific_folders=specific_folder_prefs
+                )
+                if not have_optimal_display_name:
+                    # Update the GUI with the real name of the camera
+                    # and its storage information
+                    have_optimal_display_name = True
+                    self.camera_display_name = self.camera.display_name
+                    self.display_name = self.camera_display_name
+                    storage_space = self.camera.get_storage_media_capacity(refresh=True)
+                    storage_descriptions = self.camera.get_storage_descriptions()
+                    self.content = pickle.dumps(
+                        ScanResults(
+                            optimal_display_name=self.camera_display_name,
+                            storage_space=storage_space,
+                            storage_descriptions=storage_descriptions,
+                            scan_id=int(self.worker_id),
+                        ),
+                        pickle.HIGHEST_PROTOCOL
+                    )
+                    self.send_message_to_sink()
+                break
+            except CameraProblemEx as e:
+                self.content = pickle.dumps(
+                    ScanResults(
+                        error_code=e.code, scan_id=int(self.worker_id)
+                    ),
+                    pickle.HIGHEST_PROTOCOL
+                )
+                self.send_message_to_sink()
+                # Wait for command to resume or halt processing
+                self.resume_work()
+
+        self.camera_details = 0
+        self.problems.uri = get_uri(camera_details=self.camera_details)
+        self.problems.name = self.display_name
+
+        if self.ignore_mdatatime_for_mtp_dng:
+            logging.info(
+                "For any DNG files on the %s, when determining the creation date/"
+                "time, the metadata date/time will be ignored, and the file "
+                "modification date/time used instead", self.display_name
+            )
+
+        # Download only from the DCIM type folder(s) in the camera,
+        # if that's what the user has specified. Otherwise, try to download from everything we
+        # can find.
+        if self.camera.camera_has_folders_to_scan():
+            logging.info("Scanning {}".format(self.display_name))
+            self._camera_folders_and_files = []
+            self._camera_file_names = defaultdict(list)
+            self._camera_audio_files = defaultdict(list)
+            self._camera_video_thumbnails = defaultdict(list)
+            self._camera_xmp_files = defaultdict(list)
+            self._camera_log_files = defaultdict(list)
+            self._folder_identifiers = {}
+            self._folder_identifers_for_file = \
+                defaultdict(list)  # type: DefaultDict[int, List[int]]
+            self._camera_directories_for_file = defaultdict(list)
+            self._camera_photos_videos_by_type = \
+                defaultdict(list)  # type: DefaultDict[FileExtension, List[CameraMetadataDetails]]
+
+            specific_folders = self.camera.specific_folders
+
+            if self.camera.dual_slots_active:
+                # This camera has dual memory cards in use.
+                # Give each folder an numeric identifier that will be
+                # used to identify which card a given file comes from
+                for idx, folders in enumerate(specific_folders):
+                    for folder in folders:
+                        self._folder_identifiers[folder] = idx + 1
+
+            # locate photos and videos, identifying duplicate files
+            # identify candidates for extracting metadata
+            for idx, folders in enumerate(specific_folders):
+                # Setup camera details for each storage space in the camera
+                self.camera_details = idx
+                # Now initialize the problems container, if not already done so
+                if idx:
+                    self.problems.name = self.camera_display_name
+                    self.problems.uri = get_uri(camera_details=self.camera_details)
+
+                for specific_folder in folders:
+                    logging.debug(
+                        "Scanning %s on %s", specific_folder, self.camera.display_name
+                    )
+                    folder_identifier = self._folder_identifiers.get(specific_folder)
+                    if specific_folder_prefs is None:
+                        basedir = specific_folder
+                    else:
+                        basedir = os.path.dirname(specific_folder)
+                    self.locate_files_on_camera(specific_folder, folder_identifier, basedir)
+
+            # extract camera metadata
+            if self._camera_photos_videos_by_type:
+                self.identify_camera_tz_and_sample_files()
+
+            # now, process each file
+            for self.dir_name, self.file_name in self._camera_folders_and_files:
+                self.process_file()
+        else:
+            logging.warning(
+                "Unable to detect any specific folders (like DCIM) on %s", self.display_name
+            )
 
     def locate_files_on_camera(self, path: str, folder_identifier: int, basedir: str) -> None:
         """
@@ -492,9 +542,14 @@ class ScanWorker(WorkerInPublishPullPipeline):
         try:
             files_in_folder = self.camera.camera.folder_list_files(path, self.camera.context)
         except gp.GPhoto2Error as e:
-            logging.error("Unable to scan files on camera: error %s", e.code)
+            logging.error(
+                "Unable to scan files on %s: %s", self.display_name, gphoto2_named_error(e.code)
+            )
             uri = get_uri(path=path, camera_details=self.camera_details)
             self.problems.append(CameraDirectoryReadProblem(uri=uri, name=path, gp_code=e.code))
+            if e.code in (gp.GP_ERROR_IO_USB_FIND, gp.GP_ERROR_BAD_PARAMETERS):
+                logging.error("%s removed while listing files during scan", self.display_name)
+                raise CameraError(CameraErrorCode.inaccessible)
 
         if files_in_folder:
             # Distinguish the file type for every file in the folder
@@ -528,8 +583,8 @@ class ScanWorker(WorkerInPublishPullPipeline):
                     modification_time, size = self.camera.get_file_info(path, name)
                 except gp.GPhoto2Error as e:
                     logging.error(
-                        "Unable to access modification_time or size from %s on %s. Error code: %s",
-                        os.path.join(path, name), self.display_name, e.code
+                        "Unable to access modification_time or size from %s on %s. Error: %s",
+                        os.path.join(path, name), self.display_name, gphoto2_named_error(e.code)
                     )
                     modification_time, size = 0, 0
                     uri = get_uri(
@@ -612,9 +667,15 @@ class ScanWorker(WorkerInPublishPullPipeline):
                 if self.scan_preferences.scan_this_path(os.path.join(path, name)):
                     folders.append(name)
         except gp.GPhoto2Error as e:
-            logging.error("Unable to scan files on %s. Error code: %s", self.display_name, e.code)
+            logging.error(
+                "Unable to list folders on %s: %s", self.display_name,
+                gphoto2_named_error(e.code)
+            )
             uri = get_uri(path=path, camera_details=self.camera_details)
             self.problems.append(CameraDirectoryReadProblem(uri=uri, name=path, gp_code=e.code))
+            if e.code in (gp.GP_ERROR_IO_USB_FIND, gp.GP_ERROR_BAD_PARAMETERS):
+                logging.error("%s removed while listing folders during scan", self.display_name)
+                raise CameraError(code=CameraErrorCode.inaccessible)
 
         # recurse over subfolders
         for name in folders:
@@ -770,9 +831,8 @@ class ScanWorker(WorkerInPublishPullPipeline):
                 adjusted_mtime = self.adjusted_mtime(modification_time)
 
                 downloaded = self.downloaded.file_downloaded(
-                                        name=self.file_name,
-                                        size=size,
-                                        modification_time=adjusted_mtime)
+                    name=self.file_name, size=size, modification_time=adjusted_mtime
+                )
 
                 thumbnail_cache_status = ThumbnailCacheDiskStatus.unknown
 
@@ -1000,12 +1060,14 @@ class ScanWorker(WorkerInPublishPullPipeline):
                     self.problems.append(
                         CameraFileReadProblem(uri=uri, name=name, gp_code=e.gp_code)
                     )
-                else:
-                    assert e.code == CameraErrorCode.write
+                elif e.code == CameraErrorCode.write:
                     uri = get_uri(path=os.path.dirname(temp_name))
                     self.problems.append(
                         FileWriteProblem(uri=uri, name=temp_name, exception=e.py_exception)
                     )
+                else:
+                    if e.gp_code in (gp.GP_ERROR_IO_USB_FIND, gp.GP_ERROR_BAD_PARAMETERS):
+                        raise CameraError(code=CameraErrorCode.inaccessible)
             else:
                 if file_type == FileType.video:
                     metadata = metadatavideo.MetaData(temp_name, self.et_process)
@@ -1067,14 +1129,20 @@ class ScanWorker(WorkerInPublishPullPipeline):
 
         if ext_type == FileExtension.jpeg:
             determined_by = 'jpeg'
-            if self.camera.can_fetch_thumbnails:
-                use_app1 = True
-            else:
+            if self.prefs.force_exiftool:
                 exif_extract = True
+                use_exiftool = True
+                save_chunk = True
+            else:
+                if self.camera.can_fetch_thumbnails:
+                    use_app1 = True
+                else:
+                    exif_extract = True
+
         elif ext_type == FileExtension.raw:
             determined_by = 'RAW'
             exif_extract = True
-            use_exiftool = fileformats.use_exiftool_on_photo(
+            use_exiftool = self.prefs.force_exiftool or fileformats.use_exiftool_on_photo(
                 extension, preview_extraction_irrelevant=True
             )
             save_chunk = use_exiftool
@@ -1084,7 +1152,7 @@ class ScanWorker(WorkerInPublishPullPipeline):
         elif ext_type == FileExtension.heif:
             determined_by = 'HEIF / HEIC'
             exif_extract = True
-            use_exiftool = fileformats.use_exiftool_on_photo(
+            use_exiftool = self.prefs.force_exiftool or fileformats.use_exiftool_on_photo(
                 extension, preview_extraction_irrelevant=True
             )
             save_chunk = True
@@ -1097,6 +1165,9 @@ class ScanWorker(WorkerInPublishPullPipeline):
                     full_file_name=os.path.join(path, name), camera_details=self.camera_details
                 )
                 self.problems.append(CameraFileReadProblem(uri=uri, name=name, gp_code=e.gp_code))
+                if e.gp_code in (gp.GP_ERROR_IO_USB_FIND, gp.GP_ERROR_BAD_PARAMETERS):
+                    raise CameraError(code=CameraErrorCode.inaccessible)
+
             else:
                 try:
                     with stdchannel_redirected(sys.stderr, os.devnull):
@@ -1133,7 +1204,13 @@ class ScanWorker(WorkerInPublishPullPipeline):
                 if offset is None:
                     offset = size
                 offset = min(size, offset)
-                self.sample_exif_bytes = self.camera.get_exif_extract(path, name, offset)
+                try:
+                    self.sample_exif_bytes = self.camera.get_exif_extract(path, name, offset)
+                except CameraProblemEx as e:
+                    self.sample_exif_bytes = None
+                    if e.gp_code in (gp.GP_ERROR_IO_USB_FIND, gp.GP_ERROR_BAD_PARAMETERS):
+                        raise CameraError(code=CameraErrorCode.inaccessible)
+
                 if self.sample_exif_bytes is not None:
                     try:
                         with stdchannel_redirected(sys.stderr, os.devnull):
@@ -1147,7 +1224,8 @@ class ScanWorker(WorkerInPublishPullPipeline):
                         )
                         self.sample_exif_bytes = None
                         uri = get_uri(
-                            full_file_name=os.path.join(path, name), camera_details=self.camera_details
+                            full_file_name=os.path.join(path, name),
+                            camera_details=self.camera_details
                         )
                         self.problems.append(FileMetadataLoadProblem(uri=uri, name=name))
                     else:
@@ -1213,7 +1291,9 @@ class ScanWorker(WorkerInPublishPullPipeline):
             dt = metadata.date_time(missing=None)
         else:
             # photo - we don't care if jpeg or RAW
-            if fileformats.use_exiftool_on_photo(extension, preview_extraction_irrelevant=True):
+            if self.prefs.force_exiftool or fileformats.use_exiftool_on_photo(
+                    extension, preview_extraction_irrelevant=True):
+
                 metadata = metadataexiftool.MetadataExiftool(
                     full_file_name=full_file_name, et_process=self.et_process,
                     file_type=file_type
@@ -1557,6 +1637,7 @@ def trace_calls(frame, event, arg):
         if func_name.find(f) >= 0:
             # Trace into this function
             return trace_lines
+
 
 if __name__ == "__main__":
     if os.getenv('RPD_SCAN_DEBUG') is not None:
