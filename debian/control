@@ -15,6 +15,7 @@ Build-Depends: debhelper-compat (= 13),
                python3-setuptools,
                python3-xdg
 Standards-Version: 4.5.0
+Rules-Requires-Root: no
 Homepage: https://damonlynch.net/rapid
 Vcs-Git: https://salsa.debian.org/debian/rapid-photo-downloader.git
 Vcs-Browser: https://salsa.debian.org/debian/rapid-photo-downloader
