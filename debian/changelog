@@ -1,3 +1,15 @@
+rapid-photo-downloader (0.9.26-1) unstable; urgency=medium
+
+  * New upstream version 0.9.26
+  * Switch to DEP-14 git branch layout
+  * Move libraw-bin from Depends to Recommends.
+    According to upstream, libraw-bin is only optional and will be
+    used by rapid-photo-downloader if it's available.
+  * Use Rules-Requires-Root: no
+  * Update Standards-Version to 4.5.1, no changes needed
+
+ -- Dr. Tobias Quathamer <toddy@debian.org>  Mon, 25 Jan 2021 22:09:23 +0100
+
 rapid-photo-downloader (0.9.23-1) unstable; urgency=medium
 
   * New upstream version 0.9.23 (Closes: #956125)
