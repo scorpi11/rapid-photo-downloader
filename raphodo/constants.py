@@ -502,7 +502,9 @@ class Desktop(Enum):
     popgnome = 10
     deepin = 11
     zorin = 12
-    unknown = 13
+    ukui = 13
+    pantheon = 14
+    unknown = 15
 
 
 class FileManagerType(Enum):
@@ -510,18 +512,21 @@ class FileManagerType(Enum):
     select = 2
     dir_only_uri = 3
     show_item = 4
+    show_items = 5
 
 
 FileManagerBehavior = dict(
-    nautilus=FileManagerType.regular,
+    nautilus=FileManagerType.select,
     dolphin=FileManagerType.select,
     caja=FileManagerType.dir_only_uri,
     thunar=FileManagerType.dir_only_uri,
     nemo=FileManagerType.regular,
     pcmanfm=FileManagerType.dir_only_uri,
+    peony=FileManagerType.show_items,
 )
 FileManagerBehavior['pcmanfm-qt'] = FileManagerType.dir_only_uri
 FileManagerBehavior['dde-file-manager'] = FileManagerType.show_item
+FileManagerBehavior['io.elementary.files'] = FileManagerType.regular
 
 
 DefaultFileBrowserFallback = dict(
@@ -536,9 +541,12 @@ DefaultFileBrowserFallback = dict(
     lxde='pcmanfm',
     lxqt='pcmanfm-qt',
     deepin='dde-file-manager',
+    kylin='peony',
+    pantheon='io.elementary.files',
 )
 
 
+# Sync with value in install.py
 class Distro(Enum):
     debian = 1
     ubuntu = 2
@@ -551,11 +559,13 @@ class Distro(Enum):
     manjaro = 9
     galliumos = 10
     peppermint = 11
-    antergos = 12
     elementary = 13
     centos = 14
-    gentoo = 15
-    deepin = 16
+    centos7 = 15
+    gentoo = 16
+    deepin = 17
+    kylin = 18
+    popos = 19
     unknown = 20
 
 

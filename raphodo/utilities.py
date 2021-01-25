@@ -21,6 +21,7 @@ __author__ = 'Damon Lynch'
 __copyright__ = "Copyright 2007-2020, Damon Lynch"
 
 import contextlib
+import site
 import locale
 import logging
 import os
@@ -40,6 +41,7 @@ import struct
 import ctypes
 import signal
 import warnings
+import xdg
 import babel
 from glob import glob
 from pkg_resources import parse_version
@@ -47,7 +49,7 @@ import pkg_resources
 
 import arrow
 import psutil
-from PyQt5.QtCore import QSize
+from PyQt5.QtCore import QSize, QLocale, QTranslator, QLibraryInfo
 
 import raphodo.__about__ as __about__
 from raphodo.constants import disable_version_check
@@ -106,14 +108,17 @@ def available_cpu_count(physical_only=False) -> int:
     available = None
     if sys.platform.startswith('linux'):
         try:
-            m = re.search(r'(?m)^Cpus_allowed:\s*(.*)$',
-                          open('/proc/self/status').read())
+            status_file = open('/proc/self/status')
+            status = status_file.read()
+            status_file.close()
+        except IOError:
+            pass
+        else:
+            m = re.search(r'(?m)^Cpus_allowed:\s*(.*)$', status)
             if m:
                 available = bin(int(m.group(1).replace(',', ''), 16)).count('1')
                 if available > 0 and not physical_only:
                     return available
-        except IOError:
-            pass
 
     if physical_only:
         physical = psutil.cpu_count(logical=False)
@@ -857,6 +862,78 @@ def extract_file_from_tar(full_tar_path, member_filename) -> bool:
             return False
 
 
+def bug_report_full_tar_path() -> str:
+    """
+    Generate a full path for uncompressed bug report tar file.
+    The filename will not already exist.
+
+    :return: File name including path
+    """
+
+    filename = 'rpd-bug-report-{}'.format(datetime.now().strftime('%Y%m%d'))
+    component = os.path.join(os.path.expanduser('~'), filename)
+
+    i = 0
+    while os.path.isfile('{}{}.tar'.format(component, '' if not i else '-{}'.format(i))):
+        i += 1
+
+    return '{}{}.tar'.format(component, '' if not i else '-{}'.format(i))
+
+
+def create_bugreport_tar(full_tar_name: str,
+                         log_path: Optional[str]='',
+                         full_config_file: Optional[str]='') -> bool:
+    """
+    Create a tar file containing log and configuration files.
+
+    If the file already exists, do nothing.
+
+    :param full_tar_name: the full path in which to create the tar file
+    :param log_path: path to the log files
+    :param full_config_file: the full path and file of the configuration file
+    :return: True if tar file created, else False
+    """
+
+    if os.path.isfile(full_tar_name):
+        logging.error("Cannot create bug report tarfile, because it already exists")
+        return False
+
+    if not log_path:
+        log_path = os.path.join(xdg.BaseDirectory.xdg_cache_home, 'rapid-photo-downloader', 'log')
+
+    if not full_config_file:
+        config_dir = os.path.join(xdg.BaseDirectory.xdg_config_home, 'Rapid Photo Downloader')
+        config_file = 'Rapid Photo Downloader.conf'
+    else:
+        config_dir, config_file = os.path.split(full_config_file)
+
+    curr_dir = os.getcwd()
+    created = False
+
+    try:
+        with tarfile.open(full_tar_name, 'x') as t:
+            os.chdir(log_path)
+            for l in glob('*'):
+                t.add(l)
+            os.chdir(config_dir)
+            t.add(config_file)
+    except FileNotFoundError as e:
+        logging.error(
+            "When creating a bug report tar file, the directory or file %s does not exist", e.filename
+        )
+    except Exception:
+        logging.exception("Unexpected error when creating bug report tar file")
+    else:
+        created = True
+
+    try:
+        os.chdir(curr_dir)
+    except FileNotFoundError:
+        pass
+
+    return created
+
+
 def current_version_is_dev_version(current_version=None) -> bool:
     if current_version is None:
         current_version = parse_version(__about__.__version__)
@@ -1147,20 +1224,59 @@ def available_languages(display_locale_code: str='') -> List[Tuple[str, str]]:
     return langs
 
 
-def installed_using_pip(package='rapid-photo-downloader') -> bool:
+def installed_using_pip(package: str, suppress_errors: bool = True) -> bool:
     """
-    Determine if python package was installed using pip.
+    Determine if python package was installed in local directory using pip.
+
+    Determination is not 100% robust in all circumstances.
 
     Exceptions are not caught.
 
     :param package: package name to search for
+    :param suppress_errors: if True, silently catch all exceptions and return False
     :return: True if installed via pip, else False
     """
 
-    pip_install = False
-    pkg = pkg_resources.get_distribution(package)
-    if pkg.has_metadata('INSTALLER'):
-        if pkg.get_metadata('INSTALLER').strip() == 'pip':
-            pip_install = True
+    try:
+        pkg = pkg_resources.get_distribution(package)
+        location = pkg.location
+        return not location.startswith('/usr') or location.find('local') > 0
+    except Exception:
+        if not suppress_errors:
+            raise
+        return False
 
-    return pip_install
+
+def getQtSystemTranslation(locale_name: str) -> Optional[QTranslator]:
+    """
+    Attempt to install Qt base system translations (for QMessageBox and QDialogBox buttons)
+    :return: translator if loaded, else None
+    """
+
+    # These locales are found in the path QLibraryInfo.TranslationsPath
+    convert_locale = dict(
+        cs_CZ='cs',
+        da_DK='da',
+        de_DE='de',
+        es_ES='es',
+        fi_FI='fi',
+        fr_FR='fr',
+        it_IT='it',
+        ja_JP='ja',
+        hu_HU='hu',
+        pl_PL='pl',
+        ru_RU='ru',
+        sk_SK='sk',
+        uk_UA='uk',
+    )
+
+    qtTranslator = QTranslator()
+    location = QLibraryInfo.location(QLibraryInfo.TranslationsPath)
+    qm_file = "qtbase_{}.qm".format(convert_locale.get(locale_name, locale_name))
+    qm_file = os.path.join(location, qm_file)
+    if os.path.isfile(qm_file):
+        if qtTranslator.load(qm_file):
+            logging.debug("Installing Qt support for locale %s", locale_name)
+            return qtTranslator
+        else:
+            logging.debug("Could not load Qt locale file %s", qm_file)

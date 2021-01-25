@@ -78,9 +78,9 @@ Supported Linux Versions
  - Ubuntu 16.04 or newer
  - LinuxMint 18 or newer
  - Debian 9, unstable or testing
- - Fedora 30 or newer
- - openSUSE Leap 42.3 or newer
- - CentOS 7.5
+ - Fedora 32 or newer
+ - openSUSE Leap 15.1 or newer
+ - CentOS 7.5 or 8
  - Any distribution meeting the software requirements below
 
 Software Requirements and Program Installation on Other Systems
@@ -92,7 +92,7 @@ modules.
 
 Rapid Photo Downloader requires:
 
- - Python 3.4 or greater, and its development headers
+ - Python 3.5 or greater, and its development headers
  - PyQt_ 5.4 or greater
  - Qt_ 5.4 or greater
  - `Python gobject introspection`_ modules:
@@ -102,7 +102,6 @@ Rapid Photo Downloader requires:
     - GExiv2 0.10
     - Gst 1.0
     - Notify 0.7
-    - Gdk 3.0
  - `python-gphoto2`_ 1.4.0 or newer
  - pyzmq_
  - tornado_
@@ -124,9 +123,6 @@ Rapid Photo Downloader requires:
  - Tenacity_
  - intltool_
  - Babel_
- - If using Python 3.4, these additional modules:
-    - typing_
-    - scandir_
 
 Highly recommended, optional dependencies:
 
@@ -205,8 +201,7 @@ Rapid Photo Downloader can be installed into a virtual environment, allowing you
 to isolate the Python packages it needs from other programs on your system.
 
 Virtual environments created with the --system-site-packages option are not
-supported. Python 3.5 or newer is required, as is an Intel or AMD 64 bit
-platform.
+supported. An Intel or AMD 64 bit platform is required.
 
 To install Rapid Photo Downloader into a Python virtual environment, create the
 virtual environment (naming it whatever you like):

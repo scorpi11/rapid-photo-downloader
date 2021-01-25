@@ -52,6 +52,7 @@ po/rapid-photo-downloader.pot
 po/ro.po
 po/ru.po
 po/sk.po
+po/sq.po
 po/sr.po
 po/sv.po
 po/tr.po
@@ -79,6 +80,7 @@ raphodo/excepthook.py
 raphodo/exiftool.py
 raphodo/filebrowse.py
 raphodo/fileformats.py
+raphodo/filesystemurl.py
 raphodo/fileutilities.py
 raphodo/filmstrip.py
 raphodo/foldercombo.py

@@ -37,8 +37,11 @@ from PyQt5.QtGui import (
 )
 
 
-from raphodo.constants import (JobCodeSort, ThumbnailBackgroundName, )
-from raphodo.viewutils import QFramedWidget, QNarrowListWidget, standardIconSize, translateButtons
+from raphodo.constants import (JobCodeSort, ThumbnailBackgroundName)
+from raphodo.viewutils import (
+    QFramedWidget, QNarrowListWidget, standardIconSize, translateDialogBoxButtons,
+    standardMessageBox
+)
 from raphodo.panelview import QPanelView
 from raphodo.preferences import Preferences
 from raphodo.messagewidget import MessageWidget, MessageButton
@@ -48,15 +51,22 @@ from raphodo.chevroncombo import ChevronCombo
 class JobCodeDialog(QDialog):
     def __init__(self, parent, on_download: bool, job_codes: List[str]) -> None:
         """
+        Prompt user to enter a Job Code, either at the time a download starts,
+        or to zero or more selected files before the download begins.
 
         :param parent: rapidApp main window
         :param on_download: if True, dialog is being prompted for before a download starts.
         :param job_codes:
         """
+
         super().__init__(parent)
         self.rapidApp = parent  # type: 'RapidWindow'
-        self.prefs = self.rapidApp.prefs
+        self.prefs = self.rapidApp.prefs  # type: Preferences
         thumbnailModel = self.rapidApp.thumbnailModel
+
+        # Whether the user has opened this dialog before a download starts without having
+        # selected any files first
+        no_selection_made = None  # type: Optional[bool]
 
         if on_download:
             directive = _('Enter a new Job Code, or select a previous one')
@@ -65,38 +75,43 @@ class JobCodeDialog(QDialog):
             details = file_types.file_types_present_details(title_case=False)
             if sum(file_types.values()) == 1:
                 # Translators: the value substituted will be something like '1 photo'.
-                file_details = _('The Job Code will be applied to %s that does not yet have a Job '
-                                 'Code.') % details
+                file_details = _(
+                    'The Job Code will be applied to %s that does not yet have a Job Code.'
+                ) % details
             else:
                 # Translators: the value substituted will be something like '85 photos and 5
                 # videos'.
-                file_details = _('The Job Code will be applied to %s that do not yet have a Job '
-                                 'Code.') % details
+                file_details = _(
+                    'The Job Code will be applied to %s that do not yet have a Job Code.'
+                ) % details
+
+            hint = '<b>Hint:</b> To assign Job Codes before the download begins, select ' \
+                   'photos or videos and apply a new or existing Job Code to them via the Job Code panel.'
+            file_details = '{}<br><br><i>{}</i>'.format(file_details, hint)
 
             title = _('Apply Job Code to Download')
         else:
             directive = _('Enter a new Job Code')
 
             file_types = thumbnailModel.getNoFilesSelected()
-            if sum(file_types.values()) == 0:
-                file_types = thumbnailModel.getDisplayedCounter()
-                if sum(file_types.values()) == 0:
-                    file_details = _('The new Job Code will not be applied to any photos or '
-                                     'videos.')
-                else:
-                    details = file_types.file_types_present_details(title_case=False)
-                    # Translators: the value substituted will be something like '100 photos and 5
-                    #  videos'.
-                    file_details = _('The new Job Code will <b>not</b> be applied to %s.') % details
+            no_selection_made = sum(file_types.values()) == 0
+            if no_selection_made:
+                file_details = '<i>' + _(
+                    '<b>Hint:</b> Select photos or videos before entering a new Job Code to '
+                    'have the Job Code applied to them.'
+                ) + '</i>'
+
+                _('')
             else:
                 details = file_types.file_types_present_details(title_case=False)
                 # Translators: the value substituted will be something like '100 photos and 5
                 # videos'.
-                file_details = _('The new Job Code will be applied to %s.') % details
+                file_details = '<i>' + _('The new Job Code will be applied to %s.') % details \
+                               + '</i>'
 
             title = _('New Job Code')
 
-        instructionLabel = QLabel('<b>%s</b><br><br><i>%s</i><br>' % (directive, file_details))
+        instructionLabel = QLabel('<b>%s</b><br><br>%s<br>' % (directive, file_details))
         instructionLabel.setWordWrap(True)
 
         self.jobCodeComboBox = QComboBox()
@@ -107,6 +122,7 @@ class JobCodeDialog(QDialog):
             exp = "[^/\\0]+"
         else:
             exp = '[^\\:\*\?"<>|\\0/]+'
+
         self.jobCodeExp = QRegularExpression()
         self.jobCodeExp.setPattern(exp)
         self.jobCodeValidator = QRegularExpressionValidator(self.jobCodeExp, self.jobCodeComboBox)
@@ -131,18 +147,26 @@ class JobCodeDialog(QDialog):
 
         jobCodeLabel = QLabel(_('&Job Code:'))
         jobCodeLabel.setBuddy(self.jobCodeComboBox)
-        self.rememberCheckBox = QCheckBox(_("&Remember this choice"))
-        self.rememberCheckBox.setChecked(parent.prefs.remember_job_code)
+
+        if on_download or not no_selection_made:
+            self.rememberCheckBox = QCheckBox(_("&Remember this Job Code"))
+            self.rememberCheckBox.setChecked(parent.prefs.remember_job_code)
+
         buttonBox = QDialogButtonBox(QDialogButtonBox.Ok| QDialogButtonBox.Cancel)
-        translateButtons(buttonBox)
+        translateDialogBoxButtons(buttonBox)
 
         grid = QGridLayout()
         grid.addWidget(iconLabel, 0, 0, 4, 1)
         grid.addWidget(instructionLabel, 0, 1, 1, 2)
         grid.addWidget(jobCodeLabel, 1, 1)
         grid.addWidget(self.jobCodeComboBox, 1, 2)
-        grid.addWidget(self.rememberCheckBox, 2, 1, 1, 2)
-        grid.addWidget(buttonBox, 3, 0, 1, 3)
+
+        if hasattr(self, 'rememberCheckBox'):
+            grid.addWidget(self.rememberCheckBox, 2, 1, 1, 2)
+            grid.addWidget(buttonBox, 3, 0, 1, 3)
+        else:
+            grid.addWidget(buttonBox, 2, 0, 1, 3)
+
         grid.setColumnStretch(2, 1)
         self.setLayout(grid)
         self.setWindowTitle(title)
@@ -153,8 +177,11 @@ class JobCodeDialog(QDialog):
     @pyqtSlot()
     def accept(self) -> None:
         self.job_code = self.jobCodeComboBox.currentText()
-        self.remember = self.rememberCheckBox.isChecked()
-        self.rapidApp.prefs.remember_job_code = self.remember
+        if hasattr(self, 'rememberCheckBox'):
+            self.remember = self.rememberCheckBox.isChecked()
+            self.rapidApp.prefs.remember_job_code = self.remember
+        else:
+            self.remember = True
         super().accept()
 
 
@@ -180,16 +207,21 @@ class JobCodeOptionsWidget(QFramedWidget):
         layout.addLayout(jobCodeLayout)
         self.setLayout(layout)
 
-        self.messageWidget = MessageWidget(
-            (_('Select photos and videos to be able to apply a new or existing Job Code to them.'),
-             _('The new Job Code will be applied to all selected photos and/or videos.'),
-             _('Click the Apply button to apply the current Job Code to all selected '
-               'photos and/or videos. You can also simply double click the Job Code.'),
-             _('Removing a Job Code removes it only from the list of saved Job Codes, '
-               'not from any photos or videos that it may have been applied to.'),
-             _('If you want to use Job Codes, configure file renaming or destination subfolder '
-               'names to use them.'))
-        )
+        self.messageWidget = MessageWidget((
+            _('Select photos and videos to be able to apply a new or existing Job Code to them.'),
+            _('The new Job Code will be applied to all selected photos and/or videos.'),
+            _(
+                'Click the Apply button to apply the current Job Code to all selected '
+                'photos and/or videos. You can also simply double click the Job Code.'
+            ),
+            _(
+                'Removing a Job Code removes it only from the list of saved Job Codes, '
+                'not from any photos or videos that it may have been applied to.'
+            ),
+            _(
+                'If you want to use Job Codes, configure file renaming or destination subfolder '
+                'names to use them.')
+        ))
 
         self.setDefaultMessage()
 
@@ -230,18 +262,13 @@ class JobCodeOptionsWidget(QFramedWidget):
         self.removeAllButton.isInactive.connect(self.setDefaultMessage)
         self.removeAllButton.clicked.connect(self.removeAllButtonClicked)
 
-        # explanation_not_done = QLabel(_("<i>This part of the user interface will be "
-        #                                 "implemented in a forthcoming alpha release.</i>"))
-
         self.jobCodesWidget = QNarrowListWidget()
         self.jobCodesWidget.currentRowChanged.connect(self.rowChanged)
         self.jobCodesWidget.itemDoubleClicked.connect(self.rowDoubleClicked)
         self.jobCodesWidget.setSelectionMode(QAbstractItemView.SingleSelection)
-        self.jobCodesWidget.setSizePolicy(QSizePolicy.MinimumExpanding,
-                                          QSizePolicy.MinimumExpanding)
-
-        # self.prefs.job_codes = ['Wedding', "Birthday", "Minneapolis", "Cricket", "Rugby",
-        #                         "Wellington"]
+        self.jobCodesWidget.setSizePolicy(
+            QSizePolicy.MinimumExpanding, QSizePolicy.MinimumExpanding
+        )
 
         if self.prefs.list_not_empty('job_codes'):
             self._insertJobCodes(job_code=self.prefs.job_codes[0], clear=False)
@@ -430,11 +457,10 @@ class JobCodeOptionsWidget(QFramedWidget):
     @pyqtSlot()
     def removeAllButtonClicked(self) -> None:
         message = _('Do you really want to remove all the Job Codes?')
-        msgBox = QMessageBox(parent=self)
-        msgBox.setWindowTitle(_('Remove all Job Codes'))
-        msgBox.setText(message)
-        msgBox.setIcon(QMessageBox.Question)
-        msgBox.setStandardButtons(QMessageBox.Yes|QMessageBox.No)
+        msgBox = standardMessageBox(
+            parent=self, title=_('Remove all Job Codes'), message=message, rich_text=False,
+            standardButtons=QMessageBox.Yes | QMessageBox.No,
+        )
         if msgBox.exec() == QMessageBox.Yes:
             # Must clear the job codes before adjusting the qlistwidget,
             # or else the Remove All button will not be disabled.

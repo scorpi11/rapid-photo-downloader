@@ -1,38 +1,39 @@
-# Kabyle translation for rapid
-# Copyright (c) 2017 Rosetta Contributors and Canonical Ltd 2017
+# Albanian translation for rapid
+# Copyright (c) 2020 Rosetta Contributors and Canonical Ltd 2020
 # This file is distributed under the same license as the rapid package.
-# FIRST AUTHOR <EMAIL@ADDRESS>, 2017.
+# FIRST AUTHOR <EMAIL@ADDRESS>, 2020.
 #
 msgid ""
 msgstr ""
 "Project-Id-Version: rapid\n"
 "Report-Msgid-Bugs-To: damonlynch@gmail.com\n"
 "POT-Creation-Date: 2020-12-24 19:58+0000\n"
-"PO-Revision-Date: 2020-03-12 06:18+0000\n"
-"Last-Translator: Belkacem Mohammed <belkacem77@gmail.com>\n"
-"Language-Team: Kabyle <kab@li.org>\n"
+"PO-Revision-Date: 2020-12-09 09:55+0000\n"
+"Last-Translator: Algent Albrahimi <algent@protonmail.com>\n"
+"Language-Team: Albanian <sq@li.org>\n"
 "MIME-Version: 1.0\n"
 "Content-Type: text/plain; charset=UTF-8\n"
 "Content-Transfer-Encoding: 8bit\n"
 "X-Launchpad-Export-Date: 2020-12-24 22:40+0000\n"
 "X-Generator: Launchpad (build 34b3ffd45c9543b7f7aa5aa313925241e9e7ca3f)\n"
-"Language: kab\n"
+"Language: sq\n"
 
 #: ../install.py:75
 msgid ""
 "To continue, please first install the python3 package setuptools using your "
 "system's package manager."
 msgstr ""
-"Akken ad tkemmleḍ, ččar sebded deg tazwara akemmus setuptools  n python3 "
-"useqdec n umsefrak n yikemmusen n unagraw."
+"Për të vazhduar, ju lutemi instaloni së pari paketën setuptools të python3 "
+"duke përdorur menaxherin e paketave të sistemit tuaj."
 
 #: ../install.py:83
 msgid "Rapid Photo Downloader installer"
-msgstr "Amsebdad n umsider Rapid Photo"
+msgstr "Instaluesi i Rapid Photo Downloader"
 
 #: ../install.py:84
 msgid "Download and install latest version of Rapid Photo Downloader."
-msgstr "Sider sakin sebded lqem aneggaru n umsider Rapid Photo."
+msgstr ""
+"Shkarkoni dhe instaloni versionin më të fundit të Rapid Photo Downloader."
 
 #: ../install.py:161
 msgid ""
@@ -40,23 +41,27 @@ msgid ""
 "enable generating thumbnails for a wider range of video formats, and (2) "
 "enable support for the HEIC / HEIF image format."
 msgstr ""
+"Depoja e programit RPM Fusion Free u shtua në sistemin tuaj për të (1) "
+"mundësuar krijimin e miniaturave për një gamë më të gjerë të formateve të "
+"videos, dhe (2) mundësimin e mbështetjes për formatin e imazhit HEIC / HEIF."
 
 #: ../install.py:363 ../install.py:3494
 msgid "Installer not found:"
-msgstr "Ulac amsebdad:"
+msgstr "Instaluesi nuk u gjet:"
 
 #. Translators: do not translate the term tar.gz
 #: ../install.py:367 ../install.py:3498
 msgid "Installer not in tar.gz format:"
-msgstr "Ulac amsebdad s umasal tar.gz:"
+msgstr "Instalues jo në formatin tar.gz:"
 
 #: ../install.py:526
 msgid "The specified PyQt5 version does not exist. Valid versions are: {}."
 msgstr ""
+"Versioni i specifikuar PyQt5 nuk ekziston. Versione të vlefshme janë: {}."
 
 #: ../install.py:604
 msgid "{} will be upgraded from version {} to version {}"
-msgstr ""
+msgstr "{} do të përditësohet nga versioni {} në versionin {}"
 
 #. Translators: "not system-wide" in this context means "not for the entire system"
 #: ../install.py:926
@@ -64,6 +69,8 @@ msgid ""
 "These Python3 packages will be upgraded for your user (i.e. not system-"
 "wide): {}"
 msgstr ""
+"Këto paketa Python3 do të përditësohen për përdoruesin tuaj (d.m.th. jo në "
+"të gjithë sistemin): {}"
 
 #: ../install.py:1028
 #, python-brace-format
@@ -71,103 +78,119 @@ msgid ""
 "Incorrect folder ownership detected. Changing ownership of and resetting "
 "permissions for {file_system_path}."
 msgstr ""
+"Pronësi e pasaktë e dosjes u zbulua. Ndryshimi i pronësisë dhe rivendosja e "
+"lejeve për {file_system_path}."
 
 #: ../install.py:1168
 msgid "The following command will be run:"
-msgstr ""
+msgstr "Do të ekzekutohet komanda e mëposhtme:"
 
 #. Translators: do not translate the term sudo
 #: ../install.py:1172 ../install.py:3073 ../install.py:3078
 msgid "sudo may prompt you for the sudo password."
-msgstr ""
+msgstr "sudo mund t'ju kërkojë fjalëkalimin e sudo."
 
 #: ../install.py:1176
 msgid "Would you like to run the command now?"
-msgstr ""
+msgstr "Dëshironi të ekzekutoni komandën tani?"
 
 #: ../install.py:1178
 msgid "Answer is not yes, exiting."
-msgstr ""
+msgstr "Përgjigja nuk është po, duke dalë."
 
 #: ../install.py:1189 ../install.py:1752 ../install.py:1804 ../install.py:2197
 #: ../install.py:2246
 msgid "Command failed"
-msgstr ""
+msgstr "Komanda dështoi"
 
 #: ../install.py:1191 ../install.py:1753 ../install.py:1805 ../install.py:2198
 #: ../install.py:2247
 msgid "Exiting"
-msgstr ""
+msgstr "Duke dalë"
 
 #: ../install.py:1212
 msgid "The Universe repository must be enabled."
-msgstr ""
+msgstr "Depoja Universe duhet të aktivizohet."
 
 #. Translators: do not translate the term IUS Community
 #: ../install.py:1249
 msgid "The IUS Community repository must be enabled."
-msgstr ""
+msgstr "Depoja  IUS Community duhet të aktivizohet."
 
 #. Translators: do not translate the term EPEL
 #: ../install.py:1277
 msgid "The EPEL repository must be enabled."
-msgstr ""
+msgstr "Depoja EPEL duhet të aktivizohet."
 
 #. Translators: do not translate the term RPM Fusion Free
 #: ../install.py:1314
 msgid "The RPM Fusion Free repository must be enabled."
-msgstr ""
+msgstr "Depoja RPM Fusion Free duhet të aktivizohet."
 
 #: ../install.py:1358
 msgid ""
 "Do you want to to uninstall the previous version of Rapid Photo Downloader?"
-msgstr "Sider sakin sebded lqem aneggaru n umsider Rapid Photo?"
+msgstr ""
+"Dëshiron të çinstalosh versionin e mëparshëm të Rapid Photo Downloader?"
 
 #: ../install.py:1732 ../install.py:1759 ../install.py:1788
 msgid ""
 "Querying package system to see if an older version of Rapid Photo Downloader "
 "is installed (this may take a while)..."
 msgstr ""
+"Duke kërkuar sistemin e paketave për të parë nëse është instaluar një "
+"version i vjetër i Rapid Photo Downloader (kjo mund të zgjasë pak)..."
 
 #: ../install.py:1747
 msgid "Uninstalling system package"
-msgstr ""
+msgstr "Duke çinstaluar paketën e sistemit"
 
 #: ../install.py:1770
 msgid ""
 "Unable to query package system. Please check your Internet connection and "
 "try again."
 msgstr ""
+"Pamundësi për të kërkuar paketën e sistemit. Ju lutemi kontrolloni lidhjen "
+"tuaj të Internetit dhe provoni përsëri."
 
 #. Translators: do not translate the term pip
 #: ../install.py:1810
 msgid "Checking if previous version installed with pip..."
 msgstr ""
+"Duke kontrolluar nëse versioni i mëparshëm është instaluar me anë të pip ..."
 
 #: ../install.py:1949 ../install.py:2000 ../install.py:2086
 msgid "The following package is unknown on your system: {}\n"
-msgstr ""
+msgstr "Paketa e mëposhtme është e panjohur në sistemin tuaj: {}\n"
 
 #: ../install.py:2013 ../install.py:2136 ../install.py:2205 ../install.py:2254
 msgid ""
 "To continue, some packages required to run the application will be installed."
 msgstr ""
+"Për të vazhduar, disa paketa të kërkuara për të ekzekutuar aplikacionin do "
+"të instalohen."
 
 #: ../install.py:2080 ../install.py:2095
 msgid "Querying installed and available packages (this may take a while)"
 msgstr ""
+"Duke kërkuar paketat e instaluara dhe të disponueshme (kjo mund të zgjasë "
+"pak)"
 
 #: ../install.py:2189
 msgid ""
 "Querying zypper to see if any required packages are already installed (this "
 "may take a while)... "
 msgstr ""
+"Duke kërkuar zypper për të parë nëse ndonjë prej paketave të kërkuara janë "
+"instaluar tashmë (kjo mund të zgjasë pak)... "
 
 #: ../install.py:2239
 msgid ""
 "Querying yum to see if any required packages are already installed (this may "
 "take a while)... "
 msgstr ""
+"Duke kërkuar yum për të parë nëse ndonjë prej paketave të kërkuara janë "
+"instaluar tashmë (kjo mund të zgjasë pak)... "
 
 #: ../install.py:2287
 msgid "Query to confirm action at each step."
@@ -244,7 +267,7 @@ msgstr ""
 
 #: ../install.py:2446
 msgid "Failed to download versions file."
-msgstr "Amsebdad n umsider Rapid Photo."
+msgstr ""
 
 #: ../install.py:2450
 msgid "Got error code {} while accessing versions file"
@@ -421,7 +444,7 @@ msgstr ""
 
 #: ../install.py:3389
 msgid "Exiting..."
-msgstr "Tufɣa..."
+msgstr ""
 
 #. Translators: do not translate the term python3-apt
 #: ../install.py:3413
@@ -451,7 +474,7 @@ msgstr ""
 
 #: ../upgrade.py:647 ../raphodo/viewutils.py:255 ../raphodo/viewutils.py:275
 msgid "&Cancel"
-msgstr "&Sefsex"
+msgstr ""
 
 #: ../upgrade.py:651
 msgid "&Upgrade"
@@ -469,15 +492,15 @@ msgstr ""
 #: ../upgrade.py:662 ../upgrade.py:668 ../raphodo/viewutils.py:254
 #: ../raphodo/viewutils.py:274
 msgid "&Close"
-msgstr "&Mdel"
+msgstr ""
 
 #: ../upgrade.py:663
 msgid "&Run"
-msgstr "&Selkem"
+msgstr ""
 
 #: ../upgrade.py:693
 msgid "Close Rapid Photo Downloader before running this upgrade."
-msgstr "Amsebdad n umsider Rapid Photo."
+msgstr ""
 
 #: ../upgrade.py:696
 msgid "Upgrade running..."
@@ -521,7 +544,7 @@ msgstr ""
 
 #: ../raphodo/aboutdialog.py:318
 msgid "Credits"
-msgstr "Ismaden"
+msgstr ""
 
 #: ../raphodo/aboutdialog.py:323
 msgid "Translators"
@@ -529,31 +552,29 @@ msgstr ""
 
 #: ../raphodo/backuppanel.py:241
 msgid "Backups are not configured"
-msgstr "Aḥraz ur ittuswel ara"
+msgstr ""
 
 #: ../raphodo/backuppanel.py:243
 msgid "No backup devices detected"
-msgstr "Ulac ibenkan n uḥraz yettwafen"
+msgstr ""
 
 #: ../raphodo/backuppanel.py:245
 msgid "Valid backup locations not yet specified"
-msgstr "Idigen n uḥraz imeɣta ur ttwamlen ara yakan"
+msgstr ""
 
 #: ../raphodo/backuppanel.py:406
 msgid ""
 "You can have your photos and videos backed up to multiple locations as they "
 "are downloaded, e.g. external hard drives."
 msgstr ""
-"Aḥraz n teqlafin-ik akked tvidyutin-ik izmer ad yili ɣef des n ibenkan ticki "
-"ttwasidren-d, md. idebṣiyen iquranen izɣarayen."
 
 #: ../raphodo/backuppanel.py:414
 msgid "Back up photos and videos when downloading"
-msgstr "Ḥrez tiwlafin akked tvidyutin deg usider"
+msgstr ""
 
 #: ../raphodo/backuppanel.py:420
 msgid "Automatically detect backup devices"
-msgstr "Ṭṭef s wudem awurman ibenkan n uḥraz"
+msgstr ""
 
 #: ../raphodo/backuppanel.py:426
 msgid ""
@@ -567,16 +588,16 @@ msgstr ""
 
 #: ../raphodo/backuppanel.py:441
 msgid "Photo folder name:"
-msgstr "Isem n ukaram n tewlaft:"
+msgstr ""
 
 #: ../raphodo/backuppanel.py:446
 msgid "Video folder name:"
-msgstr "Isem n ularam n tvidyut:"
+msgstr ""
 
 #: ../raphodo/backuppanel.py:451 ../raphodo/nameeditor.py:929
 #: ../raphodo/renamepanel.py:125
 msgid "Example:"
-msgstr "Amedya:"
+msgstr ""
 
 #: ../raphodo/backuppanel.py:462
 msgid ""
@@ -589,11 +610,11 @@ msgstr ""
 #. folder name. See http://damonlynch.net/rapid/documentation/thumbnails/backup.png
 #: ../raphodo/backuppanel.py:470
 msgid "Photo backup location:"
-msgstr "Adig n uḥraz n tewlaft:"
+msgstr ""
 
 #: ../raphodo/backuppanel.py:476
 msgid "Select Photo Backup Location"
-msgstr "Fren adig n uḥraz n tewlaft"
+msgstr ""
 
 #. Translators: the word 'location' is optional in your translation. The left
 #. side of the folder chooser combo box will always line up with the left side of the
@@ -601,23 +622,23 @@ msgstr "Fren adig n uḥraz n tewlaft"
 #. folder name. See http://damonlynch.net/rapid/documentation/thumbnails/backup.png
 #: ../raphodo/backuppanel.py:487
 msgid "Video backup location:"
-msgstr "Adig n uḥraz n tvidyut:"
+msgstr ""
 
 #: ../raphodo/backuppanel.py:493
 msgid "Select Video Backup Location"
-msgstr "Fren Adig n uḥraz n tvidyut"
+msgstr ""
 
 #. Translators: this value is used as an example device when automatic backup device
 #. detection is enabled. You should translate this.
 #: ../raphodo/backuppanel.py:597
 msgid "drive1"
-msgstr "ameɣri1"
+msgstr ""
 
 #. Translators: this value is used as an example device when automatic backup device
 #. detection is enabled. You should translate this.
 #: ../raphodo/backuppanel.py:600
 msgid "drive2"
-msgstr "ameɣri2"
+msgstr ""
 
 #: ../raphodo/backuppanel.py:665
 msgid "Projected Backup Storage Use"
@@ -625,17 +646,17 @@ msgstr ""
 
 #: ../raphodo/backuppanel.py:671
 msgid "Backup Options"
-msgstr "Iɣewwaṛen n uḥraz"
+msgstr ""
 
 #. translators: refers to the video thumbnail file that some
 #. cameras generate -- it has a .THM file extension
 #: ../raphodo/copyfiles.py:544
 msgid "video THM"
-msgstr "tavidyut THM"
+msgstr ""
 
 #: ../raphodo/copyfiles.py:550
 msgid "audio"
-msgstr "ameslaw"
+msgstr ""
 
 #. Translators: %(variable)s represents Python code, not a plural of the term
 #. variable. You must keep the %(variable)s untranslated, or the program will
@@ -644,7 +665,7 @@ msgstr "ameslaw"
 #: ../raphodo/rpdfile.py:290
 #, python-format
 msgid "%(no_photos)s Photos"
-msgstr "%(no_photos)s n tewlafin"
+msgstr ""
 
 #. Translators: %(variable)s represents Python code, not a plural of the term
 #. variable. You must keep the %(variable)s untranslated, or the program will
@@ -653,11 +674,11 @@ msgstr "%(no_photos)s n tewlafin"
 #: ../raphodo/rpdfile.py:278
 #, python-format
 msgid "%(no_videos)s Videos"
-msgstr "%(no_videos)s n tvidyutin"
+msgstr ""
 
 #: ../raphodo/destinationdisplay.py:99
 msgid "Used"
-msgstr "Yettwaseqdec"
+msgstr ""
 
 #: ../raphodo/destinationdisplay.py:100
 msgid "Excess"
@@ -687,14 +708,14 @@ msgstr ""
 #: ../raphodo/rapid.py:2167 ../raphodo/rapid.py:2295 ../raphodo/rapid.py:6485
 #: ../raphodo/rpdfile.py:917
 msgid "Photos"
-msgstr "Tiwlafin"
+msgstr ""
 
 #. translators: the name of the Videos folder
 #: ../raphodo/destinationdisplay.py:204 ../raphodo/devicedisplay.py:1033
 #: ../raphodo/rapid.py:2172 ../raphodo/rapid.py:2296 ../raphodo/rapid.py:6485
 #: ../raphodo/rpdfile.py:945 ../raphodo/storage.py:511
 msgid "Videos"
-msgstr "Tividyutin"
+msgstr ""
 
 #: ../raphodo/destinationdisplay.py:205
 msgid "Projected storage use after download"
@@ -702,7 +723,7 @@ msgstr ""
 
 #: ../raphodo/destinationdisplay.py:342 ../raphodo/nameeditor.py:536
 msgid "Custom..."
-msgstr "Yugnen..."
+msgstr ""
 
 #: ../raphodo/destinationdisplay.py:710
 msgid "Configure photo subfolder creation"
@@ -710,11 +731,11 @@ msgstr ""
 
 #: ../raphodo/destinationdisplay.py:712
 msgid "Configure video subfolder creation"
-msgstr "Swel timerna n ukaram asnawan n tvidyut"
+msgstr ""
 
 #: ../raphodo/devicedisplay.py:1022
 msgid "Other"
-msgstr "Wayeḍ"
+msgstr ""
 
 #: ../raphodo/devicedisplay.py:1023
 msgid "Probing device..."
@@ -736,17 +757,17 @@ msgstr ""
 #: ../raphodo/devicedisplay.py:1151
 #, python-format
 msgid "%s full"
-msgstr "%s n taččart"
+msgstr ""
 
 #: ../raphodo/devices.py:479
 msgid "Cameras"
-msgstr "Takamiṛat"
+msgstr ""
 
 #: ../raphodo/devices.py:480 ../raphodo/devices.py:1023
 #: ../raphodo/preferencedialog.py:114 ../raphodo/preferencedialog.py:124
 #: ../raphodo/rapid.py:2123
 msgid "Devices"
-msgstr "Ibenkan"
+msgstr ""
 
 #. Translators: %(variable)s represents Python code, not a plural of the term
 #. variable. You must keep the %(variable)s untranslated, or the program will
@@ -754,7 +775,7 @@ msgstr "Ibenkan"
 #: ../raphodo/devices.py:813
 #, python-format
 msgid "Downloading from %(device_names)s"
-msgstr "Asider seg %(device_names)s"
+msgstr ""
 
 #. Translators: e.g. Three Devices
 #. Translators: %(variable)s represents Python code, not a plural of the term
@@ -763,11 +784,11 @@ msgstr "Asider seg %(device_names)s"
 #: ../raphodo/devices.py:876
 #, python-format
 msgid "%(no_devices)s %(device_type)s"
-msgstr "%(no_devices)s %(device_type)s"
+msgstr ""
 
 #: ../raphodo/devices.py:1008 ../raphodo/rapid.py:1950
 msgid "Select Source"
-msgstr "Fren aɣbalu"
+msgstr ""
 
 #. Translators: this text shows the devices being downloaded from, and is shown at
 #. the top of the window. The plus sign is used instead of 'and' to leave as much
@@ -784,7 +805,7 @@ msgstr "Fren aɣbalu"
 #: ../raphodo/devices.py:1045 ../raphodo/devices.py:1062
 #, python-format
 msgid "%(device1)s + %(device2)s"
-msgstr "%(device1)s + %(device2)s"
+msgstr ""
 
 #. Translators: Number of cameras e.g. 3 Cameras
 #. Translators: %(variable)s represents Python code, not a plural of the term
@@ -793,7 +814,7 @@ msgstr "%(device1)s + %(device2)s"
 #: ../raphodo/devices.py:1076
 #, python-format
 msgid "%(no_cameras)s Cameras"
-msgstr "%(no_cameras)s n tkamiratin"
+msgstr ""
 
 #. Translators: %(variable)s represents Python code, not a plural of the term
 #. variable. You must keep the %(variable)s untranslated, or the program will
@@ -801,13 +822,13 @@ msgstr "%(no_cameras)s n tkamiratin"
 #: ../raphodo/devices.py:1084
 #, python-format
 msgid "%(no_devices)s Devices"
-msgstr "%(no_devices)s n ibenkan"
+msgstr ""
 
 #. Translators: two folder names, separated by a plus sign
 #: ../raphodo/devices.py:1379
 #, python-format
 msgid "%s + %s"
-msgstr "%s + %s"
+msgstr ""
 
 #: ../raphodo/didyouknow.py:43
 msgid "Click on a file's checkbox to mark or unmark it for download."
@@ -1281,44 +1302,44 @@ msgstr ""
 #. Be friendly in the last few seconds
 #: ../raphodo/downloadtracker.py:531
 msgid "A few seconds"
-msgstr "Kra n tesinin"
+msgstr ""
 
 #: ../raphodo/downloadtracker.py:587
 msgid "1 second"
-msgstr "1 tasint"
+msgstr ""
 
 #: ../raphodo/downloadtracker.py:589
 #, python-format
 msgid "%d seconds"
-msgstr "%d tasinin"
+msgstr ""
 
 #: ../raphodo/downloadtracker.py:594
 msgid "1 minute"
-msgstr "1 tasdat"
+msgstr ""
 
 #: ../raphodo/downloadtracker.py:596
 #, python-format
 msgid "%d minutes"
-msgstr "%d tesdatin"
+msgstr ""
 
 #: ../raphodo/downloadtracker.py:601 ../raphodo/downloadtracker.py:783
 msgid "1 hour"
-msgstr "1 n usrag"
+msgstr ""
 
 #: ../raphodo/downloadtracker.py:603
 #, python-format
 msgid "%d hours"
-msgstr "%d n isragen"
+msgstr ""
 
 #: ../raphodo/downloadtracker.py:608 ../raphodo/downloadtracker.py:812
 #: ../raphodo/downloadtracker.py:820
 msgid "1 day"
-msgstr "1 n wass"
+msgstr ""
 
 #: ../raphodo/downloadtracker.py:610
 #, python-format
 msgid "%d days"
-msgstr "%d dayn wussans"
+msgstr ""
 
 #: ../raphodo/downloadtracker.py:789
 msgid "1 minute, 1 second"
@@ -1434,7 +1455,7 @@ msgstr ""
 
 #: ../raphodo/errorlog.py:237
 msgid "Clear"
-msgstr "Sfeḍ"
+msgstr ""
 
 #: ../raphodo/errorlog.py:337
 msgid "Phrase not found"
@@ -1532,7 +1553,7 @@ msgstr ""
 
 #: ../raphodo/foldercombo.py:118
 msgid "File System"
-msgstr "Anagraw n ufaylu"
+msgstr ""
 
 #: ../raphodo/foldercombo.py:155
 msgid "Other..."
@@ -1549,19 +1570,19 @@ msgstr ""
 
 #: ../raphodo/generatenameconfig.py:193
 msgid "Text"
-msgstr "Aḍris"
+msgstr ""
 
 #: ../raphodo/generatenameconfig.py:194 ../raphodo/rapid.py:2269
 msgid "Filename"
-msgstr "Isem n ufaylu"
+msgstr ""
 
 #: ../raphodo/generatenameconfig.py:195 ../raphodo/preferencedialog.py:761
 msgid "Metadata"
-msgstr "Adferisefka"
+msgstr ""
 
 #: ../raphodo/generatenameconfig.py:196
 msgid "Sequences"
-msgstr "Igzumen"
+msgstr ""
 
 #. Translators: for an explanation of what this means,
 #. see http://damonlynch.net/rapid/documentation/index.html#jobcode
@@ -1579,11 +1600,11 @@ msgstr ""
 
 #: ../raphodo/generatenameconfig.py:202
 msgid "Today"
-msgstr "Ass-a"
+msgstr ""
 
 #: ../raphodo/generatenameconfig.py:203
 msgid "Yesterday"
-msgstr "Iḍelli"
+msgstr ""
 
 #. Translators: Download time is the time and date that the download started (when the
 #. user clicked the Download button)
@@ -1595,13 +1616,13 @@ msgstr ""
 #. see http://damonlynch.net/rapid/documentation/index.html#renamefilename
 #: ../raphodo/generatenameconfig.py:209
 msgid "Name"
-msgstr "Isem"
+msgstr ""
 
 #. Translators: for an explanation of what this means,
 #. see http://damonlynch.net/rapid/documentation/index.html#renamefilename
 #: ../raphodo/generatenameconfig.py:212 ../raphodo/rapid.py:2270
 msgid "Extension"
-msgstr "Asiɣzef"
+msgstr ""
 
 #. Translators: for an explanation of what this means,
 #. see http://damonlynch.net/rapid/documentation/index.html#renamefilename
@@ -1629,7 +1650,7 @@ msgstr ""
 #. see http://damonlynch.net/rapid/documentation/index.html#renamemetadata
 #: ../raphodo/generatenameconfig.py:225
 msgid "Exposure time"
-msgstr "Akud n timzikent"
+msgstr ""
 
 #. Translators: for an explanation of what this means,
 #. see http://damonlynch.net/rapid/documentation/index.html#renamemetadata
@@ -1647,7 +1668,7 @@ msgstr ""
 #. see http://damonlynch.net/rapid/documentation/index.html#renamemetadata
 #: ../raphodo/generatenameconfig.py:234
 msgid "Camera model"
-msgstr "Talɣa n taweṣṣaft"
+msgstr ""
 
 #. Translators: for an explanation of what this means,
 #. see http://damonlynch.net/rapid/documentation/index.html#renamemetadata
@@ -1700,15 +1721,15 @@ msgstr ""
 
 #: ../raphodo/generatenameconfig.py:257
 msgid "Width"
-msgstr "Tehri"
+msgstr ""
 
 #: ../raphodo/generatenameconfig.py:258
 msgid "Height"
-msgstr "Awrir"
+msgstr ""
 
 #: ../raphodo/generatenameconfig.py:259
 msgid "Length"
-msgstr "Tanzagt"
+msgstr ""
 
 #: ../raphodo/generatenameconfig.py:260
 msgid "Frames Per Second"
@@ -1716,11 +1737,11 @@ msgstr ""
 
 #: ../raphodo/generatenameconfig.py:261
 msgid "Artist"
-msgstr "Anaẓur"
+msgstr ""
 
 #: ../raphodo/generatenameconfig.py:262
 msgid "Copyright"
-msgstr "Izerfan ttwaḥerzen"
+msgstr ""
 
 #. Translators: for an explanation of what this means,
 #. see http://damonlynch.net/rapid/documentation/index.html#sequencenumbers
@@ -1756,7 +1777,7 @@ msgstr ""
 #. see http://damonlynch.net/rapid/documentation/index.html#renamefilename
 #: ../raphodo/generatenameconfig.py:280
 msgid "All digits"
-msgstr "Akk izwilen"
+msgstr ""
 
 #. Translators: for an explanation of what this means,
 #. see http://damonlynch.net/rapid/documentation/index.html#renamefilename
@@ -1826,7 +1847,7 @@ msgstr ""
 
 #: ../raphodo/generatenameconfig.py:308
 msgid "Seven digits"
-msgstr "Sa n izwilen"
+msgstr ""
 
 #. Translators: for an explanation of what this means,
 #. see http://damonlynch.net/rapid/documentation/index.html#renamedateandtime
@@ -1838,37 +1859,37 @@ msgstr ""
 #. see http://damonlynch.net/rapid/documentation/index.html#renamedateandtime
 #: ../raphodo/generatenameconfig.py:314 ../raphodo/generatenameconfig.py:401
 msgid "YYYYMMDD"
-msgstr "DDMMYYYY"
+msgstr ""
 
 #. Translators: for an explanation of what this means,
 #. see http://damonlynch.net/rapid/documentation/index.html#renamedateandtime
 #: ../raphodo/generatenameconfig.py:317 ../raphodo/generatenameconfig.py:402
 msgid "YYYY-MM-DD"
-msgstr "DD-MM-YYYY"
+msgstr ""
 
 #. Translators: for an explanation of what this means,
 #. see http://damonlynch.net/rapid/documentation/index.html#renamedateandtime
 #: ../raphodo/generatenameconfig.py:320 ../raphodo/generatenameconfig.py:403
 msgid "YYYY_MM_DD"
-msgstr "DD_MM_YYYY"
+msgstr ""
 
 #. Translators: for an explanation of what this means,
 #. see http://damonlynch.net/rapid/documentation/index.html#renamedateandtime
 #: ../raphodo/generatenameconfig.py:323
 msgid "YYMMDD"
-msgstr "DDMMYY"
+msgstr ""
 
 #. Translators: for an explanation of what this means,
 #. see http://damonlynch.net/rapid/documentation/index.html#renamedateandtime
 #: ../raphodo/generatenameconfig.py:326
 msgid "YY-MM-DD"
-msgstr "DD-MM-YY"
+msgstr ""
 
 #. Translators: for an explanation of what this means,
 #. see http://damonlynch.net/rapid/documentation/index.html#renamedateandtime
 #: ../raphodo/generatenameconfig.py:329
 msgid "YY_MM_DD"
-msgstr "DD_MM_YY"
+msgstr ""
 
 #. Translators: for an explanation of what this means,
 #. see http://damonlynch.net/rapid/documentation/index.html#renamedateandtime
@@ -1898,7 +1919,7 @@ msgstr ""
 #. see http://damonlynch.net/rapid/documentation/index.html#renamedateandtime
 #: ../raphodo/generatenameconfig.py:344
 msgid "DDMMYY"
-msgstr "DDMMYY"
+msgstr ""
 
 #. Translators: for an explanation of what this means,
 #. see http://damonlynch.net/rapid/documentation/index.html#renamedateandtime
@@ -1906,37 +1927,37 @@ msgstr "DDMMYY"
 #: ../raphodo/generatenameconfig.py:402 ../raphodo/generatenameconfig.py:403
 #: ../raphodo/generatenameconfig.py:404 ../raphodo/generatenameconfig.py:405
 msgid "YYYY"
-msgstr "YYYY"
+msgstr ""
 
 #. Translators: for an explanation of what this means,
 #. see http://damonlynch.net/rapid/documentation/index.html#renamedateandtime
 #: ../raphodo/generatenameconfig.py:350
 msgid "YY"
-msgstr "YY"
+msgstr ""
 
 #. Translators: for an explanation of what this means,
 #. see http://damonlynch.net/rapid/documentation/index.html#renamedateandtime
 #: ../raphodo/generatenameconfig.py:353
 msgid "MM"
-msgstr "MM"
+msgstr ""
 
 #. Translators: for an explanation of what this means,
 #. see http://damonlynch.net/rapid/documentation/index.html#renamedateandtime
 #: ../raphodo/generatenameconfig.py:356
 msgid "DD"
-msgstr "DD"
+msgstr ""
 
 #. Translators: for an explanation of what this means,
 #. see http://damonlynch.net/rapid/documentation/index.html#renamedateandtime
 #: ../raphodo/generatenameconfig.py:359
 msgid "Month (full)"
-msgstr "Ayyur (ummid)"
+msgstr ""
 
 #. Translators: for an explanation of what this means,
 #. see http://damonlynch.net/rapid/documentation/index.html#renamedateandtime
 #: ../raphodo/generatenameconfig.py:362
 msgid "Month (abbreviated)"
-msgstr "Ayyur (awezlan)"
+msgstr ""
 
 #. Translators: for an explanation of what this means,
 #. see http://damonlynch.net/rapid/documentation/index.html#renamedateandtime
@@ -1954,47 +1975,47 @@ msgstr ""
 #. see http://damonlynch.net/rapid/documentation/index.html#renamedateandtime
 #: ../raphodo/generatenameconfig.py:371
 msgid "HHMMSS"
-msgstr "HHMMSS"
+msgstr ""
 
 #. Translators: for an explanation of what this means,
 #. see http://damonlynch.net/rapid/documentation/index.html#renamedateandtime
 #: ../raphodo/generatenameconfig.py:374
 msgid "HHMM"
-msgstr "HHMM"
+msgstr ""
 
 #. Translators: for an explanation of what this means,
 #. see http://damonlynch.net/rapid/documentation/index.html#renamedateandtime
 #: ../raphodo/generatenameconfig.py:377
 msgid "HH-MM-SS"
-msgstr "HH-MM-SS"
+msgstr ""
 
 #. Translators: for an explanation of what this means,
 #. see http://damonlynch.net/rapid/documentation/index.html#renamedateandtime
 #: ../raphodo/generatenameconfig.py:380
 msgid "HH-MM"
-msgstr "HH-MM"
+msgstr ""
 
 #. Translators: for an explanation of what this means,
 #. see http://damonlynch.net/rapid/documentation/index.html#renamedateandtime
 #: ../raphodo/generatenameconfig.py:383
 msgid "HH"
-msgstr "HH"
+msgstr ""
 
 #. Translators: for an explanation of what this means,
 #. see http://damonlynch.net/rapid/documentation/index.html#renamedateandtime
 #: ../raphodo/generatenameconfig.py:386
 msgid "MM (minutes)"
-msgstr "MM (tisdatin)"
+msgstr ""
 
 #. Translators: for an explanation of what this means,
 #. see http://damonlynch.net/rapid/documentation/index.html#renamedateandtime
 #: ../raphodo/generatenameconfig.py:389
 msgid "SS"
-msgstr "SS"
+msgstr ""
 
 #: ../raphodo/generatenameconfig.py:401
 msgid "Date"
-msgstr "Azemz"
+msgstr ""
 
 #: ../raphodo/generatenameconfig.py:402
 msgid "Date (hyphens)"
@@ -2011,7 +2032,7 @@ msgstr ""
 
 #: ../raphodo/generatenameconfig.py:404
 msgid "YYYYMM_Job Code"
-msgstr "MMYYYY_Tangalt n Twuri"
+msgstr ""
 
 #: ../raphodo/generatenameconfig.py:405
 msgid "Date and Job Code Subfolder"
@@ -2019,7 +2040,7 @@ msgstr ""
 
 #: ../raphodo/generatenameconfig.py:405
 msgid "YYYYMM"
-msgstr "MMYYYY"
+msgstr ""
 
 #: ../raphodo/generatenameconfig.py:405 ../raphodo/jobcodepanel.py:230
 #: ../raphodo/nameeditor.py:860 ../raphodo/rapid.py:1996
@@ -2037,7 +2058,7 @@ msgstr ""
 
 #: ../raphodo/generatenameconfig.py:446 ../raphodo/generatenameconfig.py:541
 msgid "YYYYMMDD-HHMM-1"
-msgstr "DDMMYYYY-HHMM-1"
+msgstr ""
 
 #: ../raphodo/generatenameconfig.py:447 ../raphodo/generatenameconfig.py:542
 msgid "Date and Downloads today"
@@ -2045,7 +2066,7 @@ msgstr ""
 
 #: ../raphodo/generatenameconfig.py:447 ../raphodo/generatenameconfig.py:542
 msgid "YYYYMMDD-1"
-msgstr "DDMMYYYY-1"
+msgstr ""
 
 #: ../raphodo/generatenameconfig.py:448
 msgid "Date-Time and Image number"
@@ -2053,7 +2074,7 @@ msgstr ""
 
 #: ../raphodo/generatenameconfig.py:448
 msgid "YYYYMMDD-1234"
-msgstr "DDMMYYYY-1234"
+msgstr ""
 
 #: ../raphodo/generatenameconfig.py:449 ../raphodo/generatenameconfig.py:544
 msgid "Date-Time and Job Code"
@@ -2061,11 +2082,11 @@ msgstr ""
 
 #: ../raphodo/generatenameconfig.py:449 ../raphodo/generatenameconfig.py:544
 msgid "YYYYMMDD-HHMM-Job Code-1"
-msgstr "DDMMYYYY-HHMM-Job Code-1"
+msgstr ""
 
 #: ../raphodo/generatenameconfig.py:450 ../raphodo/generatenameconfig.py:545
 msgid "YYYYMMDD-Job Code-1"
-msgstr "DDMMYYY-Tangalt n Twuri-1"
+msgstr ""
 
 #: ../raphodo/generatenameconfig.py:543
 msgid "Date-Time and Video number"
@@ -2073,15 +2094,15 @@ msgstr ""
 
 #: ../raphodo/generatenameconfig.py:543
 msgid "YYYYMMDD_1234"
-msgstr "DDMMYYYY_1234"
+msgstr ""
 
 #: ../raphodo/generatenameconfig.py:546
 msgid "Resolution"
-msgstr "Afray"
+msgstr ""
 
 #: ../raphodo/generatenameconfig.py:546
 msgid "YYYYMMDD-HHMM-1-1920x1080"
-msgstr "DDMMYYYY-HHMM-1-1920x1080"
+msgstr ""
 
 #: ../raphodo/jobcodepanel.py:72
 msgid "Enter a new Job Code, or select a previous one"
@@ -2161,7 +2182,7 @@ msgstr ""
 
 #: ../raphodo/jobcodepanel.py:229
 msgid "Last Used"
-msgstr "Aseqdec anneggaru"
+msgstr ""
 
 #: ../raphodo/jobcodepanel.py:234
 msgid "Job Code Sort:"
@@ -2169,28 +2190,28 @@ msgstr ""
 
 #: ../raphodo/jobcodepanel.py:237 ../raphodo/rapid.py:2277
 msgid "Ascending"
-msgstr "S walluy"
+msgstr ""
 
 #: ../raphodo/jobcodepanel.py:238 ../raphodo/rapid.py:2278
 msgid "Descending"
-msgstr "S usider"
+msgstr ""
 
 #: ../raphodo/jobcodepanel.py:248
 msgid "&New..."
-msgstr "Amaynut..."
+msgstr ""
 
 #: ../raphodo/jobcodepanel.py:252
 msgid "&Apply"
-msgstr "&Snes"
+msgstr ""
 
 #: ../raphodo/jobcodepanel.py:256
 msgid "&Remove"
-msgstr "&Kkes"
+msgstr ""
 
 #: ../raphodo/jobcodepanel.py:260 ../raphodo/preferencedialog.py:207
 #: ../raphodo/preferencedialog.py:236 ../raphodo/preferencedialog.py:567
 msgid "Remove All"
-msgstr "Kkes akk"
+msgstr ""
 
 #: ../raphodo/jobcodepanel.py:459
 msgid "Do you really want to remove all the Job Codes?"
@@ -2307,7 +2328,7 @@ msgstr ""
 
 #: ../raphodo/nameeditor.py:1079
 msgid "Insert"
-msgstr "Ger"
+msgstr ""
 
 #: ../raphodo/nameeditor.py:1421
 msgid "Save Preset - Rapid Photo Downloader"
@@ -2390,7 +2411,7 @@ msgstr ""
 
 #: ../raphodo/preferencedialog.py:92
 msgid "Preferences"
-msgstr "Ismenyifen"
+msgstr ""
 
 #: ../raphodo/preferencedialog.py:114 ../raphodo/preferencedialog.py:124
 msgid "Language"
@@ -2411,7 +2432,7 @@ msgstr ""
 
 #: ../raphodo/preferencedialog.py:115 ../raphodo/preferencedialog.py:125
 msgid "Warnings"
-msgstr "Ilɣa"
+msgstr ""
 
 #: ../raphodo/preferencedialog.py:115
 msgid "Consolidation"
@@ -2419,7 +2440,7 @@ msgstr ""
 
 #: ../raphodo/preferencedialog.py:115 ../raphodo/preferencedialog.py:125
 msgid "Miscellaneous"
-msgstr "Divers"
+msgstr ""
 
 #: ../raphodo/preferencedialog.py:154
 msgid "Device Scanning"
@@ -2461,7 +2482,7 @@ msgstr ""
 
 #: ../raphodo/preferencedialog.py:174 ../raphodo/preferencedialog.py:226
 msgid "Add..."
-msgstr "Rnu..."
+msgstr ""
 
 #: ../raphodo/preferencedialog.py:176
 msgid ""
@@ -2473,7 +2494,7 @@ msgstr ""
 #: ../raphodo/preferencedialog.py:179 ../raphodo/preferencedialog.py:205
 #: ../raphodo/preferencedialog.py:231 ../raphodo/preferencedialog.py:565
 msgid "Remove"
-msgstr "Kkes"
+msgstr ""
 
 #: ../raphodo/preferencedialog.py:181
 msgid ""
@@ -2557,7 +2578,7 @@ msgstr ""
 #: ../raphodo/preferencedialog.py:304 ../raphodo/preferencedialog.py:391
 #: ../raphodo/preferencedialog.py:437
 msgid "*"
-msgstr "*"
+msgstr ""
 
 #. Translators: the * acts as an asterisk to denote a reference to this annotation
 #: ../raphodo/preferencedialog.py:311 ../raphodo/preferencedialog.py:457
@@ -2638,7 +2659,7 @@ msgstr ""
 
 #: ../raphodo/preferencedialog.py:422
 msgid "days"
-msgstr "ussan"
+msgstr ""
 
 #: ../raphodo/preferencedialog.py:423
 msgid "forever"
@@ -2688,7 +2709,7 @@ msgstr ""
 
 #: ../raphodo/preferencedialog.py:480
 msgid "Overwrite"
-msgstr "Sfeɛj"
+msgstr ""
 
 #: ../raphodo/preferencedialog.py:481
 msgid "Overwrite the previously backed up file"
@@ -2696,7 +2717,7 @@ msgstr ""
 
 #: ../raphodo/preferencedialog.py:482
 msgid "Skip"
-msgstr "Zgel"
+msgstr ""
 
 #: ../raphodo/preferencedialog.py:484
 msgid "Don't overwrite the backup file, and issue an error message"
@@ -2789,7 +2810,7 @@ msgstr ""
 
 #: ../raphodo/preferencedialog.py:561
 msgid "Add"
-msgstr "Rnu"
+msgstr ""
 
 #: ../raphodo/preferencedialog.py:562
 msgid ""
@@ -3057,7 +3078,7 @@ msgstr ""
 
 #: ../raphodo/preferencedialog.py:1611 ../raphodo/renamepanel.py:124
 msgid "Extension:"
-msgstr "Asiɣzef:"
+msgstr ""
 
 #: ../raphodo/preferencedialog.py:1626
 msgid "Invalid File Extension"
@@ -3094,7 +3115,7 @@ msgstr ""
 
 #: ../raphodo/preferences.py:291
 msgid "Birthday"
-msgstr "Azemz n tlalit"
+msgstr ""
 
 #: ../raphodo/preferences.py:644
 #, python-format
@@ -3126,7 +3147,7 @@ msgstr ""
 #: ../raphodo/problemnotification.py:94
 #, python-format
 msgid "Error: %s"
-msgstr "Tuccḍa: %s"
+msgstr ""
 
 #: ../raphodo/problemnotification.py:122
 #, python-format
@@ -3499,13 +3520,13 @@ msgstr ""
 #: ../raphodo/proximity.py:1779
 #, python-format
 msgid "%(minutes)dm"
-msgstr "%(minutes)dm"
+msgstr ""
 
 #. Translators: i.e. "1.5h", which is short for 1.5 hours.
 #. Replace the entire string with the correct localized value
 #: ../raphodo/proximity.py:1783
 msgid "1.5h"
-msgstr "1.5sr"
+msgstr ""
 
 #. Translators: e.g. "5h", which is short for 5 hours.
 #. Replace the very last character (after the d) with the correct localized value,
@@ -3513,7 +3534,7 @@ msgstr "1.5sr"
 #: ../raphodo/proximity.py:1788
 #, python-format
 msgid "%(hours)dh"
-msgstr "%(hours)dsr"
+msgstr ""
 
 #: ../raphodo/proximity.py:1839
 msgid ""
@@ -3585,7 +3606,7 @@ msgstr ""
 
 #: ../raphodo/rapid.py:1589
 msgid "Download failed"
-msgstr "Asider ur yeddi ara"
+msgstr ""
 
 #: ../raphodo/rapid.py:1591
 msgid ""
@@ -3604,7 +3625,7 @@ msgstr ""
 
 #: ../raphodo/rapid.py:1606
 msgid "Install"
-msgstr "Sebded"
+msgstr ""
 
 #: ../raphodo/rapid.py:1624
 msgid "New version saved"
@@ -3630,19 +3651,19 @@ msgstr ""
 
 #: ../raphodo/rapid.py:1852 ../raphodo/rapid.py:2572
 msgid "Download"
-msgstr "Sider"
+msgstr ""
 
 #: ../raphodo/rapid.py:1856
 msgid "&Refresh..."
-msgstr "&Smiren..."
+msgstr ""
 
 #: ../raphodo/rapid.py:1860
 msgid "&Preferences"
-msgstr "&Ismenyifen"
+msgstr ""
 
 #: ../raphodo/rapid.py:1864
 msgid "&Quit"
-msgstr "&Ffeɣ"
+msgstr ""
 
 #: ../raphodo/rapid.py:1868
 msgid "Error &Reports"
@@ -3662,35 +3683,35 @@ msgstr ""
 
 #: ../raphodo/rapid.py:1884
 msgid "Report a Problem..."
-msgstr "Azen ugur..."
+msgstr ""
 
 #: ../raphodo/rapid.py:1888
 msgid "Make a Donation..."
-msgstr "Mudd tawsa..."
+msgstr ""
 
 #: ../raphodo/rapid.py:1892
 msgid "Translate this Application..."
-msgstr "Suqel asnas-agi..."
+msgstr ""
 
 #: ../raphodo/rapid.py:1896
 msgid "&About..."
-msgstr "&Ɣef..."
+msgstr ""
 
 #: ../raphodo/rapid.py:1900
 msgid "Check for Updates..."
-msgstr "Senqed ileqman..."
+msgstr ""
 
 #: ../raphodo/rapid.py:1984
 msgid "Timeline"
-msgstr "Amazray"
+msgstr ""
 
 #: ../raphodo/rapid.py:1994
 msgid "Destination"
-msgstr "Taniɣert"
+msgstr ""
 
 #: ../raphodo/rapid.py:1995
 msgid "Rename"
-msgstr "Snifel isem"
+msgstr ""
 
 #: ../raphodo/rapid.py:1997
 msgid "Back Up"
@@ -3727,11 +3748,11 @@ msgstr ""
 
 #: ../raphodo/rapid.py:2261
 msgid "All"
-msgstr "Meṛṛa"
+msgstr ""
 
 #: ../raphodo/rapid.py:2262
 msgid "New"
-msgstr "Amynut"
+msgstr ""
 
 #: ../raphodo/rapid.py:2264
 msgid "Show:"
@@ -3747,7 +3768,7 @@ msgstr ""
 
 #: ../raphodo/rapid.py:2271
 msgid "File Type"
-msgstr "Anaw n ufaylu"
+msgstr ""
 
 #: ../raphodo/rapid.py:2272
 msgid "Device"
@@ -3759,7 +3780,7 @@ msgstr ""
 
 #: ../raphodo/rapid.py:2285
 msgid "Select All:"
-msgstr "Fren akk:"
+msgstr ""
 
 #. Translators: %(variable)s represents Python code, not a plural of the term
 #. variable. You must keep the %(variable)s untranslated, or the program will
@@ -3775,7 +3796,7 @@ msgstr ""
 
 #: ../raphodo/rapid.py:2570
 msgid "Pause"
-msgstr "Ḥbes"
+msgstr ""
 
 #: ../raphodo/rapid.py:2680
 msgid "Thank you for reporting a problem in Rapid Photo Downloader"
@@ -3937,12 +3958,12 @@ msgstr ""
 
 #: ../raphodo/rapid.py:4175
 msgid "1 warning"
-msgstr "1 Alɣu"
+msgstr ""
 
 #: ../raphodo/rapid.py:4177
 #, python-format
 msgid "%d warnings"
-msgstr "%d ilɣa"
+msgstr ""
 
 #: ../raphodo/rapid.py:4202
 #, python-format
@@ -4445,16 +4466,16 @@ msgstr ""
 #. translators: natural language expression signifying a single video
 #: ../raphodo/rpdfile.py:282
 msgid "a video"
-msgstr "tavidyut"
+msgstr ""
 
 #: ../raphodo/rpdfile.py:284
 msgid "1 Video"
-msgstr "1 Tavidyut"
+msgstr ""
 
 #. translators: natural language expression signifying a single photo
 #: ../raphodo/rpdfile.py:294
 msgid "a photo"
-msgstr "tawlaft"
+msgstr ""
 
 #: ../raphodo/rpdfile.py:296
 msgid "1 Photo"
@@ -4469,11 +4490,11 @@ msgstr ""
 
 #: ../raphodo/rpdfile.py:819
 msgid "Photo"
-msgstr "Tawlaft"
+msgstr ""
 
 #: ../raphodo/rpdfile.py:871
 msgid "Video"
-msgstr "Tavidyut"
+msgstr ""
 
 #: ../raphodo/storage.py:170
 msgid "File system root"
@@ -4546,19 +4567,19 @@ msgstr ""
 #. kilobytes, etc.
 #: ../raphodo/utilities.py:207
 msgid "B"
-msgstr "B"
+msgstr ""
 
 #: ../raphodo/utilities.py:207
 msgid "KB"
-msgstr "KAṬ"
+msgstr ""
 
 #: ../raphodo/utilities.py:207
 msgid "MB"
-msgstr "KAṬ"
+msgstr ""
 
 #: ../raphodo/utilities.py:207
 msgid "GB"
-msgstr "GAṬ"
+msgstr ""
 
 #: ../raphodo/utilities.py:207
 msgid "TB"
@@ -4611,11 +4632,11 @@ msgstr ""
 
 #: ../raphodo/utilities.py:526
 msgid "six"
-msgstr "seḍis"
+msgstr ""
 
 #: ../raphodo/utilities.py:527
 msgid "seven"
-msgstr "sa"
+msgstr ""
 
 #: ../raphodo/utilities.py:528
 msgid "eight"
@@ -4639,47 +4660,47 @@ msgstr ""
 
 #: ../raphodo/utilities.py:533
 msgid "thirteen"
-msgstr "mraw krad"
+msgstr ""
 
 #: ../raphodo/utilities.py:534
 msgid "fourteen"
-msgstr "mraw kuẓ"
+msgstr ""
 
 #: ../raphodo/utilities.py:535
 msgid "fifteen"
-msgstr "mraw semmus"
+msgstr ""
 
 #: ../raphodo/utilities.py:536
 msgid "sixteen"
-msgstr "mraw sḍis"
+msgstr ""
 
 #: ../raphodo/utilities.py:537
 msgid "seventeen"
-msgstr "mraw sa"
+msgstr ""
 
 #: ../raphodo/utilities.py:538
 msgid "eighteen"
-msgstr "mraw ṭam"
+msgstr ""
 
 #: ../raphodo/utilities.py:539
 msgid "ninenteen"
-msgstr "mraw tza"
+msgstr ""
 
 #: ../raphodo/utilities.py:540
 msgid "twenty"
-msgstr "sin imrawen"
+msgstr ""
 
 #: ../raphodo/viewutils.py:253 ../raphodo/viewutils.py:273
 msgid "&OK"
-msgstr "&Ih"
+msgstr ""
 
 #: ../raphodo/viewutils.py:256 ../raphodo/viewutils.py:276
 msgid "&Save"
-msgstr "&ekles"
+msgstr ""
 
 #: ../raphodo/viewutils.py:257
 msgid "&Help"
-msgstr "&Tallalt"
+msgstr ""
 
 #: ../raphodo/viewutils.py:258
 msgid "Restore Defaults"
@@ -4687,11 +4708,11 @@ msgstr ""
 
 #: ../raphodo/viewutils.py:259 ../raphodo/viewutils.py:277
 msgid "&Yes"
-msgstr "&Ih"
+msgstr ""
 
 #: ../raphodo/viewutils.py:260 ../raphodo/viewutils.py:278
 msgid "&No"
-msgstr "&Ala"
+msgstr ""
 
 #: ../data/net.damonlynch.rapid_photo_downloader.metainfo.xml.in.h:2
 #: ../data/net.damonlynch.rapid_photo_downloader.desktop.in.h:1
