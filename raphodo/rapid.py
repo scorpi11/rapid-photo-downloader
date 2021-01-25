@@ -37,6 +37,7 @@ import logging
 import shutil
 import datetime
 import locale
+
 try:
     # Use the default locale as defined by the LANG variable
     locale.setlocale(locale.LC_ALL, '')
@@ -56,6 +57,8 @@ import subprocess
 from urllib.request import pathname2url
 import inspect
 
+import dateutil
+
 import gi
 gi.require_version('Notify', '0.7')
 from gi.repository import Notify
@@ -63,8 +66,10 @@ from gi.repository import Notify
 try:
     gi.require_version('Unity', '7.0')
     from gi.repository import Unity
+    launcher = 'net.damonlynch.rapid_photo_downloader.desktop'
+    Unity.LauncherEntry.get_for_desktop_id(launcher)
     have_unity = True
-except (ImportError, ValueError):
+except (ImportError, ValueError, gi.repository.GLib.GError):
     have_unity = False
 
 import zmq
@@ -74,11 +79,11 @@ import gphoto2 as gp
 from PyQt5 import QtCore
 from PyQt5.QtCore import (
     QThread, Qt, QStorageInfo, QSettings, QPoint, QSize, QTimer, QTextStream, QModelIndex,
-    pyqtSlot, QRect, pyqtSignal, QObject, QEvent
+    pyqtSlot, QRect, pyqtSignal, QObject, QEvent, QLocale, 
 )
 from PyQt5.QtGui import (
     QIcon, QPixmap, QImage, QColor, QPalette, QFontMetrics, QFont, QPainter, QMoveEvent, QBrush,
-    QPen, QColor, QScreen
+    QPen, QColor, QScreen, QDesktopServices
 )
 from PyQt5.QtWidgets import (
     QAction, QApplication, QMainWindow, QMenu, QWidget, QDialogButtonBox,
@@ -130,7 +135,7 @@ from raphodo.utilities import (
     same_device, make_internationalized_list, thousands, addPushButtonLabelSpacer,
     make_html_path_non_breaking, prefs_list_from_gconftool2_string,
     pref_bool_from_gconftool2_string, extract_file_from_tar, format_size_for_user,
-    is_snap, version_check_disabled, installed_using_pip
+    is_snap, version_check_disabled, installed_using_pip, getQtSystemTranslation
 )
 from raphodo.rememberthisdialog import RememberThisDialog
 import raphodo.utilities
@@ -156,7 +161,7 @@ from raphodo.filebrowse import (
 from raphodo.toggleview import QToggleView
 import raphodo.__about__ as __about__
 import raphodo.iplogging as iplogging
-import raphodo.excepthook
+import raphodo.excepthook as excepthook
 from raphodo.panelview import QPanelView
 from raphodo.computerview import ComputerWidget
 from raphodo.folderspreview import DownloadDestination, FoldersPreview
@@ -180,11 +185,13 @@ from raphodo.problemnotification import (
 )
 from raphodo.viewutils import (
     standardIconSize, qt5_screen_scale_environment_variable, QT5_VERSION, validateWindowSizeLimit,
-    validateWindowPosition, scaledIcon, any_screen_scaled
+    validateWindowPosition, scaledIcon, any_screen_scaled, standardMessageBox
 )
+from raphodo import viewutils
 import raphodo.didyouknow as didyouknow
 from raphodo.thumbnailextractor import gst_version, libraw_version, rawkit_version
 from raphodo.heif import have_heif_module, pyheif_version, libheif_version
+from raphodo.filesystemurl import FileSystemUrlHandler
 
 
 # Avoid segfaults at exit:
@@ -193,7 +200,7 @@ app = None  # type: 'QtSingleApplication'
 
 faulthandler.enable()
 logger = None
-sys.excepthook = raphodo.excepthook.excepthook
+sys.excepthook = excepthook.excepthook
 
 
 class FolderPreviewManager(QObject):
@@ -507,6 +514,9 @@ class RapidWindow(QMainWindow):
         self.close_event_run = False
 
         self.file_manager, self.file_manager_type = get_default_file_manager()
+
+        self.fileSystemUrlHandler = FileSystemUrlHandler(self.file_manager, self.file_manager_type)
+        QDesktopServices.setUrlHandler("file", self.fileSystemUrlHandler, "openFileBrowser")
 
         for version in get_versions(
                 self.file_manager, self.file_manager_type, scaling_action,
@@ -1904,8 +1914,8 @@ class RapidWindow(QMainWindow):
         centralWidget.setLayout(verticalLayout)
         self.standard_spacing = verticalLayout.spacing()
 
-        topBar = self.createTopBar()
-        verticalLayout.addLayout(topBar)
+        self.topBar = self.createTopBar()
+        verticalLayout.addLayout(self.topBar)
 
         centralLayout = QHBoxLayout()
         centralLayout.setContentsMargins(0, 0, 0, 0)
@@ -1937,7 +1947,8 @@ class RapidWindow(QMainWindow):
         topBar.setSpacing(int(QFontMetrics(QFont()).height() / 2))
 
         self.sourceButton = TopPushButton(
-            addPushButtonLabelSpacer(_('Select Source')), extra_top=self.standard_spacing
+            addPushButtonLabelSpacer(_('Select Source')),
+            parent=self, extra_top=self.standard_spacing
         )
         self.sourceButton.clicked.connect(self.sourceButtonClicked)
 
@@ -1950,7 +1961,7 @@ class RapidWindow(QMainWindow):
         hlayout.setSpacing(menu_margin)
         vlayout.addLayout(hlayout)
 
-        self.downloadButton = DownloadButton(self.downloadAct.text())
+        self.downloadButton = DownloadButton(self.downloadAct.text(), parent=self)
         self.downloadButton.addAction(self.downloadAct)
         self.downloadButton.setDefault(True)
         self.downloadButton.clicked.connect(self.downloadButtonClicked)
@@ -2648,29 +2659,22 @@ class RapidWindow(QMainWindow):
         :param title: optional title
         """
 
-        log_path, log_file = os.path.split(iplogging.full_log_file_path())
-        log_uri = get_uri(log_path)
-        config_path, config_file = os.path.split(self.prefs.settings_path())
-        config_uri = get_uri(path=config_path)
-
-        body = _(
-            r"""Please report the problem at <a href="{website}">{website}</a>.<br><br>
-            Include in your bug report the program's log files. The bug report must include 
-            <i>{log_file}</i>, but attaching the other log files is often helpful.<br><br> 
-            If possible, please also include the program's configuration file
-            <i>{config_file}</i>.<br><br> 
-            Click <a href="{log_path}">here</a> to open the log directory, and 
-            <a href="{config_path}">here</a> to open the configuration directory.
-            """
-        ).format(
-            website='https://bugs.launchpad.net/rapid', log_path=log_uri, log_file=log_file,
-            config_path=config_uri, config_file = config_file
+        body = excepthook.please_report_problem_body.format(
+            website='https://bugs.launchpad.net/rapid'
         )
 
         message = '{header}<br><br>{body}'.format(header=header, body=body)
 
-        errorbox = self.standardMessageBox(message=message, rich_text=True, title=title)
-        errorbox.exec_()
+        errorbox = standardMessageBox(
+            message=message, rich_text=True, title=title,
+            standardButtons=QMessageBox.Save | QMessageBox.Cancel,
+            defaultButton=QMessageBox.Save
+        )
+        if errorbox.exec_() == QMessageBox.Save:
+            excepthook.save_bug_report_tar(
+                config_file=self.prefs.settings_path(),
+                full_log_file_path=iplogging.full_log_file_path()
+            )
 
     def doReportProblemAction(self) -> None:
         header = _('Thank you for reporting a problem in Rapid Photo Downloader')
@@ -2686,30 +2690,6 @@ class RapidWindow(QMainWindow):
     def doAboutAction(self) -> None:
         about = AboutDialog(self)
         about.exec()
-
-    def standardMessageBox(self, message: str,
-                           rich_text: bool,
-                           title: Optional[str]=None) -> QMessageBox:
-        """
-        Create a standard messagebox to be displayed to the user
-
-        :param message: the text to display
-        :param rich_text: whether it text to display is in HTML format
-        :param title: optional title for message box, else defaults to 
-         localized 'Rapid Photo Downloader'
-        :return: the message box
-        """
-
-        msgBox = QMessageBox()
-        icon = QIcon(':/rapid-photo-downloader.svg').pixmap(standardIconSize())
-        if title is None:
-            title = _("Rapid Photo Downloader")
-        if rich_text:
-            msgBox.setTextFormat(Qt.RichText)
-        msgBox.setIconPixmap(icon)
-        msgBox.setWindowTitle(title)
-        msgBox.setText(message)
-        return msgBox
 
     @pyqtSlot(bool)
     def thisComputerToggleValueChanged(self, on: bool) -> None:
@@ -2800,9 +2780,9 @@ class RapidWindow(QMainWindow):
                 source_path=make_html_path_non_breaking(self.prefs.this_computer_path)
             )
 
-            msgbox = self.standardMessageBox(message=message, rich_text=True)
-            msgbox.setIcon(QMessageBox.Question)
-            msgbox.setStandardButtons(QMessageBox.Yes|QMessageBox.No)
+            msgbox = standardMessageBox(
+                message=message, rich_text=True, standardButtons=QMessageBox.Yes | QMessageBox.No,
+            )
             if msgbox.exec() == QMessageBox.No:
                 self.thisComputerFSView.goToPath(self.prefs.this_computer_path)
                 return
@@ -2861,8 +2841,10 @@ class RapidWindow(QMainWindow):
         problematic = self.downloadIsRunning()
         if problematic:
             message = _("You cannot change the download destination while downloading.")
-            msgbox = self.standardMessageBox(message=message, rich_text=False)
-            msgbox.setIcon(QMessageBox.Warning)
+            msgbox = standardMessageBox(
+                message=message, rich_text=False, standardButtons=QMessageBox.Ok,
+                iconType=QMessageBox.Warning
+            )
             msgbox.exec()
 
         else:
@@ -2875,9 +2857,10 @@ class RapidWindow(QMainWindow):
             ) % dict(
                 file_type=file_type.name, path=make_html_path_non_breaking(path)
             )
-            msgbox = self.standardMessageBox(message=message, rich_text=True)
-            msgbox.setStandardButtons(QMessageBox.Yes|QMessageBox.No)
-            msgbox.setIcon(QMessageBox.Question)
+            msgbox = standardMessageBox(
+                message=message, rich_text=True,
+                standardButtons=QMessageBox.Yes | QMessageBox.No,
+            )
             problematic = msgbox.exec() == QMessageBox.No
 
         if problematic:
@@ -4272,7 +4255,10 @@ Do you want to proceed with the download?
         # crash.
         # Translators: please do not change HTML codes like <br>, <i>, </i>, or <b>, </b> etc.
         message = "<b>%(title)s</b><br><br>%(details)s" % dict(title=title, details=details)
-        msgBox = self.standardMessageBox(message=message, rich_text=True)
+        msgBox = standardMessageBox(
+            message=message, rich_text=True, standardButtons=QMessageBox.Ok,
+            iconType=QMessageBox.Warning
+        )
         msgBox.exec()
 
     def deviceState(self, scan_id: int) -> DeviceState:
@@ -4966,8 +4952,10 @@ Do you want to proceed with the download?
 
                 # Show the main window if it's not yet visible
                 self.showMainWindow()
-                msgBox = self.standardMessageBox(message=message, rich_text=True)
-                msgBox.setIconPixmap(camera.get_pixmap())
+                msgBox = standardMessageBox(
+                    message=message, rich_text=True, standardButtons=QMessageBox.Ok,
+                    iconPixmap=camera.get_pixmap()
+                )
                 msgBox.exec()
         else:
             # A download was initiated
@@ -5059,7 +5047,6 @@ Do you want to proceed with the download?
         :param on_startup: if True, the scan is occurring during
          the program's startup phase
         """
-
 
         scan_id = self.devices.add_device(device=device, on_startup=on_startup)
         logging.debug("Assigning scan id %s to %s", scan_id, device.name())
@@ -5748,8 +5735,10 @@ Do you want to proceed with the download?
                 "Do you really want to download from here?<br><br>On some systems, scanning this "
                 "location can take a very long time."
             )
-            msgbox = self.standardMessageBox(message=message, rich_text=True)
-            msgbox.setStandardButtons(QMessageBox.Yes|QMessageBox.No)
+            msgbox = standardMessageBox(
+                message=message, rich_text=True,
+                standardButtons=QMessageBox.Yes | QMessageBox.No,
+            )
             return msgbox.exec() == QMessageBox.Yes
         return True
 
@@ -5926,6 +5915,17 @@ class QtSingleApplication(QApplication):
             self.messageReceived.emit(msg)
 
 
+def python_package_source(package: str) -> str:
+    """
+    Return package installation source for Python package
+    :param package: package name
+    :return:
+    """
+
+    pip_install = '(installed using pip)'
+    system_package = '(system package)'
+    return pip_install if installed_using_pip(package) else system_package
+
 def get_versions(file_manager: Optional[str],
                  file_manager_type: Optional[FileManagerType],
                  scaling_action: ScalingAction,
@@ -5942,33 +5942,32 @@ def get_versions(file_manager: Optional[str],
     except Exception:
         total = used = 'unknown'
 
-    try:
-        pip_install = installed_using_pip()
-    except Exception:
-        pip_install = False
+    rpd_pip_install = installed_using_pip('rapid-photo-downloader')
 
     versions = [
         'Rapid Photo Downloader: {}'.format(__about__.__version__),
         'Platform: {}'.format(platform.platform()),
         'Memory: {} used of {}'.format(used, total),
         'Confinement: {}'.format('snap' if is_snap() else 'none'),
-        'Installed using pip: {}'.format('yes' if pip_install else 'no'),
+        'Installed using pip: {}'.format('yes' if rpd_pip_install else 'no'),
         'Python: {}'.format(platform.python_version()),
         'Python executable: {}'.format(sys.executable),
         'Qt: {}'.format(QtCore.QT_VERSION_STR),
-        'PyQt: {}'.format(QtCore.PYQT_VERSION_STR),
+        'PyQt: {} {}'.format(QtCore.PYQT_VERSION_STR, python_package_source('PyQt5')),
         'SIP: {}'.format(sip.SIP_VERSION_STR),
         'ZeroMQ: {}'.format(zmq.zmq_version()),
         'Python ZeroMQ: {} ({} backend)'.format(zmq.pyzmq_version(), pyzmq_backend),
         'gPhoto2: {}'.format(gphoto2_version()),
-        'Python gPhoto2: {}'.format(python_gphoto2_version()),
+        'Python gPhoto2: {} {}'.format(
+            python_gphoto2_version(), python_package_source('gphoto2')
+        ),
         'ExifTool: {}'.format(EXIFTOOL_VERSION),
         'pymediainfo: {}'.format(pymedia_version_info()),
         'GExiv2: {}'.format(gexiv2_version()),
         'Gstreamer: {}'.format(gst_version()),
         'PyGObject: {}'.format('.'.join(map(str, gi.version_info))),
-        'libraw: {}'.format(libraw_version()),
-        'rawkit: {}'.format(rawkit_version()),
+        'libraw: {}'.format(libraw_version() or 'not installed'),
+        'rawkit: {}'.format(rawkit_version() or 'not installed'),
         'psutil: {}'.format('.'.join(map(str, psutil.version_info)))
     ]
     v = exiv2_version()
@@ -5979,7 +5978,8 @@ def get_versions(file_manager: Optional[str],
     except:
         pass
     try:
-        versions.append('Arrow: {}'.format(arrow.__version__))
+        versions.append('Arrow: {} {}'.format(arrow.__version__, python_package_source('arrow')))
+        versions.append('dateutil: {}'.format(dateutil.__version__))
     except AttributeError:
         pass
     try:
@@ -6000,7 +6000,7 @@ def get_versions(file_manager: Optional[str],
         if session.find('wayland') >= 0:
             wayland_platform = os.getenv('QT_QPA_PLATFORM', '')
             if wayland_platform != 'wayland':
-                session = 'wayland desktop (but this application is probably running in XWayland)'
+                session = 'wayland desktop (but this application might be running in XWayland)'
                 break
             else:
                 session = 'wayland desktop (with wayland enabled for this application)'
@@ -6499,7 +6499,7 @@ def main():
     logger = iplogging.setup_main_process_logging(logging_level=logging_level)
 
     logging.info("Rapid Photo Downloader is starting")
-    
+
     if args.photo_renaming:
         photo_rename = args.photo_renaming == 'on'
         if photo_rename:
@@ -6668,6 +6668,29 @@ def main():
     app.setOrganizationDomain("damonlynch.net")
     app.setApplicationName("Rapid Photo Downloader")
     app.setWindowIcon(QIcon(':/rapid-photo-downloader.svg'))
+
+    # Determine the system locale as reported by Qt. Use it to
+    # see if Qt has a base translation available, which allows
+    # automatic translation of QMessageBox buttons
+    try:
+        locale = QLocale.system()
+        if locale:
+            locale_name = locale.name()
+            if not locale_name:
+                logging.debug("Could not determine system locale using Qt")
+            elif locale_name.startswith('en'):
+                # Set module level variable indicating there is no need to translate
+                # the buttons because language is English
+                viewutils.Do_Message_And_Dialog_Box_Button_Translation = False
+            else:
+                qtTranslator = getQtSystemTranslation(locale_name)
+                if qtTranslator:
+                    app.installTranslator(qtTranslator)
+                    # Set module level variable indicating there is no need to translate
+                    # the buttons because Qt does the translation
+                    viewutils.Do_Message_And_Dialog_Box_Button_Translation = False
+    except Exception:
+        logging.error('Error determining locale via Qt')
 
     # darkFusion(app)
     # app.setStyle('Fusion')

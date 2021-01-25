@@ -2,20 +2,19 @@
 --index-url https://pypi.python.org/simple/
 
 psutil>=3.4.2
-gphoto2>=2.2.0
+gphoto2>=1.8.0
 pyzmq>=14.4.1,<=15.1.0; python_version < '3.6'
 pyzmq>=16.0.2; python_version >= '3.6'
 pyxdg>=0.25
-arrow>=0.9.0
-python-dateutil>=2.2
-rawkit>=0.6.0
+arrow>=0.9.0, <1.0; python_version < '3.6'
+arrow>=0.9.0; python_version >= '3.6'
+python-dateutil>=2.7
 PyPrind>=2.9.4
 colorlog>=2.6
-typing>=3.5.0.1; python_version < '3.5'
-scandir>=1.2; python_version < '3.5'
-easygui<=0.97.4
+easygui>=0.98.1
 colour
-pymediainfo>=2.2.0
+pymediainfo>=2.2.0,<=4.3.0; python_version < '3.6'
+pymediainfo>=2.2.0; python_version >= '3.6'
 sortedcontainers
 requests
 tornado

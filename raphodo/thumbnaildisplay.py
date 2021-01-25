@@ -73,6 +73,7 @@ from raphodo.rpdsql import ThumbnailRowsSQL, ThumbnailRow
 from raphodo.viewutils import ThumbnailDataForProximity, scaledIcon
 from raphodo.proximity import TemporalProximityState
 from raphodo.rpdsql import DownloadedSQL
+from raphodo.preferences import Preferences
 
 
 DownloadFiles = namedtuple(
@@ -139,7 +140,7 @@ class ThumbnailListModel(QAbstractListModel):
     def __init__(self, parent, logging_port: int, log_gphoto2: bool) -> None:
         super().__init__(parent)
         self.rapidApp = parent
-        self.prefs = self.rapidApp.prefs
+        self.prefs = self.rapidApp.prefs  # type: Preferences
 
         self.thumbnailer_ready = False
         self.thumbnailer_generation_queue = []
@@ -436,7 +437,9 @@ class ThumbnailListModel(QAbstractListModel):
         elif role == Qt.ToolTipRole:
             devices = self.rapidApp.devices
             if len(devices) > 1:
-                device_name = devices[rpd_file.scan_id].display_name
+                # To account for situations where the device has been removed, use
+                # the display name from the device archive
+                device_name = devices.device_archive[rpd_file.scan_id].name
             else:
                 device_name = ''
             size = format_size_for_user(rpd_file.size)
@@ -1661,8 +1664,11 @@ class ThumbnailListModel(QAbstractListModel):
          file types they will be applied to.
         """
 
-        no_photos = self.tsql.get_count(marked=True, file_type=FileType.photo, job_code=False)
-        no_videos = self.tsql.get_count(marked=True, file_type=FileType.video, job_code=False)
+        no_photos = no_videos = 0
+        if self.prefs.file_type_uses_job_code(FileType.photo):
+            no_photos = self.tsql.get_count(marked=True, file_type=FileType.photo, job_code=False)
+        if self.prefs.file_type_uses_job_code(FileType.video):
+            no_videos = self.tsql.get_count(marked=True, file_type=FileType.video, job_code=False)
 
         f = FileTypeCounter()
         f[FileType.photo] = no_photos

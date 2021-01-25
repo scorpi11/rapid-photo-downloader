@@ -57,7 +57,8 @@ import pwd
 import shutil
 from collections import namedtuple
 from typing import Optional, Tuple, List, Dict, Set
-from urllib.request import pathname2url, quote
+from urllib.request import pathname2url
+from urllib.parse import unquote_plus, quote, urlparse
 from tempfile import NamedTemporaryFile
 
 from PyQt5.QtCore import (QStorageInfo, QObject, pyqtSignal, QFileSystemWatcher, pyqtSlot, QTimer)
@@ -107,12 +108,16 @@ def get_distro_id(id_or_id_like: str) -> Distro:
         return Distro.unknown
 
 
+os_release = '/etc/os-release'
+
+
+# Sync get_distro() with code in install.py
+
 def get_distro() -> Distro:
     """
     Determine the Linux distribution using /etc/os-release
     """
 
-    os_release = '/etc/os-release'
     if os.path.isfile(os_release):
         with open(os_release, 'r') as f:
             for line in f:
@@ -125,8 +130,14 @@ def get_distro() -> Distro:
                         return Distro.opensuse
                     if line.find('Deepin') > 0:
                         return Distro.deepin
+                    if line.find('KDE neon') > 0:
+                        return Distro.neon
                     if line.find('Zorin') > 0:
                         return Distro.zorin
+                    if line.find('Kylin') > 0:
+                        return Distro.kylin
+                    if line.find('Pop!_OS') > 0:
+                        return Distro.popos
                 if line.startswith('ID='):
                     return get_distro_id(line[3:])
                 if line.startswith('ID_LIKE='):
@@ -176,12 +187,12 @@ def get_media_dir() -> str:
         distro = get_distro()
         if os.path.isdir(run_media_dir) and distro not in (
                 Distro.ubuntu, Distro.debian, Distro.neon, Distro.galliumos, Distro.peppermint,
-                Distro.elementary, Distro.zorin):
+                Distro.elementary, Distro.zorin, Distro.popos):
             if distro not in (Distro.fedora, Distro.manjaro, Distro.arch, Distro.opensuse,
-                              Distro.gentoo, Distro.antergos, Distro.centos):
+                              Distro.gentoo, Distro.centos, Distro.centos7):
                 logging.debug(
                     "Detected /run/media directory, but distro does not appear to be CentOS, "
-                    "Fedora, Arch, openSUSE, Gentoo, Korora, Manjaro, or Antergos"
+                    "Fedora, Arch, openSUSE, Gentoo, or Manjaro"
                 )
                 log_os_release()
             return run_media_dir
@@ -428,7 +439,7 @@ def gvfs_controls_mounts() -> bool:
     desktop = get_desktop()
     if desktop in (Desktop.gnome, Desktop.unity, Desktop.cinnamon, Desktop.xfce,
                    Desktop.mate, Desktop.lxde, Desktop.ubuntugnome,
-                   Desktop.popgnome, Desktop.gnome, Desktop.lxqt):
+                   Desktop.popgnome, Desktop.gnome, Desktop.lxqt, Desktop.pantheon):
         return True
     elif desktop == Desktop.kde:
         return False
@@ -451,7 +462,7 @@ def xdg_photos_directory(home_on_failure: bool=True) -> Optional[str]:
     :return: the directory if it is specified, else the user's
     home directory or None
     """
-    return _get_xdg_special_dir(GLib.USER_DIRECTORY_PICTURES, home_on_failure)
+    return _get_xdg_special_dir(GLib.UserDirectory.DIRECTORY_PICTURES, home_on_failure)
 
 
 def xdg_videos_directory(home_on_failure: bool=True) -> str:
@@ -463,7 +474,7 @@ def xdg_videos_directory(home_on_failure: bool=True) -> str:
     :return: the directory if it is specified, else the user's
     home directory or None
     """
-    return _get_xdg_special_dir(GLib.USER_DIRECTORY_VIDEOS, home_on_failure)
+    return _get_xdg_special_dir(GLib.UserDirectory.DIRECTORY_VIDEOS, home_on_failure)
 
 def xdg_desktop_directory(home_on_failure: bool=True) -> str:
     """
@@ -482,7 +493,7 @@ def xdg_photos_identifier() -> str:
     :return: the subfolder name if it is specified, else the localized version of 'Pictures'
     """
 
-    path = _get_xdg_special_dir(GLib.USER_DIRECTORY_PICTURES, home_on_failure=False)
+    path = _get_xdg_special_dir(GLib.UserDirectory.DIRECTORY_PICTURES, home_on_failure=False)
     if path is None:
         # translators: the name of the Pictures folder
         return _('Pictures')
@@ -494,7 +505,7 @@ def xdg_videos_identifier() -> str:
     :return: the subfolder name if it is specified, else the localized version of 'Pictures'
     """
 
-    path = _get_xdg_special_dir(GLib.USER_DIRECTORY_VIDEOS, home_on_failure=False)
+    path = _get_xdg_special_dir(GLib.UserDirectory.DIRECTORY_VIDEOS, home_on_failure=False)
     if path is None:
         # translators: the name of the Videos folder
         return _('Videos')
@@ -675,15 +686,26 @@ def get_default_file_manager() -> Tuple[Optional[str], Optional[FileManagerType]
 
             fm = desktop_entry.getExec()
 
-            # Unhelpful results
-            if fm.startswith('baobab') or fm.startswith('exo-open'):
-                logging.debug('%s returned as default file manager: will substitute', fm)
-                return _default_file_manager_for_desktop()
-
             # Strip away any extraneous arguments
             fm_cmd = fm.split()[0]
             # Strip away any path information
             fm_cmd = os.path.split(fm_cmd)[1]
+            # Strip away any quotes
+            fm_cmd = fm_cmd.replace('"', '')
+            fm_cmd = fm_cmd.replace("'", '')
+
+            # Unhelpful results
+            invalid_file_managers = ('baobab', 'exo-open', 'RawTherapee', 'ART')
+            for invalid_file_manger in invalid_file_managers:
+                if fm_cmd.startswith(invalid_file_manger):
+                    logging.warning('%s is an invalid file manager: will substitute', fm)
+                    return _default_file_manager_for_desktop()
+
+            # Nonexistent file managers
+            if shutil.which(fm_cmd) is None:
+                logging.warning('Default file manager %s does not exist: will substitute', fm)
+                return _default_file_manager_for_desktop()
+
             try:
                 file_manager_type = FileManagerBehavior[fm_cmd]
             except KeyError:
@@ -700,12 +722,26 @@ def get_default_file_manager() -> Tuple[Optional[str], Optional[FileManagerType]
 def open_in_file_manager(file_manager: str,
                          file_manager_type: FileManagerType,
                          uri: str) -> None:
-    if file_manager_type == FileManagerType.select:
-        arg = '--select '
-    elif file_manager_type == FileManagerType.show_item:
-        arg = '--show-item '
-    else:
-        arg = ''
+    """
+    Open a directory or file in the file manager.
+
+    If the item is a file, then try to select it in the file manager,
+    rather than opening it directly.
+
+    :param file_manager: the file manager to use
+    :param file_manager_type: file manager behavior
+    :param uri: the URI (path) to open. Assumes file:// or gphoto2:// schema
+    """
+
+    arg = ''
+    path = unquote_plus(urlparse(uri).path)
+    if not os.path.isdir(path):
+        if file_manager_type == FileManagerType.select:
+            arg = '--select '
+        elif file_manager_type == FileManagerType.show_item:
+            arg = '--show-item '
+        elif file_manager_type == FileManagerType.show_items:
+            arg = '--show-items '
 
     cmd = '{} {}{}'.format(file_manager, arg, uri)
     logging.debug("Launching: %s", cmd)
@@ -1215,11 +1251,16 @@ class UDisks2Monitor(QObject):
         """
 
         object_path = '/org/freedesktop/UDisks2/block_devices/{}'.format(
-            os.path.split(device_path)[1])
+            os.path.split(device_path)[1]
+        )
         obj = self.udisks.get_object(object_path)
-        icon_names = self.get_icon_names(obj)
-        can_eject = self.get_can_eject(obj)
-        return (icon_names, can_eject)
+        if obj is None:
+            icon_names = []
+            can_eject = False
+        else:
+            icon_names = self.get_icon_names(obj)
+            can_eject = self.get_can_eject(obj)
+        return icon_names, can_eject
 
     @pyqtSlot(str)
     def unmount_volume(self, mount_point: str) -> None:
@@ -1620,8 +1661,9 @@ if have_gio:
             device_path = volume.get_identifier(
                 Gio.VOLUME_IDENTIFIER_KIND_UNIX_DEVICE
             )
-
-            if self.unixDevicePathIsCamera(device_path):
+            if device_path is None:
+                logging.error("Unable to determine device path of %s", volume_name)
+            elif self.unixDevicePathIsCamera(device_path):
                 self.camera_volumes_added[device_path] = volume_name
                 logging.debug(
                     "%s is a camera at %s", volume_name, device_path
