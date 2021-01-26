@@ -1,0 +1,20 @@
+From: "Dr. Tobias Quathamer" <toddy@debian.org>
+Date: Tue, 26 Jan 2021 21:54:33 +0100
+Subject: Disable optional rawkit usage
+
+---
+ setup.py | 1 -
+ 1 file changed, 1 deletion(-)
+
+diff --git a/setup.py b/setup.py
+index cc5e682..356c4e3 100644
+--- a/setup.py
++++ b/setup.py
+@@ -263,7 +263,6 @@ setup(
+         'arrow',
+         'python-dateutil',
+         'colour',
+-        'rawkit',
+         'easygui',
+         'pymediainfo',
+         'sortedcontainers',
