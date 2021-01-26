@@ -1,3 +1,10 @@
+rapid-photo-downloader (0.9.26-2) unstable; urgency=medium
+
+  * New patch to disable optional rawkit usage
+  * Convert patches from quilt to git-buildpackage
+
+ -- Dr. Tobias Quathamer <toddy@debian.org>  Tue, 26 Jan 2021 22:22:43 +0100
+
 rapid-photo-downloader (0.9.26-1) unstable; urgency=medium
 
   * New upstream version 0.9.26
