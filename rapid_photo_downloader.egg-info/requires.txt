@@ -1,22 +1,22 @@
-PyGObject
-PyQt5
+gphoto2
+pyzmq
+psutil
+pyxdg
 arrow
-babel
+python-dateutil
 colour
 easygui
-gphoto2
-psutil
 pymediainfo
-python-dateutil
-pyxdg
-pyzmq
-rawkit
 sortedcontainers
 tornado
+PyGObject
+PyQt5
+babel
+setuptools
+show-in-file-manager
 
-[:python_version < "3.5"]
-scandir
-typing
+[:python_version < "3.8"]
+importlib_metadata
 
 [color_ouput]
 colorlog
