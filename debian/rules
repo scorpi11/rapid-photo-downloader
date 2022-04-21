@@ -17,4 +17,4 @@ override_dh_auto_clean:
 	dh_auto_clean
 
 override_dh_installchangelogs:
-	dh_installchangelogs CHANGES.rst
+	dh_installchangelogs CHANGES.md
