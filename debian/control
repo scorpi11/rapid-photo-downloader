@@ -48,7 +48,6 @@ Depends: gir1.2-gexiv2-0.10,
          ${misc:Depends},
          ${python3:Depends},
          ${shlibs:Depends}
-Recommends: libraw-bin
 Description: Photo downloader (importer) from cameras, memory cards, other devices
  Rapid Photo Downloader can be used by both professional and amateur
  photographers to download photos and videos from multiple cameras,
