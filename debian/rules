@@ -18,3 +18,7 @@ override_dh_auto_clean:
 
 override_dh_installchangelogs:
 	dh_installchangelogs CHANGES.md
+
+override_dh_auto_test:
+        # Per developer, there are no unit tests. This is causing errors that shouldn't happen.
+
