@@ -1,3 +1,17 @@
+rapid-photo-downloader (0.9.33-1) unstable; urgency=medium
+
+  * New upstream version 0.9.33
+  * Add Depends: for python3-showinfilemanager
+  * Add Depends: for ifuse and libimobiledevice-utils, needed as of 0.9.29
+  * Remove Recommends: for libraw-bin, as it is not used anymore
+  * Remove 0002-Disable-optional-rawkit-usage.patch, applied upstream
+  * Don't generate analyze-pv-structure.1 as it was removed upstream
+  * Use CHANGES.md, CHANGES.rst was dropped by upstream
+  * Disable dh_auto_test, it causes a build failure
+  * Update debian/copyright
+
+ -- Tino Mettler <tino+debian@tikei.de>  Mon, 25 Apr 2022 22:36:26 +0200
+
 rapid-photo-downloader (0.9.26-2) unstable; urgency=medium
 
   * New patch to disable optional rawkit usage
